@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+body {
+  font-family: var(--font-mono);
+  background: #0a0a0f;
+  color: white;
+}
+
+/* Subtle canvas polish */
+canvas {
+  outline: none;
+}
