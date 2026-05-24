@@ -14,6 +14,7 @@ interface GameActions {
   newGame: (mass?: number) => void;
   startDrag: (faceId: number) => void;
   endDrag: (faceId: number, dragWorld: { x: number; y: number; z: number }) => void;
+  setDragTargetId: (id: number | null) => void;
   updatePhaseIfNeeded: () => void;
   reset: () => void;
 }
@@ -33,6 +34,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   phase: 'main_sequence',
   elementCounts: initialElementCounts(),
   selectedFaceId: null,
+  dragTargetId: null,
   isAnimating: false,
   endState: null,
 
@@ -65,6 +67,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       phase: 'main_sequence',
       elementCounts: initialCounts,
       selectedFaceId: null,
+      dragTargetId: null,
       isAnimating: false,
       endState: null,
       activeSlide: undefined,
@@ -84,11 +87,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   endDrag: async (fromFaceId, dragWorld) => {
     const state = get();
     if (state.isAnimating || state.endState || state.selectedFaceId !== fromFaceId) {
-      set({ selectedFaceId: null });
+      set({ selectedFaceId: null, dragTargetId: null });
       return;
     }
 
-    set({ isAnimating: true, selectedFaceId: null });
+    set({ isAnimating: true, selectedFaceId: null, dragTargetId: null });
 
     try {
       // Execute slide
@@ -106,6 +109,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({
           isAnimating: true,
           selectedFaceId: null,
+          dragTargetId: null,
           tiles: new Map(state.tiles),
           activeSlide: {
             element: tile.element,
@@ -162,8 +166,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
     } catch (e) {
       console.error('Error in endDrag:', e);
-      set({ isAnimating: false, selectedFaceId: null });
+      set({ isAnimating: false, selectedFaceId: null, dragTargetId: null });
     }
+  },
+
+  setDragTargetId: (id) => {
+    set({ dragTargetId: id });
   },
 
   updatePhaseIfNeeded: () => {

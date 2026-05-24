@@ -10,9 +10,48 @@ body {
   font-family: var(--font-mono);
   background: #0a0a0f;
   color: white;
+  touch-action: none; /* Prevent default browser scrolling/gestures on mobile */
+  -webkit-user-select: none; /* Prevent selection overlays */
+  user-select: none;
 }
 
 /* Subtle canvas polish */
 canvas {
   outline: none;
+  touch-action: none; /* Prevent default browser actions on WebGL canvas */
 }
+
+/* Premium Touch Ripple & Drift Animations */
+@keyframes touch-ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes touch-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes particle-drift {
+  0% {
+    transform: translate(-50%, -50%) translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(0.1);
+    opacity: 0;
+  }
+}
+

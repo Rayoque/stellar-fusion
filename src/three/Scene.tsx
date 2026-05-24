@@ -19,7 +19,9 @@ export function Scene() {
       <pointLight position={[8, 8, 8]} intensity={2.0} color="#fff8e7" />
       <pointLight position={[-6, -4, -6]} intensity={0.6} color="#a0c4ff" />
 
-      <Sphere />
+      <React.Suspense fallback={null}>
+        <Sphere />
+      </React.Suspense>
       <Controls />
     </Canvas>
   );

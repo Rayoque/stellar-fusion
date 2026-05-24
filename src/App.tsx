@@ -6,6 +6,7 @@ import { initAudio, startAmbientDrone, playSpawnTick } from './audio/synth';
 import { HUD } from './ui/HUD';
 import { EndScreen } from './ui/EndScreen';
 import { StartScreen } from './ui/StartScreen';
+import { TouchIndicator } from './ui/TouchIndicator';
 
 export default function App() {
   const newGame = useGameStore(s => s.newGame);
@@ -54,6 +55,7 @@ export default function App() {
   return (
     <div className="relative w-full h-screen overflow-hidden bg-[#0a0a0f] text-white font-mono">
       <Scene />
+      <TouchIndicator />
 
       <HUD
         phase={phase}

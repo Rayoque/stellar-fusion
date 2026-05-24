@@ -1,44 +1,54 @@
-# Stellar Fusion — MVP
+# Stellar Fusion
 
-3D sphere-based fusion puzzle game on a truncated icosahedron (soccer ball topology), governed by simplified real stellar nucleosynthesis rules.
+A 3D fusion puzzle game played on the surface of a soccer ball. Slide hydrogen into hydrogen, build helium, then carbon, then heavier elements, all the way to iron. Spiritual successor to 2048, with real stellar nucleosynthesis as the rule set.
 
-Spiritual successor to 2048.
+![Stellar Fusion gameplay](doc/screenshot.png)
 
-## Tech
-- React 19 + TypeScript + Vite
-- Three.js + @react-three/fiber + drei
-- Zustand for state
-- Tailwind
-- Web Audio API (synthesized)
-
-## Run locally
+## Play it
 
 ```bash
+git clone https://github.com/Rayoque/stellar-fusion.git
 cd stellar-fusion
 npm install
 npm run dev
 ```
 
-Then open http://localhost:5173
+Open http://localhost:5173.
 
-## Implementation status (per spec order)
-- [x] Geometry (truncated icosahedron + adjacency) — basic working version; refine with tests
-- [x] R3F rendering + OrbitControls
-- [x] Drag + slide resolution
-- [x] Merge rules (H→He, triple-alpha, alpha chain, Si→Fe)
-- [x] Hydrogen spawn on every move
-- [x] Phase system + visual scale
-- [x] End states
-- [x] Audio (merge swoops, ambient drone, spawn tick)
-- [x] HUD + End screen
-- [ ] Full polish, particles, perfect geometry adjacency (high priority for playtest)
+## How it works
 
-## First-principles notes
-- Iron is immovable by design (slideDistance: 0) — it is the endpoint of fusion.
-- Pentagon CNO shortcut gives early progression.
-- Triangle requirement for triple-alpha creates satisfying regime shift into red giant phase.
-- Every committed drag costs one hydrogen — preserves 2048 pressure.
+The board is a truncated icosahedron: 12 pentagons and 20 hexagons, the same shape as a soccer ball or a C60 buckminsterfullerene molecule. Tiles live on each face. You drag a tile into a neighbor to attempt a fusion. Every committed drag costs one hydrogen, which is also how new hydrogen spawns. That tension is the 2048 pressure loop, transplanted onto a curved surface.
 
-Built following the architecture spec. MVP load-bearing features implemented.
+Fusion rules follow the actual physics, simplified:
 
-Next: Playtest steps 1-7 from spec. Feel-test the core loop.
+- H + H -> He (proton-proton chain)
+- 3 He on a triangle -> C (triple-alpha process, gates the red giant phase)
+- C + He -> O, O + He -> Ne, Ne + He -> Mg, Mg + He -> Si (alpha ladder)
+- Si + Si -> Fe (silicon burning)
+- Pentagons act as CNO catalytic shortcuts for early progression
+- Iron is immovable. It is the endpoint of fusion. Once you make iron, that face is locked.
+
+End states map to real stellar outcomes based on accumulated mass and phase.
+
+## Stack
+
+React 19, TypeScript, Vite, Three.js via @react-three/fiber and drei, Zustand for state, Tailwind for UI, Web Audio API for synthesized sound.
+
+## Design notes
+
+The full architecture spec is in [doc/stellar-fusion-architecture.pdf](doc/stellar-fusion-architecture.pdf).
+
+Core design decisions:
+
+- Iron's `slideDistance: 0` makes it a permanent dead tile. This is the entire reason iron exists as an endpoint in real stars too.
+- The pentagon CNO shortcut gives the player a way out of the early-game grind, mirroring how massive stars use catalytic carbon-nitrogen-oxygen cycles to burn hydrogen faster.
+- The triple-alpha requirement (three He on a triangular neighborhood) creates a clean regime shift. You go from filling the board with helium to reorganizing it. That shift is the red giant phase.
+- One hydrogen per move keeps the board pressured. Without it, the puzzle has no failure state.
+
+## Status
+
+MVP. Playable. Rough edges in geometry adjacency and particle polish. Not yet tuned for difficulty.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

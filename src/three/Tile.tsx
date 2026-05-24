@@ -13,10 +13,19 @@ interface TileProps {
   tile?: TileType;
 }
 
+// Shared temporary vector pools for useFrame culling calculations to avoid per-frame allocations
+const tempWorldCenter = new THREE.Vector3();
+const tempCamDir = new THREE.Vector3();
+
 export function Tile({ face, tile }: TileProps) {
   const startDrag = useGameStore(s => s.startDrag);
   const endDrag = useGameStore(s => s.endDrag);
   const isAnimating = useGameStore(s => s.isAnimating);
+  const selectedFaceId = useGameStore(s => s.selectedFaceId);
+  const dragTargetId = useGameStore(s => s.dragTargetId);
+
+  const isSelected = face.id === selectedFaceId;
+  const isTarget = face.id === dragTargetId;
 
   const element = tile ? ELEMENTS[tile.element] : null;
   const color = element ? element.color : '#334155';
@@ -56,20 +65,55 @@ export function Tile({ face, tile }: TileProps) {
     if (tile) startDrag(face.id);
   };
 
-  const textRef = React.useRef<any>(null);
-
-  React.useEffect(() => {
-    if (textRef.current && face.tangentFrame) {
-      const localNormal = new THREE.Vector3(face.center.x, face.center.y, face.center.z).normalize();
-      const localUp = new THREE.Vector3(face.tangentFrame.v.x, face.tangentFrame.v.y, face.tangentFrame.v.z).normalize();
-      const localRight = new THREE.Vector3().crossVectors(localUp, localNormal).normalize();
-      const m = new THREE.Matrix4().makeBasis(localRight, localUp, localNormal);
-      textRef.current.quaternion.setFromRotationMatrix(m);
+  const textQuaternion = React.useMemo(() => {
+    const localNormal = new THREE.Vector3(face.center.x, face.center.y, face.center.z).normalize();
+    
+    // Choose "up" direction to point towards world-up (0, 1, 0)
+    let localUp = new THREE.Vector3(0, 1, 0);
+    
+    // Project world-up onto the tangent plane: localUp = worldUp - localNormal * (worldUp . localNormal)
+    const dotVal = localUp.dot(localNormal);
+    if (Math.abs(dotVal) > 0.99) {
+      // If we are at the poles, use world-forward (0, 0, -1) as "up"
+      localUp.set(0, 0, -1);
+      // Project world-forward onto the tangent plane
+      const dotVal2 = localUp.dot(localNormal);
+      localUp.sub(localNormal.clone().multiplyScalar(dotVal2)).normalize();
+    } else {
+      localUp.sub(localNormal.clone().multiplyScalar(dotVal)).normalize();
     }
+    
+    const localRight = new THREE.Vector3().crossVectors(localUp, localNormal).normalize();
+    const m = new THREE.Matrix4().makeBasis(localRight, localUp, localNormal);
+    return new THREE.Quaternion().setFromRotationMatrix(m);
   }, [face]);
 
+  const groupRef = React.useRef<THREE.Group>(null);
+
+  useFrame((state) => {
+    if (!groupRef.current) return;
+    
+    // Ensure world matrix is up to date (handling orbit camera rotations and animations)
+    groupRef.current.updateWorldMatrix(true, false);
+    
+    // Get the world position of the face center using shared static pool
+    tempWorldCenter.set(face.center.x, face.center.y, face.center.z);
+    tempWorldCenter.applyMatrix4(groupRef.current.matrixWorld);
+    tempWorldCenter.normalize();
+    
+    // Copy camera position and normalize using shared static pool
+    tempCamDir.copy(state.camera.position).normalize();
+    
+    // Compute dot product with zero object allocations
+    const dot = tempWorldCenter.dot(tempCamDir);
+    
+    // Keep visible slightly past the horizon (threshold -0.2) to avoid popping,
+    // but cull entirely beyond that to prevent any edges/text from clipping.
+    groupRef.current.visible = dot > -0.2;
+  });
+
   return (
-    <group>
+    <group ref={groupRef} scale={isSelected ? [1.06, 1.06, 1.06] : [1, 1, 1]}>
       <mesh
         geometry={geometry}
         onPointerDown={handlePointerDown}
@@ -77,10 +121,16 @@ export function Tile({ face, tile }: TileProps) {
       >
         <meshLambertMaterial 
           color={color} 
-          side={THREE.DoubleSide} 
           flatShading 
+          side={THREE.DoubleSide}
+          transparent={!element}
+          opacity={element ? 1.0 : 0.15}
         />
-        <Edges scale={1} threshold={15} color={element ? "black" : "#1a1e20"} />
+        <Edges 
+          scale={1} 
+          threshold={15} 
+          color={isSelected ? "#38bdf8" : (element ? "black" : "rgba(255, 255, 255, 0.12)")} 
+        />
       </mesh>
 
       {/* Pentagon indicator */}
@@ -90,15 +140,28 @@ export function Tile({ face, tile }: TileProps) {
             color="#ffffff" 
             transparent 
             opacity={0.12} 
-            side={THREE.DoubleSide} 
+            side={THREE.DoubleSide}
           />
+        </mesh>
+      )}
+
+      {/* Drag target indicator overlay */}
+      {isTarget && (
+        <mesh geometry={geometry} scale={1.01}>
+          <meshBasicMaterial 
+            color="#f59e0b" 
+            transparent 
+            opacity={0.25} 
+            side={THREE.DoubleSide}
+          />
+          <Edges scale={1.005} threshold={15} color="#f59e0b" />
         </mesh>
       )}
 
       {/* Element symbol */}
       {element && (
         <Text
-          ref={textRef}
+          quaternion={textQuaternion}
           position={[face.center.x * 1.01, face.center.y * 1.01, face.center.z * 1.01]}
           fontSize={0.25}
           color="#ffffff"

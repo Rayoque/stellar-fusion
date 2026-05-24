@@ -63,6 +63,7 @@ export interface GameState {
 
   // UI state
   selectedFaceId: number | null;
+  dragTargetId: number | null;
   isAnimating: boolean;
   endState: EndState | null;
   activeSlide?: {
