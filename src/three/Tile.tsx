@@ -93,18 +93,15 @@ export function Tile({ face, tile }: TileProps) {
   useFrame((state) => {
     if (!groupRef.current) return;
     
-    // Ensure world matrix is up to date (handling orbit camera rotations and animations)
-    groupRef.current.updateWorldMatrix(true, false);
+    // The sphere is stationary at the origin, and the camera rotates around it using OrbitControls.
+    // Therefore, the world-space direction of the tile is simply its normalized local center vector.
+    // This optimization bypasses manual matrix updates/multiplications for 32 tiles per frame!
+    tempWorldCenter.set(face.center.x, face.center.y, face.center.z).normalize();
     
-    // Get the world position of the face center using shared static pool
-    tempWorldCenter.set(face.center.x, face.center.y, face.center.z);
-    tempWorldCenter.applyMatrix4(groupRef.current.matrixWorld);
-    tempWorldCenter.normalize();
-    
-    // Copy camera position and normalize using shared static pool
+    // Copy camera position and normalize
     tempCamDir.copy(state.camera.position).normalize();
     
-    // Compute dot product with zero object allocations
+    // Compute dot product
     const dot = tempWorldCenter.dot(tempCamDir);
     
     // Keep visible slightly past the horizon (threshold -0.2) to avoid popping,

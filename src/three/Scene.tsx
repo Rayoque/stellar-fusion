@@ -11,7 +11,8 @@ export function Scene() {
     <Canvas
       camera={{ position: [0, 0, 5.5], fov: 48 }}
       style={{ background: '#050508' }}
-      gl={{ antialias: true, alpha: true }}
+      gl={{ antialias: true, alpha: false }} // Disable alpha composition since background is solid
+      dpr={[1, 1.5]} // Clamp DPR to 1.5 to prevent pixel shading bottleneck on high-DPI/4K screens when zoomed in
     >
       <fog attach="fog" args={['#050508', 8.0, 60.0]} />
       <Background />
