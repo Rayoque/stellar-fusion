@@ -13,9 +13,10 @@ export function Controls() {
   const endDrag = useGameStore(s => s.endDrag);
   const setDragTargetId = useGameStore(s => s.setDragTargetId);
   const faces = useGameStore(s => s.faces);
+  const tiles = useGameStore(s => s.tiles);
   const isAnimating = useGameStore(s => s.isAnimating);
-  const selectedFaceId = useGameStore(s => s.selectedFaceId);
 
+  const dragStartFaceId = useRef<number | null>(null);
   const dragStartPos = useRef<THREE.Vector3 | null>(null);
   const [isDraggingTile, setIsDraggingTile] = React.useState(false);
 
@@ -43,38 +44,46 @@ export function Controls() {
         }
       }
 
-      if (hitFaceId !== null) {
-        setIsDraggingTile(true);
+      // Only begin tracking a drag if the clicked face actually has an active tile on it!
+      if (hitFaceId !== null && tiles.has(hitFaceId)) {
+        dragStartFaceId.current = hitFaceId;
         dragStartPos.current = new THREE.Vector3(x, y, 0);
-        startDrag(hitFaceId);
         try {
           dom.setPointerCapture(event.pointerId);
         } catch (err) {}
       } else {
+        dragStartFaceId.current = null;
+        dragStartPos.current = null;
         setIsDraggingTile(false);
       }
     };
 
     const onPointerMove = (event: PointerEvent) => {
-      if (!isDraggingTile || selectedFaceId === null || isAnimating) return;
+      if (dragStartPos.current === null || dragStartFaceId.current === null || isAnimating) return;
 
       const rect = dom.getBoundingClientRect();
       const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-      const deltaX = x - (dragStartPos.current?.x || 0);
-      const deltaY = y - (dragStartPos.current?.y || 0);
+      const deltaX = x - dragStartPos.current.x;
+      const deltaY = y - dragStartPos.current.y;
+      const dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-      // Add a slight deadzone threshold to avoid accidental highlights on immediate touch down
-      if (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < 0.04) {
-        setDragTargetId(null);
-        return;
+      // If we haven't locked into tile dragging yet, check if the swipe threshold is crossed (deliberate swipe)
+      if (!isDraggingTile) {
+        if (dist > 0.08) {
+          setIsDraggingTile(true);
+          startDrag(dragStartFaceId.current);
+        } else {
+          // Otherwise, allow OrbitControls to rotate the sphere
+          return;
+        }
       }
 
       const dragVec = new THREE.Vector3(deltaX, deltaY, 0);
       dragVec.transformDirection(camera.matrixWorld).normalize();
 
-      const fromFace = faces[selectedFaceId];
+      const fromFace = faces[dragStartFaceId.current];
       if (fromFace) {
         const nextId = resolveSlideTarget(fromFace, { x: dragVec.x, y: dragVec.y, z: dragVec.z }, faces);
         setDragTargetId(nextId);
@@ -86,10 +95,17 @@ export function Controls() {
         dom.releasePointerCapture(event.pointerId);
       } catch (err) {}
 
-      if (!isDraggingTile || selectedFaceId === null) {
-        setIsDraggingTile(false);
-        dragStartPos.current = null;
-        setDragTargetId(null);
+      const startFaceId = dragStartFaceId.current;
+      const startPos = dragStartPos.current;
+      const wasDragging = isDraggingTile;
+
+      // Reset states
+      setIsDraggingTile(false);
+      dragStartFaceId.current = null;
+      dragStartPos.current = null;
+      setDragTargetId(null);
+
+      if (!wasDragging || startFaceId === null || startPos === null || isAnimating) {
         return;
       }
 
@@ -97,17 +113,13 @@ export function Controls() {
       const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-      const deltaX = x - (dragStartPos.current?.x || 0);
-      const deltaY = y - (dragStartPos.current?.y || 0);
+      const deltaX = x - startPos.x;
+      const deltaY = y - startPos.y;
 
       const dragVec = new THREE.Vector3(deltaX, deltaY, 0);
       dragVec.transformDirection(camera.matrixWorld).normalize();
 
-      endDrag(selectedFaceId, { x: dragVec.x, y: dragVec.y, z: dragVec.z });
-
-      setIsDraggingTile(false);
-      dragStartPos.current = null;
-      setDragTargetId(null);
+      endDrag(startFaceId, { x: dragVec.x, y: dragVec.y, z: dragVec.z });
     };
 
     dom.addEventListener('pointerdown', onPointerDown);
@@ -121,7 +133,7 @@ export function Controls() {
       dom.removeEventListener('pointerup', onPointerUp);
       dom.removeEventListener('pointercancel', onPointerUp);
     };
-  }, [camera, gl, scene, startDrag, endDrag, setDragTargetId, faces, isAnimating, selectedFaceId, isDraggingTile]);
+  }, [camera, gl, scene, startDrag, endDrag, setDragTargetId, faces, tiles, isAnimating, isDraggingTile]);
 
   return (
     <OrbitControls

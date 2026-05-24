@@ -65,7 +65,7 @@ export function executeSlide(
     if (!currentFace) break;
 
     const nextId = resolveSlideTarget(currentFace, currentDrag, state.faces);
-    if (nextId === null) break;
+    if (nextId === null || path.includes(nextId)) break;
 
     const nextFace = state.faces[nextId];
     const nextTile = state.tiles.get(nextId);

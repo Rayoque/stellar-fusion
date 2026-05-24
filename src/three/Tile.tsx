@@ -61,8 +61,10 @@ export function Tile({ face, tile }: TileProps) {
 
   const handlePointerDown = (e: any) => {
     if (isAnimating) return;
-    e.stopPropagation();
-    if (tile) startDrag(face.id);
+    if (tile) {
+      e.stopPropagation();
+      startDrag(face.id);
+    }
   };
 
   const textQuaternion = React.useMemo(() => {
