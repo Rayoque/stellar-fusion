@@ -83,6 +83,12 @@ export function Controls() {
         }
       }
 
+      // If they drag their finger back to the start shape (dist < 0.08), clear the drag target indicator
+      if (dist < 0.08) {
+        setDragTargetId(null);
+        return;
+      }
+
       const dragVec = new THREE.Vector3(deltaX, deltaY, 0);
       dragVec.transformDirection(camera.matrixWorld).normalize();
 
