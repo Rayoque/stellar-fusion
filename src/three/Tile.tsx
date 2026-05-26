@@ -59,13 +59,54 @@ export function Tile({ face, tile }: TileProps) {
     return geo;
   }, [face.vertices, face.center]);
 
-  const handlePointerDown = (e: any) => {
-    if (isAnimating) return;
-    if (tile) {
-      e.stopPropagation();
-      startDrag(face.id);
+  // Dedicated pentagon geometry that planarly shrinks the indicator,
+  // but lifts it slightly off the tile surface (liftFactor = 1.002) rather
+  // than scaling it towards the origin. This prevents it from intersecting
+  // the star's glowing convective shells and eliminates the "shadow" artifact.
+  const pentagonGeometry = React.useMemo(() => {
+    if (face.shape !== 'pentagon') return null;
+    const verts = face.vertices;
+    if (!verts || verts.length < 3) {
+      return new THREE.BufferGeometry();
     }
-  };
+
+    const positions: number[] = [];
+    const center = face.center;
+
+    // Outer edge is at 0.94 shrinkFactor.
+    // 0.82 makes a beautifully inset, concentric inner pentagon marker.
+    const shrinkFactor = 0.82;
+    const liftFactor = 1.002;
+
+    const liftedCenter = {
+      x: center.x * liftFactor,
+      y: center.y * liftFactor,
+      z: center.z * liftFactor
+    };
+
+    const shrunkVerts = verts.map(v => {
+      const p = lerpVec3(center, v, shrinkFactor);
+      return {
+        x: p.x * liftFactor,
+        y: p.y * liftFactor,
+        z: p.z * liftFactor
+      };
+    });
+
+    for (let i = 0; i < shrunkVerts.length; i++) {
+      const next = (i + 1) % shrunkVerts.length;
+
+      // Triangle fan from lifted center
+      positions.push(liftedCenter.x, liftedCenter.y, liftedCenter.z);
+      positions.push(shrunkVerts[i].x, shrunkVerts[i].y, shrunkVerts[i].z);
+      positions.push(shrunkVerts[next].x, shrunkVerts[next].y, shrunkVerts[next].z);
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }, [face.shape, face.vertices, face.center]);
 
   const textQuaternion = React.useMemo(() => {
     const localNormal = new THREE.Vector3(face.center.x, face.center.y, face.center.z).normalize();
@@ -115,31 +156,35 @@ export function Tile({ face, tile }: TileProps) {
     <group ref={groupRef} scale={isSelected ? [1.06, 1.06, 1.06] : [1, 1, 1]}>
       <mesh
         geometry={geometry}
-        onPointerDown={handlePointerDown}
         userData={{ faceId: face.id }}
       >
-        <meshLambertMaterial 
-          color={color} 
-          flatShading 
-          side={THREE.DoubleSide}
-          transparent={!element}
-          opacity={element ? 1.0 : 0.15}
-        />
+        {element ? (
+          <meshLambertMaterial 
+            color={color} 
+            flatShading 
+            side={THREE.DoubleSide}
+            transparent={false}
+            depthWrite={true}
+          />
+        ) : (
+          <meshBasicMaterial visible={false} />
+        )}
         <Edges 
           scale={1} 
           threshold={15} 
-          color={isSelected ? "#38bdf8" : (element ? "black" : "rgba(255, 255, 255, 0.12)")} 
+          color={isSelected ? "#38bdf8" : (element ? "black" : "rgba(255, 255, 255, 0.08)")} 
         />
       </mesh>
 
       {/* Pentagon indicator */}
-      {face.shape === 'pentagon' && (
-        <mesh geometry={geometry} scale={0.9}>
+      {face.shape === 'pentagon' && pentagonGeometry && (
+        <mesh geometry={pentagonGeometry}>
           <meshBasicMaterial 
             color="#ffffff" 
             transparent 
-            opacity={0.12} 
+            opacity={0.16} 
             side={THREE.DoubleSide}
+            depthWrite={false}
           />
         </mesh>
       )}
@@ -152,6 +197,7 @@ export function Tile({ face, tile }: TileProps) {
             transparent 
             opacity={0.25} 
             side={THREE.DoubleSide}
+            depthWrite={false}
           />
           <Edges scale={1.005} threshold={15} color="#f59e0b" />
         </mesh>

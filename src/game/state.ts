@@ -17,6 +17,8 @@ interface GameActions {
   setDragTargetId: (id: number | null) => void;
   updatePhaseIfNeeded: () => void;
   reset: () => void;
+  setPaused: (paused: boolean) => void;
+  setShowRealtimeGraphics: (show: boolean) => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -37,6 +39,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   dragTargetId: null,
   isAnimating: false,
   endState: null,
+  isPaused: false,
+  showRealtimeGraphics: true,
 
   newGame: (mass) => {
     const starMass = mass ?? (1 + Math.random() * 29); // 1–30 M☉
@@ -72,12 +76,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       endState: null,
       activeSlide: undefined,
       lastMerge: undefined,
+      isPaused: false,
     });
   },
 
   startDrag: (faceId) => {
     const state = get();
-    if (state.isAnimating || state.endState) return;
+    if (state.isAnimating || state.endState || state.isPaused) return;
     const tile = state.tiles.get(faceId);
     if (!tile || ELEMENTS[tile.element].slideDistance === 0) return;
 
@@ -96,7 +101,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     try {
       // Execute slide
       const slideResult = executeSlide(fromFaceId, dragWorld as any, state);
-      const moved = slideResult.path.length > 1 || slideResult.stoppedReason === 'merge';
+      
+      let moved = slideResult.path.length > 1;
+      if (slideResult.stoppedReason === 'merge') {
+        if (slideResult.path.length === 1) {
+          // If we didn't slide through any empty spaces, we only count as moved if a merge is actually valid
+          const tempMergeRule = detectMerge(fromFaceId, state);
+          if (tempMergeRule) {
+            moved = true;
+          }
+        } else {
+          moved = true;
+        }
+      }
       console.log('Slide result:', slideResult, 'moved:', moved);
 
       if (moved) {
@@ -147,6 +164,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // Update phase
         updatePhase(state);
 
+        // Recount elementCounts to keep HUD in sync
+        const newCounts: Record<ElementSymbol, number> = {
+          H: 0, He: 0, C: 0, O: 0, Ne: 0, Mg: 0, Si: 0, Fe: 0
+        };
+        for (const t of state.tiles.values()) {
+          newCounts[t.element]++;
+        }
+        state.elementCounts = newCounts;
+
         // Check end state
         const end = checkEndState(state);
         if (end) {
@@ -184,5 +210,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   reset: () => {
     get().newGame();
+  },
+  setPaused: (paused) => {
+    set({ isPaused: paused });
+  },
+  setShowRealtimeGraphics: (show) => {
+    set({ showRealtimeGraphics: show });
   },
 }));

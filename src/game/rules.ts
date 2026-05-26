@@ -140,6 +140,9 @@ export function applyMerge(rule: MergeRule, landedFaceId: number, state: GameSta
         }
       }
     }
+  } else if (rule.pattern === 'pair' && rule.requiresPentagon) {
+    // Self-fuse on pentagon: only remove the single H
+    toRemove.push(landedFaceId);
   } else if (rule.pattern === 'pair' || rule.pattern === 'pair_alpha') {
     toRemove.push(landedFaceId);
     const [inputA, inputB] = rule.inputs;
@@ -152,9 +155,6 @@ export function applyMerge(rule: MergeRule, landedFaceId: number, state: GameSta
         break;
       }
     }
-  } else if (rule.pattern === 'pair' && rule.requiresPentagon) {
-    // Self-fuse on pentagon: only remove the single H
-    toRemove.push(landedFaceId);
   }
 
   // Remove input tiles

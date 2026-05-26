@@ -78,8 +78,8 @@ export function executeSlide(
 
       // Re-resolve direction from new face (sphere curvature)
       currentDrag = initialDragWorld; // keep original intent or reproject if needed
-    } else if (nextTile.element === element || canMerge(element, nextTile.element)) {
-      // Same element or combinable — potential merge. Stop here; caller will detect & apply.
+    } else if (canMerge(element, nextTile.element) || (element === 'He' && nextTile.element === 'He')) {
+      // Combinable or potential Helium triple-alpha triangle merge. Stop here; caller will detect & apply.
       return { path, stoppedReason: 'merge' };
     } else {
       // Different element or immovable — blocked

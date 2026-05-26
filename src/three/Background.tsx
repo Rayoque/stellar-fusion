@@ -2,9 +2,11 @@
 import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useGameStore } from '../game/state';
 
 export function Background() {
   const pointsRef = useRef<THREE.Points>(null!);
+  const showRealtimeGraphics = useGameStore(s => s.showRealtimeGraphics);
 
   const particles = useMemo(() => {
     const count = 800;
@@ -27,6 +29,8 @@ export function Background() {
       material.opacity = 0.6 + Math.sin(state.clock.elapsedTime * 1.5) * 0.15;
     }
   });
+
+  if (!showRealtimeGraphics) return null;
 
   return (
     <points ref={pointsRef}>

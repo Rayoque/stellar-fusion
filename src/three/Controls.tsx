@@ -19,6 +19,7 @@ export function Controls() {
   const dragStartFaceId = useRef<number | null>(null);
   const dragStartPos = useRef<THREE.Vector3 | null>(null);
   const [isDraggingTile, setIsDraggingTile] = React.useState(false);
+  const [isPointerDownOnTile, setIsPointerDownOnTile] = React.useState(false);
 
   useEffect(() => {
     const dom = gl.domElement;
@@ -48,6 +49,7 @@ export function Controls() {
       if (hitFaceId !== null && tiles.has(hitFaceId)) {
         dragStartFaceId.current = hitFaceId;
         dragStartPos.current = new THREE.Vector3(x, y, 0);
+        setIsPointerDownOnTile(true);
         try {
           dom.setPointerCapture(event.pointerId);
         } catch (err) {}
@@ -55,6 +57,7 @@ export function Controls() {
         dragStartFaceId.current = null;
         dragStartPos.current = null;
         setIsDraggingTile(false);
+        setIsPointerDownOnTile(false);
       }
     };
 
@@ -75,7 +78,7 @@ export function Controls() {
           setIsDraggingTile(true);
           startDrag(dragStartFaceId.current);
         } else {
-          // Otherwise, allow OrbitControls to rotate the sphere
+          // Otherwise, allow OrbitControls to rotate the sphere (blocked immediately by isPointerDownOnTile anyway)
           return;
         }
       }
@@ -101,6 +104,7 @@ export function Controls() {
 
       // Reset states
       setIsDraggingTile(false);
+      setIsPointerDownOnTile(false);
       dragStartFaceId.current = null;
       dragStartPos.current = null;
       setDragTargetId(null);
@@ -115,6 +119,16 @@ export function Controls() {
 
       const deltaX = x - startPos.x;
       const deltaY = y - startPos.y;
+      const dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+      // DELIBERATE SWIPE CANCELLATION CHECK:
+      // If the release position is close to the start touch position (dist < 0.08),
+      // it means the player dragged their finger back over the starting shape.
+      // We cancel the swipe, clear store drag targets, and return early.
+      if (dist < 0.08) {
+        useGameStore.setState({ selectedFaceId: null });
+        return;
+      }
 
       const dragVec = new THREE.Vector3(deltaX, deltaY, 0);
       dragVec.transformDirection(camera.matrixWorld).normalize();
@@ -140,7 +154,7 @@ export function Controls() {
       ref={controlsRef}
       enablePan={false}
       enableZoom={true}
-      enableRotate={!isDraggingTile}
+      enableRotate={!isDraggingTile && !isPointerDownOnTile}
       minDistance={2.5}
       maxDistance={12}
       dampingFactor={0.1}
