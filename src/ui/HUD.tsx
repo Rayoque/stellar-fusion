@@ -85,49 +85,49 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
       <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto" style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
         <div 
           onClick={() => setShowModal(true)}
-          className="flex items-center justify-between glass-pill px-4 h-11 rounded-full cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all select-none gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.35)] border border-white/8"
+          className="flex items-center justify-between glass-pill px-3 md:px-4 h-11 rounded-full cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all select-none gap-2 md:gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.35)] border border-white/8"
           style={{ 
             borderColor: `${currentThemeColor}30`, 
             boxShadow: `0 0 16px ${currentThemeColor}08, inset 0 0 10px ${currentThemeColor}05` 
           }}
           title="Open Stellar Evolution Guide"
         >
-          {/* Desktop Layout (sm:flex hidden) */}
-          <div className="hidden sm:flex items-center gap-4">
-            <div className="flex items-center gap-2.5">
-              <span className="text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
+          {/* Desktop Layout (md:flex hidden with fluid gaps/text on medium-to-large viewports) */}
+          <div className="hidden md:flex items-center gap-2.5 lg:gap-4">
+            <div className="flex items-center gap-1.5 lg:gap-2.5">
+              <span className="text-sm lg:text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
               <div>
-                <div className="text-[7.5px] tracking-[1.5px] text-white/40 leading-none">PHASE</div>
-                <div className="font-semibold tracking-wide text-[10px] leading-tight mt-0.5">{PHASE_LABELS[phase]}</div>
+                <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">PHASE</div>
+                <div className="font-semibold tracking-wide text-[9px] lg:text-[10px] leading-tight mt-0.5 whitespace-nowrap">{PHASE_LABELS[phase]}</div>
               </div>
             </div>
 
             <div className="h-5 w-px bg-white/15" />
 
             <div>
-              <div className="text-[7.5px] tracking-[1.5px] text-white/40 leading-none">MASS</div>
-              <div className="font-mono text-xs mt-0.5 tabular-nums text-white/90">{starMass.toFixed(1)} <span className="text-[8px] text-white/50 align-super">M☉</span></div>
+              <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">MASS</div>
+              <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums text-white/90 whitespace-nowrap">{starMass.toFixed(1)} <span className="text-[7.5px] lg:text-[8px] text-white/50 align-super">M☉</span></div>
             </div>
 
             <div className="h-5 w-px bg-white/15" />
 
             <div>
-              <div className="text-[7.5px] tracking-[1.5px] text-white/40 leading-none">STAR AGE</div>
-              <div className="font-mono text-xs mt-0.5 tabular-nums font-bold" style={{ color: currentThemeColor }}>{ageInfo.formatted}</div>
+              <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">STAR AGE</div>
+              <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums font-bold whitespace-nowrap" style={{ color: currentThemeColor }}>{ageInfo.formatted}</div>
             </div>
 
             <div className="h-5 w-px bg-white/15" />
 
             <div>
-              <div className="text-[7.5px] tracking-[1.5px] text-white/40 leading-none">TURN</div>
-              <div className="font-mono text-xs mt-0.5 tabular-nums text-white/90">
+              <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">TURN</div>
+              <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums text-white/90 whitespace-nowrap">
                 {turn}{maxTurns !== null ? ` / ${maxTurns}` : ''}
               </div>
             </div>
           </div>
 
-          {/* Mobile Layout (flex sm:hidden) */}
-          <div className="flex sm:hidden items-center gap-2 text-[9px] font-mono tracking-wider font-semibold uppercase text-white/80 whitespace-nowrap">
+          {/* Mobile/Compact Layout (flex md:hidden) */}
+          <div className="flex md:hidden items-center gap-2 text-[9px] font-mono tracking-wider font-semibold uppercase text-white/80 whitespace-nowrap">
             <span className="text-[11px] leading-none flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
             <span className="font-bold tracking-widest" style={{ color: currentThemeColor }}>
               {phase === 'main_sequence' ? 'MAIN SEQ' : PHASE_LABELS[phase]}
@@ -149,9 +149,8 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
         )}
       </div>
 
-      {/* Bottom Center: Element inventory dock */}
-      <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto" style={{ bottom: 'calc(2.2rem + env(safe-area-inset-bottom, 0px))' }}>
-        <div className="flex flex-col items-center gap-3.5 pointer-events-none select-none max-w-[95vw] sm:max-w-md md:max-w-xl">
+      <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto" style={{ bottom: 'calc(2.6rem + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="flex flex-col items-center gap-3.5 pointer-events-none select-none max-w-[88vw] sm:max-w-md md:max-w-xl">
           {/* Dynamic Instructions placed directly above the Elements Tray */}
           <div className="text-[9px] sm:text-[10px] opacity-35 tracking-[4px] font-mono uppercase whitespace-nowrap mb-0.5 select-none">
             DRAG TILES TO FUSE • BUILD YOUR STAR

@@ -1,5 +1,4 @@
-// src/ui/StartScreen.tsx
-import React from 'react';
+import React, { useState } from 'react';
 
 interface StartScreenProps {
   onStart: () => void;
@@ -7,6 +6,37 @@ interface StartScreenProps {
 }
 
 export function StartScreen({ onStart, onOpenCampaign }: StartScreenProps) {
+  const [pendingAction, setPendingAction] = useState<'sandbox' | 'campaign' | null>(null);
+
+  const handleSandboxClick = () => {
+    const isFirstTime = localStorage.getItem('stellar_headphones_suggested') !== 'true';
+    if (isFirstTime) {
+      setPendingAction('sandbox');
+    } else {
+      onStart();
+    }
+  };
+
+  const handleCampaignClick = () => {
+    const isFirstTime = localStorage.getItem('stellar_headphones_suggested') !== 'true';
+    if (isFirstTime) {
+      setPendingAction('campaign');
+    } else {
+      onOpenCampaign();
+    }
+  };
+
+  const handleConfirmAudio = () => {
+    localStorage.setItem('stellar_headphones_suggested', 'true');
+    const action = pendingAction;
+    setPendingAction(null);
+    if (action === 'sandbox') {
+      onStart();
+    } else if (action === 'campaign') {
+      onOpenCampaign();
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#050508] text-white overflow-hidden select-none">
       {/* Immersive Breathing Stellar Body Background Glow */}
@@ -28,7 +58,7 @@ export function StartScreen({ onStart, onOpenCampaign }: StartScreenProps) {
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
           <button
-            onClick={onStart}
+            onClick={handleSandboxClick}
             className="group px-8 py-3.5 bg-white text-black hover:bg-white/95 text-xs font-bold tracking-[3px] rounded-full transition-all duration-300 active:scale-[0.96] flex items-center gap-3 shadow-[0_4px_16px_rgba(255,255,255,0.12)] hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] cursor-pointer"
           >
             ENDLESS SANDBOX
@@ -36,7 +66,7 @@ export function StartScreen({ onStart, onOpenCampaign }: StartScreenProps) {
           </button>
 
           <button
-            onClick={onOpenCampaign}
+            onClick={handleCampaignClick}
             className="group px-8 py-3.5 border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs font-bold tracking-[3px] rounded-full transition-all duration-300 active:scale-[0.96] flex items-center gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.3)] cursor-pointer animate-pulse"
           >
             PLAY SCENARIOS
@@ -44,6 +74,36 @@ export function StartScreen({ onStart, onOpenCampaign }: StartScreenProps) {
           </button>
         </div>
       </div>
+
+      {/* Headphones Suggestion Popup Overlay */}
+      {pendingAction !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md">
+          <div 
+            className="border border-white/10 rounded-[32px] p-8 max-w-[290px] sm:max-w-sm w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.6)] relative overflow-hidden animate-fade-in-up isolate"
+            style={{
+              background: 'radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.08), transparent 45%), radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.08), transparent 45%), rgba(15, 15, 19, 0.95)',
+            }}
+          >
+            <div className="relative z-10 flex flex-col items-center">
+              <div className="text-4xl mb-4 select-none animate-float-slow">🎧</div>
+              
+              <div className="uppercase tracking-[3px] text-[7.5px] text-cyan-400 font-bold font-mono mb-2">AUDIO RECOMMENDATION</div>
+              <h2 className="text-lg font-light tracking-[0.12em] mb-3 text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 uppercase">HEADPHONES SUGGESTED</h2>
+              
+              <p className="text-[11px] text-white/40 leading-relaxed font-light mb-7 max-w-[240px]">
+                For the best cosmic experience, wear headphones to feel the deep, breathing ambient star drones and crisp nuclear fusion sound effects.
+              </p>
+
+              <button
+                onClick={handleConfirmAudio}
+                className="w-full py-3 bg-white text-black hover:bg-white/95 rounded-full font-bold tracking-[2px] active:scale-[0.97] transition-all text-xs uppercase shadow-[0_4px_16px_rgba(255,255,255,0.1)] cursor-pointer"
+              >
+                CONTINUE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

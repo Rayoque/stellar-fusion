@@ -8,7 +8,10 @@ let audioCtx: AudioContext | null = null;
 
 export function initAudio(): void {
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    audioCtx = new AudioContextClass({
+      latencyHint: 'interactive'
+    });
   }
   if (audioCtx.state === 'suspended') {
     audioCtx.resume();
