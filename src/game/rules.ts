@@ -142,16 +142,31 @@ export function applyMerge(
   if (rule.pattern === 'triangle') {
     // For triple-alpha, remove the three He (landed + two neighbors in triangle)
     toRemove.push(landedFaceId);
-    // Find the two other He in the triangle
-    const heNeighbors = landedFace.neighbors.filter(nid => {
-      const t = state.tiles.get(nid);
-      return t?.element === 'He';
-    });
-    for (let i = 0; i < heNeighbors.length && toRemove.length < 3; i++) {
-      for (let j = i + 1; j < heNeighbors.length && toRemove.length < 3; j++) {
-        if (state.faces[heNeighbors[i]].neighbors.includes(heNeighbors[j])) {
-          if (!toRemove.includes(heNeighbors[i])) toRemove.push(heNeighbors[i]);
-          if (!toRemove.includes(heNeighbors[j])) toRemove.push(heNeighbors[j]);
+    if (overrideOutputFaceId !== undefined) {
+      toRemove.push(overrideOutputFaceId);
+      const destFace = state.faces[overrideOutputFaceId];
+      if (destFace) {
+        const thirdHeId = landedFace.neighbors.find(nid => 
+          nid !== overrideOutputFaceId &&
+          destFace.neighbors.includes(nid) &&
+          state.tiles.get(nid)?.element === 'He'
+        );
+        if (thirdHeId !== undefined) {
+          toRemove.push(thirdHeId);
+        }
+      }
+    } else {
+      // Find the two other He in the triangle
+      const heNeighbors = landedFace.neighbors.filter(nid => {
+        const t = state.tiles.get(nid);
+        return t?.element === 'He';
+      });
+      for (let i = 0; i < heNeighbors.length && toRemove.length < 3; i++) {
+        for (let j = i + 1; j < heNeighbors.length && toRemove.length < 3; j++) {
+          if (state.faces[heNeighbors[i]].neighbors.includes(heNeighbors[j])) {
+            if (!toRemove.includes(heNeighbors[i])) toRemove.push(heNeighbors[i]);
+            if (!toRemove.includes(heNeighbors[j])) toRemove.push(heNeighbors[j]);
+          }
         }
       }
     }
@@ -160,14 +175,20 @@ export function applyMerge(
     toRemove.push(landedFaceId);
   } else if (rule.pattern === 'pair' || rule.pattern === 'pair_alpha') {
     toRemove.push(landedFaceId);
-    const [inputA, inputB] = rule.inputs;
-    const otherInput = inputA === state.tiles.get(landedFaceId)!.element ? inputB : inputA;
+    if (overrideOutputFaceId !== undefined) {
+      toRemove.push(overrideOutputFaceId);
+    } else {
+      const [inputA, inputB] = rule.inputs;
+      const currentTile = state.tiles.get(landedFaceId);
+      const currentElement = currentTile ? currentTile.element : inputA;
+      const otherInput = inputA === currentElement ? inputB : inputA;
 
-    for (const nid of landedFace.neighbors) {
-      const nt = state.tiles.get(nid);
-      if (nt && nt.element === otherInput) {
-        toRemove.push(nid);
-        break;
+      for (const nid of landedFace.neighbors) {
+        const nt = state.tiles.get(nid);
+        if (nt && nt.element === otherInput) {
+          toRemove.push(nid);
+          break;
+        }
       }
     }
   }

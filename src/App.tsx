@@ -40,15 +40,22 @@ export default function App() {
     const handleFirstInteraction = () => {
       initAudio();
       startAmbientDrone();
-      window.removeEventListener('click', handleFirstInteraction);
-      window.removeEventListener('keydown', handleFirstInteraction);
+      
+      const events = ['click', 'keydown', 'touchstart', 'touchend', 'pointerdown', 'pointerup'];
+      for (const ev of events) {
+        window.removeEventListener(ev, handleFirstInteraction);
+      }
     };
-    window.addEventListener('click', handleFirstInteraction, { once: true });
-    window.addEventListener('keydown', handleFirstInteraction, { once: true });
+
+    const events = ['click', 'keydown', 'touchstart', 'touchend', 'pointerdown', 'pointerup'];
+    for (const ev of events) {
+      window.addEventListener(ev, handleFirstInteraction, { once: true });
+    }
 
     return () => {
-      window.removeEventListener('click', handleFirstInteraction);
-      window.removeEventListener('keydown', handleFirstInteraction);
+      for (const ev of events) {
+        window.removeEventListener(ev, handleFirstInteraction);
+      }
     };
   }, []);
 
