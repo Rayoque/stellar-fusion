@@ -9,9 +9,10 @@ import { checkEndState } from './endgame';
 import { detectMerge, applyMerge } from './rules';
 import { executeSlide } from '../geometry/slide';
 import { playMerge, playBlocked } from '../audio/synth';
+import { LEVELS } from './levels';
 
 interface GameActions {
-  newGame: (mass?: number) => void;
+  newGame: (mass?: number, levelId?: number) => void;
   startDrag: (faceId: number) => void;
   endDrag: (faceId: number, dragWorld: { x: number; y: number; z: number }) => void;
   setDragTargetId: (id: number | null) => void;
@@ -41,6 +42,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     supergiant: null,
     collapse: null,
   },
+
+  // Campaign initial states loaded from localStorage
+  currentLevelId: null,
+  completedLevels: JSON.parse(localStorage.getItem('stellar_completed_levels') || '[]'),
+  levelObjectiveMet: false,
+  levelFailed: false,
+
   selectedFaceId: null,
   dragTargetId: null,
   isAnimating: false,
@@ -48,22 +56,38 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isPaused: false,
   showRealtimeGraphics: true,
 
-  newGame: (mass) => {
-    const starMass = mass ?? (1 + Math.random() * 29); // 1–30 M☉
+  newGame: (mass, levelId) => {
     const faces = generateTruncatedIcosahedron();
-
+    let starMass = mass ?? (1 + Math.random() * 29); // 1–30 M☉
     const initialTiles = new Map<number, Tile>();
-    // Spawn initial ~5 hydrogens
-    const emptyIndices = faces.map((_, i) => i);
-    for (let i = 0; i < 5 && emptyIndices.length > 0; i++) {
-      const idx = Math.floor(Math.random() * emptyIndices.length);
-      const faceId = emptyIndices[idx];
-      initialTiles.set(faceId, {
-        faceId,
-        element: 'H' as ElementSymbol,
-        spawnedAtTurn: 0,
-      });
-      emptyIndices.splice(idx, 1);
+    let currentLevelId: number | null = null;
+
+    if (levelId !== undefined) {
+      const level = LEVELS.find(l => l.id === levelId);
+      if (level) {
+        currentLevelId = levelId;
+        starMass = level.starMass;
+        for (const t of level.initialTiles) {
+          initialTiles.set(t.faceId, {
+            faceId: t.faceId,
+            element: t.element,
+            spawnedAtTurn: 0,
+          });
+        }
+      }
+    } else {
+      // Spawn initial ~5 hydrogens
+      const emptyIndices = faces.map((_, i) => i);
+      for (let i = 0; i < 5 && emptyIndices.length > 0; i++) {
+        const idx = Math.floor(Math.random() * emptyIndices.length);
+        const faceId = emptyIndices[idx];
+        initialTiles.set(faceId, {
+          faceId,
+          element: 'H' as ElementSymbol,
+          spawnedAtTurn: 0,
+        });
+        emptyIndices.splice(idx, 1);
+      }
     }
 
     const initialCounts = initialElementCounts();
@@ -82,6 +106,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         supergiant: null,
         collapse: null,
       },
+      currentLevelId,
+      levelObjectiveMet: false,
+      levelFailed: false,
       selectedFaceId: null,
       dragTargetId: null,
       isAnimating: false,
@@ -114,6 +141,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ isAnimating: true, selectedFaceId: null, dragTargetId: null });
 
     try {
+      let levelObjectiveMet = false;
+      let levelFailed = false;
       // Execute slide
       const slideResult = executeSlide(fromFaceId, dragWorld as any, state);
       
@@ -210,10 +239,64 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
         state.elementCounts = newCounts;
 
-        // Check end state
+        // Check Campaign Scenario Objectives
+        levelObjectiveMet = false;
+        levelFailed = false;
+
+        if (state.currentLevelId !== null) {
+          const level = LEVELS.find(l => l.id === state.currentLevelId);
+          if (level) {
+            let allObjectivesMet = true;
+            for (const obj of level.objectives) {
+              if (obj.type === 'has_element') {
+                if ((state.elementCounts[obj.element!] || 0) < (obj.count || 1)) {
+                  allObjectivesMet = false;
+                }
+              } else if (obj.type === 'has_element_on_pentagon') {
+                const met = Array.from(state.tiles.values()).some(t => {
+                  const face = state.faces[t.faceId];
+                  return t.element === obj.element && face && face.shape === 'pentagon';
+                });
+                if (!met) allObjectivesMet = false;
+              } else if (obj.type === 'has_element_count') {
+                if ((state.elementCounts[obj.element!] || 0) < (obj.count || 1)) {
+                  allObjectivesMet = false;
+                }
+              } else if (obj.type === 'has_all_elements') {
+                const allUnlocked = Object.values(state.elementCounts).every(c => c > 0);
+                if (!allUnlocked) allObjectivesMet = false;
+              }
+            }
+
+            if (allObjectivesMet) {
+              levelObjectiveMet = true;
+              const currentCompleted = get().completedLevels;
+              if (!currentCompleted.includes(level.id)) {
+                const nextCompleted = [...currentCompleted, level.id];
+                localStorage.setItem('stellar_completed_levels', JSON.stringify(nextCompleted));
+                set({ completedLevels: nextCompleted });
+              }
+            } else if (state.turn >= level.maxTurns) {
+              levelFailed = true;
+            }
+          }
+        }
+
+        // Check end state (standard jammed or collapse)
         const end = checkEndState(state);
         if (end) {
-          set({ endState: end, isAnimating: false, activeSlide: undefined, tiles: new Map(state.tiles) });
+          // If in campaign mode and objectives aren't met, a jammed board means failure
+          if (state.currentLevelId !== null && !levelObjectiveMet) {
+            levelFailed = true;
+          }
+          set({ 
+            endState: end, 
+            levelObjectiveMet,
+            levelFailed,
+            isAnimating: false, 
+            activeSlide: undefined, 
+            tiles: new Map(state.tiles) 
+          });
           return;
         }
       } else {
@@ -242,6 +325,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         turn: state.turn,
         phase: state.phase,
         elementCounts: { ...state.elementCounts },
+        levelObjectiveMet,
+        levelFailed,
         isAnimating: false,
         activeSlide: undefined,
         lastMerge: state.lastMerge,

@@ -67,6 +67,12 @@ export interface GameState {
     collapse: number | null;
   };
 
+  // Campaign state
+  currentLevelId: number | null;  // null = endless sandbox mode
+  completedLevels: number[];      // list of completed level IDs
+  levelObjectiveMet: boolean;
+  levelFailed: boolean;
+
   // UI state
   selectedFaceId: number | null;
   dragTargetId: number | null;
