@@ -8,6 +8,10 @@ import { EndScreen } from './ui/EndScreen';
 import { StartScreen } from './ui/StartScreen';
 import { TouchIndicator } from './ui/TouchIndicator';
 import { PauseMenu } from './ui/PauseMenu';
+import { CampaignSelector } from './ui/CampaignSelector';
+import { Codex } from './ui/Codex';
+import { CampaignStatusOverlay } from './ui/CampaignStatusOverlay';
+import { ELEMENTS } from './game/elements';
 
 export default function App() {
   const newGame = useGameStore(s => s.newGame);
@@ -16,11 +20,20 @@ export default function App() {
   const starMass = useGameStore(s => s.starMass);
   const turn = useGameStore(s => s.turn);
   const elementCounts = useGameStore(s => s.elementCounts);
-  const isAnimating = useGameStore(s => s.isAnimating);
   const isPaused = useGameStore(s => s.isPaused);
   const setPaused = useGameStore(s => s.setPaused);
 
+  // Campaign state bindings
+  const currentLevelId = useGameStore(s => s.currentLevelId);
+  const levelObjectiveMet = useGameStore(s => s.levelObjectiveMet);
+  const levelFailed = useGameStore(s => s.levelFailed);
+  const activeToastElement = useGameStore(s => s.activeToastElement);
+  const dismissToast = useGameStore(s => s.dismissToast);
+
+  // UI state variables
   const [showStart, setShowStart] = React.useState(true);
+  const [showCampaign, setShowCampaign] = React.useState(false);
+  const [showCodex, setShowCodex] = React.useState(false);
 
   useEffect(() => {
     // Initialize audio on first interaction
@@ -38,6 +51,16 @@ export default function App() {
       window.removeEventListener('keydown', handleFirstInteraction);
     };
   }, []);
+
+  // Auto-dismiss the Codex toast after 4.5 seconds
+  useEffect(() => {
+    if (activeToastElement) {
+      const timer = setTimeout(() => {
+        dismissToast();
+      }, 4500);
+      return () => clearTimeout(timer);
+    }
+  }, [activeToastElement, dismissToast]);
 
   const handleStart = () => {
     newGame();
@@ -57,8 +80,40 @@ export default function App() {
     newGame();
   };
 
+  const handleLaunchLevel = (levelId: number) => {
+    newGame(undefined, levelId);
+    setShowCampaign(false);
+    setShowStart(false);
+    setTimeout(() => playSpawnTick(), 120);
+  };
+
+  const handleRetryLevel = () => {
+    if (currentLevelId !== null) {
+      newGame(undefined, currentLevelId);
+    }
+  };
+
+  const handleNextLevel = () => {
+    if (currentLevelId !== null && currentLevelId < 10) {
+      newGame(undefined, currentLevelId + 1);
+    }
+  };
+
   if (showStart) {
-    return <StartScreen onStart={handleStart} />;
+    return (
+      <>
+        <StartScreen 
+          onStart={handleStart} 
+          onOpenCampaign={() => setShowCampaign(true)} 
+        />
+        {showCampaign && (
+          <CampaignSelector
+            onClose={() => setShowCampaign(false)}
+            onSelectLevel={handleLaunchLevel}
+          />
+        )}
+      </>
+    );
   }
 
   return (
@@ -72,9 +127,11 @@ export default function App() {
         turn={turn}
         elementCounts={elementCounts}
         onOpenMenu={() => setPaused(true)}
+        onOpenCodex={() => setShowCodex(true)}
       />
 
-      {endState && (
+      {/* Standard Sandbox End Screen */}
+      {endState && currentLevelId === null && (
         <EndScreen
           endState={endState}
           starMass={starMass}
@@ -83,11 +140,56 @@ export default function App() {
         />
       )}
 
+      {/* Pause Menu Overlay */}
       {isPaused && (
         <PauseMenu
           onResume={() => setPaused(false)}
           onMainMenu={handleMainMenu}
+          onOpenCampaign={() => setShowCampaign(true)}
+          onOpenCodex={() => setShowCodex(true)}
         />
+      )}
+
+      {/* Campaign Scenarios Level Selector Modal */}
+      {showCampaign && (
+        <CampaignSelector
+          onClose={() => setShowCampaign(false)}
+          onSelectLevel={handleLaunchLevel}
+        />
+      )}
+
+      {/* Stellar Codex Journal Modal */}
+      {showCodex && (
+        <Codex
+          onClose={() => setShowCodex(false)}
+        />
+      )}
+
+      {/* Campaign Success & Defeat Overlay Screens */}
+      {currentLevelId !== null && (levelObjectiveMet || levelFailed) && (
+        <CampaignStatusOverlay
+          levelId={currentLevelId}
+          status={levelObjectiveMet ? 'win' : 'fail'}
+          onNextLevel={currentLevelId < 10 ? handleNextLevel : undefined}
+          onRetry={handleRetryLevel}
+          onBackToCampaign={() => setShowCampaign(true)}
+        />
+      )}
+
+      {/* Subtle discovery dynamic toast notification */}
+      {activeToastElement && (
+        <div 
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-50 glass-pill px-5 py-2.5 rounded-full border border-cyan-500/20 text-cyan-400 font-bold tracking-[3px] text-[8.5px] sm:text-[9.5px] shadow-[0_0_20px_rgba(34,211,238,0.15)] flex items-center gap-2.5 uppercase font-mono pointer-events-auto cursor-pointer select-none animate-fade-in-up"
+          onClick={() => {
+            dismissToast();
+            setShowCodex(true);
+          }}
+          title="Click to view Codex Journal log"
+        >
+          <span className="text-xs">✦</span>
+          <span>NEW ELEMENT SYNTHESIZED: {ELEMENTS[activeToastElement].displayName}</span>
+          <span className="text-xs">✦</span>
+        </div>
       )}
 
       {/* Subtle instructions */}

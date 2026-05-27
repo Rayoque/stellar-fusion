@@ -72,6 +72,8 @@ export interface GameState {
   completedLevels: number[];      // list of completed level IDs
   levelObjectiveMet: boolean;
   levelFailed: boolean;
+  unlockedElements: ElementSymbol[]; // elements discovered across all plays
+  activeToastElement: ElementSymbol | null; // currently showing toast notification
 
   // UI state
   selectedFaceId: number | null;

@@ -3,9 +3,10 @@ import React from 'react';
 
 interface StartScreenProps {
   onStart: () => void;
+  onOpenCampaign: () => void;
 }
 
-export function StartScreen({ onStart }: StartScreenProps) {
+export function StartScreen({ onStart, onOpenCampaign }: StartScreenProps) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#050508] text-white overflow-hidden select-none">
       {/* Immersive Breathing Stellar Body Background Glow */}
@@ -25,13 +26,23 @@ export function StartScreen({ onStart }: StartScreenProps) {
           Drag elements across a soccer-ball star.<br />Fuse according to real stellar physics.
         </p>
 
-        <button
-          onClick={onStart}
-          className="group px-8 py-3.5 border border-white/15 bg-white/5 hover:bg-white text-white hover:text-black text-xs font-bold tracking-[3px] rounded-full transition-all duration-300 active:scale-[0.96] flex items-center gap-3 mx-auto shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_0_20px_rgba(255,255,255,0.12)] cursor-pointer"
-        >
-          BEGIN FUSION
-          <span className="group-hover:translate-x-0.5 transition duration-200">→</span>
-        </button>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <button
+            onClick={onStart}
+            className="group px-8 py-3.5 bg-white text-black hover:bg-white/95 text-xs font-bold tracking-[3px] rounded-full transition-all duration-300 active:scale-[0.96] flex items-center gap-3 shadow-[0_4px_16px_rgba(255,255,255,0.12)] hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] cursor-pointer"
+          >
+            ENDLESS SANDBOX
+            <span className="group-hover:translate-x-0.5 transition duration-200">→</span>
+          </button>
+
+          <button
+            onClick={onOpenCampaign}
+            className="group px-8 py-3.5 border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs font-bold tracking-[3px] rounded-full transition-all duration-300 active:scale-[0.96] flex items-center gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.3)] cursor-pointer animate-pulse"
+          >
+            PLAY SCENARIOS
+            <span className="text-[10px] select-none">✦</span>
+          </button>
+        </div>
 
         <div className="mt-20 text-[7.5px] sm:text-[8px] text-white/25 tracking-[4px] font-mono uppercase whitespace-nowrap">
           Truncated Icosahedron • 8 Elements • Fusion Rules

@@ -5,9 +5,11 @@ import { useGameStore } from '../game/state';
 interface PauseMenuProps {
   onResume: () => void;
   onMainMenu: () => void;
+  onOpenCampaign: () => void;
+  onOpenCodex: () => void;
 }
 
-export function PauseMenu({ onResume, onMainMenu }: PauseMenuProps) {
+export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }: PauseMenuProps) {
   const reset = useGameStore(s => s.reset);
   const showRealtimeGraphics = useGameStore(s => s.showRealtimeGraphics);
   const setShowRealtimeGraphics = useGameStore(s => s.setShowRealtimeGraphics);
@@ -40,6 +42,26 @@ export function PauseMenu({ onResume, onMainMenu }: PauseMenuProps) {
               className="w-full py-3 bg-white text-black rounded-full font-bold tracking-[1.5px] hover:bg-white/95 active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-xs uppercase shadow-[0_4px_16px_rgba(255,255,255,0.1)] cursor-pointer"
             >
               RESUME FUSION
+            </button>
+
+            <button
+              onClick={() => {
+                onOpenCampaign();
+                onResume();
+              }}
+              className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-full font-semibold tracking-[1.5px] hover:bg-white/10 active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-xs uppercase cursor-pointer mt-3"
+            >
+              STELLAR CAMPAIGN
+            </button>
+
+            <button
+              onClick={() => {
+                onOpenCodex();
+                onResume();
+              }}
+              className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-full font-semibold tracking-[1.5px] hover:bg-white/10 active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-xs uppercase cursor-pointer mt-3"
+            >
+              STELLAR CODEX
             </button>
 
             <button

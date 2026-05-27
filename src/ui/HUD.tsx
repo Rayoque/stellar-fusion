@@ -4,6 +4,7 @@ import type { Phase, ElementSymbol } from '../game/types';
 import { ELEMENTS } from '../game/elements';
 import { useGameStore } from '../game/state';
 import { getStarAgeInfo } from '../game/phases';
+import { LEVELS } from '../game/levels';
 
 interface HUDProps {
   phase: Phase;
@@ -11,6 +12,7 @@ interface HUDProps {
   turn: number;
   elementCounts: Record<ElementSymbol, number>;
   onOpenMenu: () => void;
+  onOpenCodex: () => void;
 }
 
 const PHASE_ICONS: Record<Phase, string> = {
@@ -34,10 +36,15 @@ const PHASE_COLORS: Record<Phase, string> = {
   collapse: '#a855f7',      // Purple
 };
 
-export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu }: HUDProps) {
+export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCodex }: HUDProps) {
   const state = useGameStore();
   const ageInfo = getStarAgeInfo(state);
   const [showModal, setShowModal] = React.useState(false);
+
+  // Campaign support
+  const currentLevelId = useGameStore(s => s.currentLevelId);
+  const level = currentLevelId !== null ? LEVELS.find(l => l.id === currentLevelId) : null;
+  const maxTurns = level ? level.maxTurns : null;
 
   // Dynamic astrophysics ages based on stellar mass: T_MS = 10 / M^2.5 Billion Years
   const tMS = 10 / Math.pow(starMass, 2.5);
@@ -69,8 +76,8 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu }: HUDPro
         </button>
       </div>
 
-      {/* Top Center: HUD Horizontal Stats Pill */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto">
+      {/* Top Center: HUD Horizontal Stats Pill & Scenario Objective Banner */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto">
         <div 
           onClick={() => setShowModal(true)}
           className="flex items-center justify-between glass-pill px-4 py-2 rounded-full cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all select-none gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.35)] border border-white/8"
@@ -108,7 +115,9 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu }: HUDPro
 
             <div>
               <div className="text-[7.5px] tracking-[1.5px] text-white/40 leading-none">TURN</div>
-              <div className="font-mono text-xs mt-0.5 tabular-nums text-white/90">{turn}</div>
+              <div className="font-mono text-xs mt-0.5 tabular-nums text-white/90">
+                {turn}{maxTurns !== null ? ` / ${maxTurns}` : ''}
+              </div>
             </div>
           </div>
 
@@ -123,9 +132,16 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu }: HUDPro
             <span className="opacity-25">•</span>
             <span className="font-bold" style={{ color: currentThemeColor }}>{ageInfo.formatted.replace(' Years', 'Y')}</span>
             <span className="opacity-25">•</span>
-            <span className="text-white">T{turn}</span>
+            <span className="text-white">T{turn}{maxTurns !== null ? `/${maxTurns}` : ''}</span>
           </div>
         </div>
+
+        {/* Campaign Objective Floating Secondary Banner */}
+        {level && (
+          <div className="glass-pill px-3 py-1 rounded-full text-[7.5px] font-mono tracking-widest text-cyan-300 font-bold uppercase whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.3)] border border-cyan-500/15 animate-fade-in-up">
+            Objective: {level.objectives[0].type === 'has_element' ? `Synthesize ${level.objectives[0].element}` : level.title}
+          </div>
+        )}
       </div>
 
       {/* Bottom Center: Element inventory dock */}
@@ -179,6 +195,18 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu }: HUDPro
                 );
               }
             })}
+
+            {/* Subtle Divider before Codex Button */}
+            <div className="w-px h-6 bg-white/10 self-center" />
+
+            {/* Codex Circular shortcut button */}
+            <button
+              onClick={onOpenCodex}
+              className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] cursor-pointer"
+              title="Open Stellar Codex Journal"
+            >
+              <span className="text-sm select-none">📔</span>
+            </button>
           </div>
         </div>
       </div>

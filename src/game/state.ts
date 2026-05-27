@@ -20,6 +20,7 @@ interface GameActions {
   reset: () => void;
   setPaused: (paused: boolean) => void;
   setShowRealtimeGraphics: (show: boolean) => void;
+  dismissToast: () => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -48,6 +49,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   completedLevels: JSON.parse(localStorage.getItem('stellar_completed_levels') || '[]'),
   levelObjectiveMet: false,
   levelFailed: false,
+  unlockedElements: JSON.parse(localStorage.getItem('stellar_unlocked_elements') || '["H", "He"]'),
+  activeToastElement: null,
 
   selectedFaceId: null,
   dragTargetId: null,
@@ -55,6 +58,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   endState: null,
   isPaused: false,
   showRealtimeGraphics: true,
+
+  dismissToast: () => {
+    set({ activeToastElement: null });
+  },
 
   newGame: (mass, levelId) => {
     const faces = generateTruncatedIcosahedron();
@@ -143,6 +150,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     try {
       let levelObjectiveMet = false;
       let levelFailed = false;
+      let activeToastElement: ElementSymbol | null = null;
       // Execute slide
       const slideResult = executeSlide(fromFaceId, dragWorld as any, state);
       
@@ -239,6 +247,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
         state.elementCounts = newCounts;
 
+        // Check and unlock new elements in Codex
+        const currentUnlocked = get().unlockedElements;
+        const nextUnlocked = [...currentUnlocked];
+        activeToastElement = null;
+        let changedUnlocked = false;
+
+        for (const sym of Object.keys(newCounts) as ElementSymbol[]) {
+          if (newCounts[sym] > 0 && !nextUnlocked.includes(sym)) {
+            nextUnlocked.push(sym);
+            activeToastElement = sym; // trigger toast notification
+            changedUnlocked = true;
+          }
+        }
+
+        if (changedUnlocked) {
+          localStorage.setItem('stellar_unlocked_elements', JSON.stringify(nextUnlocked));
+          set({ unlockedElements: nextUnlocked });
+        }
+
         // Check Campaign Scenario Objectives
         levelObjectiveMet = false;
         levelFailed = false;
@@ -327,6 +354,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         elementCounts: { ...state.elementCounts },
         levelObjectiveMet,
         levelFailed,
+        activeToastElement,
         isAnimating: false,
         activeSlide: undefined,
         lastMerge: state.lastMerge,
