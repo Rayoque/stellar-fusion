@@ -172,7 +172,11 @@ export default function App() {
           status={levelObjectiveMet ? 'win' : 'fail'}
           onNextLevel={currentLevelId < 10 ? handleNextLevel : undefined}
           onRetry={handleRetryLevel}
-          onBackToCampaign={() => setShowCampaign(true)}
+          onBackToCampaign={() => {
+            newGame();
+            setShowStart(true);
+            setShowCampaign(true);
+          }}
         />
       )}
 

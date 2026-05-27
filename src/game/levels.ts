@@ -179,7 +179,7 @@ export const LEVELS: Level[] = [
     author: "The Grand Finale",
     description: "Maintain complete chemical balance in a highly convective star. You must unlock and possess all 8 stable elements on the board simultaneously before any core collapse occurs.",
     starMass: 20.0,
-    maxTurns: 25,
+    maxTurns: 70,
     initialTiles: [
       { faceId: 3, element: 'C' },
       { faceId: 14, element: 'H' },
