@@ -179,3 +179,40 @@ export function stopAmbientDrone(): void {
   if (ambientOsc4) ambientOsc4.stop();
   ambientOsc1 = ambientOsc2 = ambientOsc3 = ambientOsc4 = ambientGain = null;
 }
+
+/**
+ * Programmatically generates a binary-perfect 1-second silent WAV file Blob URL.
+ * Bypasses data URI decoder restrictions in mobile Safari, enabling seamless ringer bypass.
+ */
+export function createSilentWavUrl(): string {
+  const sampleRate = 8000;
+  const numSamples = 8000; // 1 second of silence
+  const buffer = new ArrayBuffer(44 + numSamples);
+  const view = new DataView(buffer);
+
+  // RIFF Chunk Descriptor
+  view.setUint32(0, 0x52494646, false); // "RIFF"
+  view.setUint32(4, 36 + numSamples, true);
+  view.setUint32(8, 0x57415645, false); // "WAVE"
+
+  // "fmt " Sub-chunk
+  view.setUint32(12, 0x666d7420, false); // "fmt "
+  view.setUint32(16, 16, true);          // Sub-chunk size = 16
+  view.setUint16(20, 1, true);           // AudioFormat = 1 (PCM)
+  view.setUint16(22, 1, true);           // NumChannels = 1 (Mono)
+  view.setUint32(24, sampleRate, true);  // SampleRate = 8000
+  view.setUint32(28, sampleRate, true);  // ByteRate = 8000
+  view.setUint16(32, 1, true);           // BlockAlign = 1
+  view.setUint16(34, 8, true);           // BitsPerSample = 8
+
+  // "data" Sub-chunk
+  view.setUint32(36, 0x64617461, false); // "data"
+  view.setUint32(40, numSamples, true);  // Data size = 8000
+
+  // Fill audio data block with silent 8-bit PCM sample values (neutral mid-point is 128)
+  const data = new Uint8Array(buffer, 44, numSamples);
+  data.fill(128);
+
+  const blob = new Blob([buffer], { type: 'audio/wav' });
+  return URL.createObjectURL(blob);
+}

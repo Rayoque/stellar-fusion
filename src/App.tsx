@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { Scene } from './three/Scene';
 import { useGameStore } from './game/state';
-import { initAudio, startAmbientDrone, playSpawnTick } from './audio/synth';
+import { initAudio, startAmbientDrone, playSpawnTick, createSilentWavUrl } from './audio/synth';
 import { HUD } from './ui/HUD';
 import { EndScreen } from './ui/EndScreen';
 import { StartScreen } from './ui/StartScreen';
@@ -41,11 +41,13 @@ export default function App() {
       initAudio();
       startAmbientDrone();
       
-      // Classic iOS silent-switch ringer bypass hack: playing a brief silent audio clip via the HTML5 Audio interface 
-      // forces mobile Safari to elevate the page's AVAudioSession category from 'Ambient' (which is muted by the ringer switch)
-      // to 'Playback' (which overrides the ringer switch and plays through the speaker).
+      // Classic iOS silent-switch ringer bypass hack: playing a brief, programmatically generated 
+      // 1-second silent WAV file Blob URL forces mobile Safari to elevate the page's AVAudioSession 
+      // category from 'Ambient' (muted by silent switch) to 'Playback' (which overrides the silent switch).
       try {
-        const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAIA');
+        const url = createSilentWavUrl();
+        const silentAudio = new Audio(url);
+        silentAudio.loop = true;
         silentAudio.play().catch(() => {});
       } catch (err) {}
       

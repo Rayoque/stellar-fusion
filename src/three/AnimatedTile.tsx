@@ -108,6 +108,23 @@ export function AnimatedTile() {
   const tail2Pos = useRef(new THREE.Vector3());
   const [hasTails, setHasTails] = useState({ tail1: false, tail2: false });
 
+  // Track the active slide ID to detect when a new slide has been initiated
+  const lastSlideStartRef = useRef<number | null>(null);
+
+  if (activeSlide) {
+    const slideId = activeSlide.startTime;
+    if (lastSlideStartRef.current !== slideId) {
+      lastSlideStartRef.current = slideId;
+      const startFace = faces[activeSlide.path[0]];
+      if (startFace) {
+        const startPos = new THREE.Vector3(startFace.center.x, startFace.center.y, startFace.center.z).normalize().multiplyScalar(1.02);
+        mainPos.current.copy(startPos);
+        tail1Pos.current.copy(startPos);
+        tail2Pos.current.copy(startPos);
+      }
+    }
+  }
+
   useFrame(() => {
     if (!activeSlide || !groupRef.current) return;
     const { path, startTime, duration } = activeSlide;
