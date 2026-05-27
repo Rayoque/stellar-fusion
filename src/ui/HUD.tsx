@@ -90,7 +90,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
           {/* Desktop Layout (sm:flex hidden) */}
           <div className="hidden sm:flex items-center gap-4">
             <div className="flex items-center gap-2.5">
-              <span className="text-base" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
+              <span className="text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
               <div>
                 <div className="text-[7.5px] tracking-[1.5px] text-white/40 leading-none">PHASE</div>
                 <div className="font-semibold tracking-wide text-[10px] leading-tight mt-0.5">{PHASE_LABELS[phase]}</div>
@@ -123,7 +123,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
 
           {/* Mobile Layout (flex sm:hidden) */}
           <div className="flex sm:hidden items-center gap-2 text-[9px] font-mono tracking-wider font-semibold uppercase text-white/80 whitespace-nowrap">
-            <span className="text-xs" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
+            <span className="text-[11px] leading-none flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
             <span className="font-bold tracking-widest" style={{ color: currentThemeColor }}>
               {phase === 'main_sequence' ? 'MAIN SEQ' : PHASE_LABELS[phase]}
             </span>
@@ -145,7 +145,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
       </div>
 
       {/* Bottom Center: Element inventory dock */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
+      <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto" style={{ bottom: 'calc(1.2rem + env(safe-area-inset-bottom, 0px))' }}>
         <div className="flex flex-col items-center gap-1.5 pointer-events-none select-none max-w-[95vw] sm:max-w-md md:max-w-xl">
           {/* Elements Tray */}
           <div 

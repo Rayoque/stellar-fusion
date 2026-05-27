@@ -114,7 +114,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
           </div>
 
           <div className="text-[7.5px] text-white/25 tracking-[3px] font-mono uppercase mt-8">
-            STELLAR FUSION ENGINE • V0.9.0
+            STELLAR FUSION ENGINE • V0.9.1
           </div>
         </div>
       </div>

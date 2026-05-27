@@ -17,7 +17,7 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex justify-center items-center p-4 animate-fade-in-up select-none pointer-events-auto">
       {/* Modal Container */}
-      <div className="bg-[#0f0f15]/95 border border-white/10 p-6 sm:p-8 rounded-[32px] max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col gap-6 text-white shadow-[0_16px_48px_rgba(0,0,0,0.7)] relative isolate">
+      <div className="bg-[#0f0f15]/95 border border-white/10 p-6 sm:p-8 rounded-[32px] max-w-3xl w-full max-h-[90vh] md:max-h-[85vh] overflow-hidden flex flex-col gap-6 text-white shadow-[0_16px_48px_rgba(0,0,0,0.7)] relative isolate">
         {/* Close Button */}
         <button 
           onClick={onClose}
@@ -39,7 +39,7 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
         <div className="flex flex-col md:flex-row gap-6 flex-1 overflow-hidden min-h-0">
           
           {/* Left Panel: Level selection scrollable grid */}
-          <div className="flex-1 md:max-w-[320px] overflow-y-auto custom-scrollbar pr-1 flex flex-col gap-2">
+          <div className="h-[130px] md:h-auto flex-shrink-0 md:flex-1 md:max-w-[320px] overflow-y-auto custom-scrollbar pr-1 flex flex-col gap-2">
             <span className="text-[8px] tracking-[2px] text-white/35 font-mono uppercase mb-1 block">SCENARIO LIST</span>
             
             {LEVELS.map(level => {
@@ -98,8 +98,9 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
           </div>
 
           {/* Right Panel: Selected Level conditions & Launch Button */}
-          <div className="flex-1 bg-white/3 border border-white/5 rounded-2xl p-4 sm:p-5 flex flex-col justify-between overflow-y-auto custom-scrollbar">
-            <div className="flex flex-col gap-4">
+          <div className="flex-1 bg-white/3 border border-white/5 rounded-2xl p-4 sm:p-5 flex flex-col justify-between overflow-hidden">
+            {/* Scrollable details container */}
+            <div className="flex-grow overflow-y-auto custom-scrollbar pr-1 flex flex-col gap-4">
               {/* Scenario details */}
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
@@ -155,12 +156,15 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
               </div>
             </div>
 
-            <button
-              onClick={() => onSelectLevel(selectedLevel.id)}
-              className="mt-6 w-full py-3.5 bg-white hover:bg-white/95 text-black rounded-full font-bold tracking-[2px] transition-all active:scale-[0.98] text-xs uppercase shadow-[0_4px_16px_rgba(255,255,255,0.12)] cursor-pointer"
-            >
-              LAUNCH IGNITION
-            </button>
+            {/* Docked Launch Button at bottom (not scrollable) */}
+            <div className="flex-shrink-0 border-t border-white/5 mt-4 pt-4">
+              <button
+                onClick={() => onSelectLevel(selectedLevel.id)}
+                className="w-full py-3.5 bg-white hover:bg-white/95 text-black rounded-full font-bold tracking-[2px] transition-all active:scale-[0.98] text-xs uppercase shadow-[0_4px_16px_rgba(255,255,255,0.12)] cursor-pointer"
+              >
+                LAUNCH IGNITION
+              </button>
+            </div>
           </div>
           
         </div>
