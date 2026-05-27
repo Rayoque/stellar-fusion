@@ -27,7 +27,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
-      <div className="bg-[#0f0f13]/90 border border-white/10 rounded-[32px] p-8 max-w-sm w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.6)] relative overflow-hidden animate-fade-in-up">
+      <div className="bg-[#0f0f13]/90 border border-white/10 rounded-[32px] p-8 max-w-sm w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.6)] relative overflow-hidden animate-fade-in-up isolate">
         {/* Glow effect */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-[60px] pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-purple-500/10 rounded-full blur-[60px] pointer-events-none" />
@@ -77,10 +77,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
                 showSettings ? 'bg-white/10 border-white/20' : 'bg-white/5 border-white/10 hover:bg-white/10'
               }`}
             >
-              <span>SETTINGS</span>
-              <span className={`text-[8px] transition-transform duration-200 ${showSettings ? 'rotate-90' : ''}`}>
-                ▶
-              </span>
+              SETTINGS
             </button>
 
             {/* Expanded Settings Panel */}
@@ -116,7 +113,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
           </div>
 
           <div className="text-[7.5px] text-white/25 tracking-[3px] font-mono uppercase mt-8">
-            STELLAR FUSION ENGINE • V0.1.0
+            STELLAR FUSION ENGINE • V0.8.0
           </div>
         </div>
       </div>

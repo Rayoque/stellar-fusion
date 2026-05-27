@@ -80,7 +80,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
       <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto">
         <div 
           onClick={() => setShowModal(true)}
-          className="flex items-center justify-between glass-pill px-4 py-2 rounded-full cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all select-none gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.35)] border border-white/8"
+          className="flex items-center justify-between glass-pill px-4 h-11 rounded-full cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all select-none gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.35)] border border-white/8"
           style={{ 
             borderColor: `${currentThemeColor}30`, 
             boxShadow: `0 0 16px ${currentThemeColor}08, inset 0 0 10px ${currentThemeColor}05` 
@@ -149,7 +149,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
         <div className="flex flex-col items-center gap-1.5 pointer-events-none select-none max-w-[95vw] sm:max-w-md md:max-w-xl">
           {/* Elements Tray */}
           <div 
-            className="glass-panel px-3.5 py-2.5 rounded-[22px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center gap-2.5 overflow-x-auto max-w-full custom-scrollbar pointer-events-auto border border-white/8"
+            className="glass-panel px-3.5 py-3 rounded-[22px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center gap-2.5 overflow-x-auto no-scrollbar max-w-full pointer-events-auto border border-white/8"
             style={{ 
               borderColor: `${currentThemeColor}15`,
               boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px ${currentThemeColor}05`

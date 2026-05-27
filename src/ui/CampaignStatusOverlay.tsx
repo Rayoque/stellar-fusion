@@ -55,7 +55,7 @@ export function CampaignStatusOverlay({ levelId, status, onNextLevel, onRetry, o
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md select-none pointer-events-auto">
       {/* Modal Container */}
       <div 
-        className="bg-[#0f0f13]/90 border border-white/10 rounded-[32px] p-8 sm:p-10 max-w-md w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.65)] relative overflow-hidden animate-fade-in-up"
+        className="bg-[#0f0f13]/90 border border-white/10 rounded-[32px] p-8 sm:p-10 max-w-md w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.65)] relative overflow-hidden animate-fade-in-up isolate"
         style={{ 
           borderColor: isWin ? 'rgba(52, 211, 153, 0.2)' : 'rgba(248, 113, 113, 0.2)',
           boxShadow: `0 16px 48px rgba(0,0,0,0.65), 0 0 24px ${shadowGlow}`

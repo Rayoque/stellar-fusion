@@ -33,7 +33,7 @@ export function Codex({ onClose }: CodexProps) {
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex justify-center items-center p-4 animate-fade-in-up select-none pointer-events-auto">
       {/* Modal Card */}
-      <div className="bg-[#0f0f15]/95 border border-white/10 p-6 sm:p-8 rounded-[32px] max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col gap-6 text-white shadow-[0_16px_48px_rgba(0,0,0,0.7)] relative">
+      <div className="bg-[#0f0f15]/95 border border-white/10 p-6 sm:p-8 rounded-[32px] max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col gap-6 text-white shadow-[0_16px_48px_rgba(0,0,0,0.7)] relative isolate">
         {/* Close Button */}
         <button 
           onClick={onClose}

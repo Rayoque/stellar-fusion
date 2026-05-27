@@ -23,7 +23,7 @@ export function EndScreen({ endState, starMass, elementCounts, onPlayAgain }: En
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
-      <div className="bg-[#0f0f13]/90 border border-white/10 rounded-[32px] p-8 sm:p-10 max-w-md w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.65)] relative overflow-hidden animate-fade-in-up">
+      <div className="bg-[#0f0f13]/90 border border-white/10 rounded-[32px] p-8 sm:p-10 max-w-md w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.65)] relative overflow-hidden animate-fade-in-up isolate">
         {/* Decorative corner glows */}
         <div className="absolute -top-32 -left-32 w-64 h-64 bg-cyan-500/10 rounded-full blur-[70px] pointer-events-none" />
         <div className="absolute -bottom-32 -right-32 w-64 h-64 bg-purple-500/10 rounded-full blur-[70px] pointer-events-none" />
