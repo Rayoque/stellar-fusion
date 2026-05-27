@@ -6,6 +6,10 @@ A 3D fusion puzzle game played on the surface of a soccer ball. Slide hydrogen i
 
 ## Play it
 
+Play the live web version directly here: **[https://rayoque.github.io/stellar-fusion/](https://rayoque.github.io/stellar-fusion/)**
+
+Or run it locally:
+
 ```bash
 git clone https://github.com/Rayoque/stellar-fusion.git
 cd stellar-fusion
