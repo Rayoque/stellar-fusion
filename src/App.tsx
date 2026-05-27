@@ -74,13 +74,6 @@ export default function App() {
         onOpenMenu={() => setPaused(true)}
       />
 
-      {/* Floating Menu Button */}
-      <button
-        onClick={() => setPaused(true)}
-        className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-black/40 hover:bg-white/15 border border-white/10 hover:border-white/20 backdrop-blur-md px-5 py-2.5 rounded-xl text-[10px] tracking-[3px] font-semibold uppercase active:scale-95 transition-all flex items-center gap-2 pointer-events-auto"
-      >
-        MENU
-      </button>
 
       {endState && (
         <EndScreen

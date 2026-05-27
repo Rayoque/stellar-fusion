@@ -64,6 +64,15 @@ export function detectMerge(landedFaceId: number, state: GameState): MergeRule |
   const landedFace = state.faces[landedFaceId];
   if (!landedFace) return null;
 
+  // Resolve the actual ending/destination face where the merged output tile will be formed.
+  // This is crucial for checking if the ending element is actually on a nucleation site.
+  const activeSlide = state.activeSlide;
+  const finalDestFaceId = (activeSlide && activeSlide.isMerge)
+    ? activeSlide.path[activeSlide.path.length - 1]
+    : landedFaceId;
+  const finalDestFace = state.faces[finalDestFaceId];
+  const isFinalDestPentagon = finalDestFace?.shape === 'pentagon';
+
   // 1. Triangle (triple-alpha): only relevant for He landing
   if (landedElement === 'He') {
     const heNeighbors = landedFace.neighbors.filter(nid => {
@@ -104,8 +113,9 @@ export function detectMerge(landedFaceId: number, state: GameState): MergeRule |
     }
   }
 
-  // 3. Pentagon CNO shortcut: lone H on pentagon self-fuses
-  if (landedElement === 'H' && landedFace.shape === 'pentagon') {
+  // 3. Pentagon CNO shortcut: lone H on pentagon self-fuses.
+  // Strictly enforce that the ending element must actually form on a pentagon nucleation site.
+  if (landedElement === 'H' && isFinalDestPentagon) {
     const pentagonRule = MERGE_RULES.find(r => r.requiresPentagon && r.inputs[0] === 'H');
     if (pentagonRule) return pentagonRule;
   }
@@ -117,7 +127,12 @@ export function detectMerge(landedFaceId: number, state: GameState): MergeRule |
  * Apply a merge rule: remove inputs, place output, update counts.
  * Assumes the rule was validated by detectMerge.
  */
-export function applyMerge(rule: MergeRule, landedFaceId: number, state: GameState): void {
+export function applyMerge(
+  rule: MergeRule,
+  landedFaceId: number,
+  state: GameState,
+  overrideOutputFaceId?: number
+): void {
   const landedFace = state.faces[landedFaceId];
   if (!landedFace) return;
 
@@ -162,9 +177,10 @@ export function applyMerge(rule: MergeRule, landedFaceId: number, state: GameSta
     state.tiles.delete(fid);
   }
 
-  // Place output tile on landed face
-  state.tiles.set(landedFaceId, {
-    faceId: landedFaceId,
+  // Place output tile on landed face or overridden face
+  const outputFaceId = overrideOutputFaceId !== undefined ? overrideOutputFaceId : landedFaceId;
+  state.tiles.set(outputFaceId, {
+    faceId: outputFaceId,
     element: rule.output,
     spawnedAtTurn: state.turn,
   });
@@ -181,7 +197,7 @@ export function applyMerge(rule: MergeRule, landedFaceId: number, state: GameSta
   // Record last merge for potential animation hooks
   state.lastMerge = {
     fromFaceIds: toRemove,
-    toFaceId: landedFaceId,
+    toFaceId: outputFaceId,
     output: rule.output,
   };
 }

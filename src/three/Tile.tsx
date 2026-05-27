@@ -23,9 +23,15 @@ export function Tile({ face, tile }: TileProps) {
   const isAnimating = useGameStore(s => s.isAnimating);
   const selectedFaceId = useGameStore(s => s.selectedFaceId);
   const dragTargetId = useGameStore(s => s.dragTargetId);
+  const blockedFaceId = useGameStore(s => s.blockedFaceId);
+  const blockedTime = useGameStore(s => s.blockedTime) || 0;
+  const dragOffset3D = useGameStore(s => s.dragOffset3D);
+  const activeSlide = useGameStore(s => s.activeSlide);
 
   const isSelected = face.id === selectedFaceId;
   const isTarget = face.id === dragTargetId;
+  const isBlocked = face.id === blockedFaceId;
+  const isMergeTarget = activeSlide?.isMerge && face.id === activeSlide.path[activeSlide.path.length - 1];
 
   const element = tile ? ELEMENTS[tile.element] : null;
   const color = element ? element.color : '#334155';
@@ -132,6 +138,18 @@ export function Tile({ face, tile }: TileProps) {
   }, [face]);
 
   const groupRef = React.useRef<THREE.Group>(null);
+  const tileContentGroupRef = React.useRef<THREE.Group>(null);
+
+  const selectedTimeRef = React.useRef<number>(0);
+  const prevIsSelectedRef = React.useRef<boolean>(false);
+  const smoothPullRef = React.useRef(new THREE.Vector3(0, 0, 0));
+
+  if (isSelected && !prevIsSelectedRef.current) {
+    selectedTimeRef.current = performance.now();
+    prevIsSelectedRef.current = true;
+  } else if (!isSelected) {
+    prevIsSelectedRef.current = false;
+  }
 
   useFrame((state) => {
     if (!groupRef.current) return;
@@ -147,49 +165,143 @@ export function Tile({ face, tile }: TileProps) {
     // Compute dot product
     const dot = tempWorldCenter.dot(tempCamDir);
     
-    // Keep visible slightly past the horizon (threshold -0.2) to avoid popping,
+    // Keep visible slightly past the horizon (threshold -0.85) to avoid popping,
     // but cull entirely beyond that to prevent any edges/text from clipping.
-    groupRef.current.visible = dot > -0.2;
+    groupRef.current.visible = dot > -0.85;
+
+    // Only apply holding/pickup dynamics if the tile is selected/held
+    if (isSelected) {
+      // Dynamic pickup spring jiggle & wobbly inflation
+      const heldTime = performance.now() - selectedTimeRef.current;
+      
+      // 1. Softer pickup jiggle scale
+      const scaleJiggle = 1.0 + 0.06 * Math.sin(heldTime * 0.024) * Math.exp(-heldTime * 0.007);
+      
+      // 2. Softer pickup jiggle wobble
+      const wobbleX = Math.sin(heldTime * 0.035) * 0.014 * Math.exp(-heldTime * 0.008);
+      const wobbleY = Math.cos(heldTime * 0.03) * 0.014 * Math.exp(-heldTime * 0.008);
+
+      // 3. Ethereal pull toward cursor/finger with smooth spring-damper lerp
+      const targetPull = new THREE.Vector3(0, 0, 0);
+      if (dragOffset3D) {
+        targetPull.set(dragOffset3D.x, dragOffset3D.y, dragOffset3D.z);
+      }
+      smoothPullRef.current.lerp(targetPull, 0.18); // Highly responsive spring decay factor
+      // 4. Toned-down, extremely subtle and organic quantum electron hum/jitter
+      const tSec = state.clock.getElapsedTime();
+      const jitterX = Math.sin(tSec * 28) * 0.0016 + Math.cos(tSec * 47) * 0.0010;
+      const jitterY = Math.cos(tSec * 31) * 0.0016 + Math.sin(tSec * 53) * 0.0010;
+
+      if (tileContentGroupRef.current) {
+        // Main group scale stays stationary at 1.0 (so grid outline doesn't scale/jiggle)
+        groupRef.current.scale.set(1.0, 1.0, 1.0);
+        
+        // Scale and wobble only the floating child tileContentGroup
+        tileContentGroupRef.current.scale.set(1.06 * scaleJiggle, 1.06 * scaleJiggle, 1.06 * scaleJiggle);
+        
+        tileContentGroupRef.current.position.set(
+          face.tangentFrame.u.x * (wobbleX + jitterX) + face.tangentFrame.v.x * (wobbleY + jitterY) + smoothPullRef.current.x,
+          face.tangentFrame.u.y * (wobbleX + jitterX) + face.tangentFrame.v.y * (wobbleY + jitterY) + smoothPullRef.current.y,
+          face.tangentFrame.u.z * (wobbleX + jitterX) + face.tangentFrame.v.z * (wobbleY + jitterY) + smoothPullRef.current.z
+        );
+      }
+    } else {
+      // Smoothly reset pull ref and tile content group scale/position when not selected
+      smoothPullRef.current.set(0, 0, 0);
+      if (tileContentGroupRef.current) {
+        tileContentGroupRef.current.scale.set(1.0, 1.0, 1.0);
+        tileContentGroupRef.current.position.set(0, 0, 0);
+      }
+    }
+
+    // Blocked jiggle/shake animation parallel to the sphere's surface
+    if (isBlocked) {
+      const elapsed = performance.now() - blockedTime;
+      if (elapsed < 300) {
+        const progress = elapsed / 300;
+        const decay = Math.exp(-progress * 4.5); // rapid exponential decay
+        const amp = 0.08 * decay; // starting displacement amplitude
+        const shakeVal = Math.sin(elapsed * 0.12) * amp; // high-frequency vibration
+        
+        groupRef.current.position.set(
+          face.tangentFrame.u.x * shakeVal,
+          face.tangentFrame.u.y * shakeVal,
+          face.tangentFrame.u.z * shakeVal
+        );
+      } else {
+        groupRef.current.position.set(0, 0, 0);
+      }
+    } else {
+      // Keep position reset when not blocked
+      groupRef.current.position.set(0, 0, 0);
+    }
   });
 
   return (
-    <group ref={groupRef} scale={isSelected ? [1.06, 1.06, 1.06] : [1, 1, 1]}>
-      <mesh
-        geometry={geometry}
-        userData={{ faceId: face.id }}
-      >
-        {element ? (
-          <meshLambertMaterial 
-            color={color} 
-            flatShading 
-            side={THREE.DoubleSide}
-            transparent={false}
-            depthWrite={true}
-          />
-        ) : (
+    <group ref={groupRef} scale={[1, 1, 1]}>
+      {/* Empty slot grid outline (stays anchored to the sphere grid!) */}
+      {(!element || isSelected) && (
+        <mesh geometry={geometry} userData={{ faceId: face.id }}>
           <meshBasicMaterial visible={false} />
-        )}
-        <Edges 
-          scale={1} 
-          threshold={15} 
-          color={isSelected ? "#38bdf8" : (element ? "black" : "rgba(255, 255, 255, 0.08)")} 
-        />
-      </mesh>
-
-      {/* Pentagon indicator */}
-      {face.shape === 'pentagon' && pentagonGeometry && (
-        <mesh geometry={pentagonGeometry}>
-          <meshBasicMaterial 
-            color="#ffffff" 
-            transparent 
-            opacity={0.16} 
-            side={THREE.DoubleSide}
-            depthWrite={false}
+          <Edges 
+            scale={1} 
+            threshold={15} 
+            color="rgba(255, 255, 255, 0.08)" 
           />
         </mesh>
       )}
 
-      {/* Drag target indicator overlay */}
+      {/* Dynamic, wobbly, and cursor-pulled tile content group */}
+      <group ref={tileContentGroupRef}>
+        {element && (
+          <mesh geometry={geometry} userData={{ faceId: face.id }}>
+            <meshLambertMaterial 
+              color={color} 
+              flatShading 
+              side={THREE.DoubleSide}
+              transparent={false}
+              depthWrite={true}
+            />
+            <Edges 
+              scale={1} 
+              threshold={15} 
+              color={isSelected ? "#38bdf8" : "black"} 
+            />
+          </mesh>
+        )}
+
+        {/* Pentagon indicator (only rendered when not a merge target) */}
+        {face.shape === 'pentagon' && pentagonGeometry && !isMergeTarget && (
+          <mesh geometry={pentagonGeometry}>
+            <meshBasicMaterial 
+              color="#ffffff" 
+              transparent 
+              opacity={0.16} 
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        )}
+
+        {/* Element symbol */}
+        {element && !isMergeTarget && (
+          <Text
+            quaternion={textQuaternion}
+            position={[face.center.x * 1.01, face.center.y * 1.01, face.center.z * 1.01]}
+            fontSize={0.25}
+            color="#ffffff"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.01}
+            outlineColor="#000000"
+            renderOrder={1}
+          >
+            {element.symbol}
+          </Text>
+        )}
+      </group>
+
+      {/* Drag target indicator overlay (keeps separate from pulling content, stays anchored on the target slot!) */}
       {isTarget && (
         <mesh geometry={geometry} scale={1.01}>
           <meshBasicMaterial 
@@ -201,23 +313,6 @@ export function Tile({ face, tile }: TileProps) {
           />
           <Edges scale={1.005} threshold={15} color="#f59e0b" />
         </mesh>
-      )}
-
-      {/* Element symbol */}
-      {element && (
-        <Text
-          quaternion={textQuaternion}
-          position={[face.center.x * 1.01, face.center.y * 1.01, face.center.z * 1.01]}
-          fontSize={0.25}
-          color="#ffffff"
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.01}
-          outlineColor="#000000"
-          renderOrder={1}
-        >
-          {element.symbol}
-        </Text>
       )}
     </group>
   );

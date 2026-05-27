@@ -60,6 +60,12 @@ export interface GameState {
   turn: number;
   phase: Phase;
   elementCounts: Record<ElementSymbol, number>;
+  phaseTransitions: {
+    main_sequence: number;
+    red_giant: number | null;
+    supergiant: number | null;
+    collapse: number | null;
+  };
 
   // UI state
   selectedFaceId: number | null;
@@ -73,10 +79,14 @@ export interface GameState {
     path: number[];
     startTime: number;
     duration: number;
+    isMerge?: boolean;
   };
   lastMerge?: {
     fromFaceIds: number[];
     toFaceId: number;
     output: ElementSymbol;
   };
+  blockedFaceId?: number | null;
+  blockedTime?: number;
+  dragOffset3D?: Vec3 | null;
 }

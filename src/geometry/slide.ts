@@ -78,9 +78,29 @@ export function executeSlide(
 
       // Re-resolve direction from new face (sphere curvature)
       currentDrag = initialDragWorld; // keep original intent or reproject if needed
-    } else if (canMerge(element, nextTile.element) || (element === 'He' && nextTile.element === 'He')) {
-      // Combinable or potential Helium triple-alpha triangle merge. Stop here; caller will detect & apply.
+    } else if (canMerge(element, nextTile.element)) {
+      // Direct pair or pair-alpha merge combinable. Append target face and stop.
+      path.push(nextId);
       return { path, stoppedReason: 'merge' };
+    } else if (element === 'He' && nextTile.element === 'He') {
+      // For Helium, check if there is a third adjacent Helium to complete the triangle
+      const currentFace = state.faces[currentId];
+      const nextFace = state.faces[nextId];
+      
+      const hasThirdHelium = currentFace.neighbors.some(nid => 
+        nid !== nextId && 
+        nextFace.neighbors.includes(nid) && 
+        state.tiles.get(nid)?.element === 'He'
+      );
+      
+      if (hasThirdHelium) {
+        // Complete triangle exists — valid merge!
+        path.push(nextId);
+        return { path, stoppedReason: 'merge' };
+      } else {
+        // No third Helium to complete the triangle — this swipe is blocked!
+        return { path, stoppedReason: 'blocked' };
+      }
     } else {
       // Different element or immovable — blocked
       return { path, stoppedReason: 'blocked' };

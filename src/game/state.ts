@@ -8,7 +8,7 @@ import { spawnHydrogen } from './spawn';
 import { checkEndState } from './endgame';
 import { detectMerge, applyMerge } from './rules';
 import { executeSlide } from '../geometry/slide';
-import { playMerge } from '../audio/synth';
+import { playMerge, playBlocked } from '../audio/synth';
 
 interface GameActions {
   newGame: (mass?: number) => void;
@@ -35,6 +35,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   turn: 0,
   phase: 'main_sequence',
   elementCounts: initialElementCounts(),
+  phaseTransitions: {
+    main_sequence: 0,
+    red_giant: null,
+    supergiant: null,
+    collapse: null,
+  },
   selectedFaceId: null,
   dragTargetId: null,
   isAnimating: false,
@@ -70,12 +76,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
       turn: 0,
       phase: 'main_sequence',
       elementCounts: initialCounts,
+      phaseTransitions: {
+        main_sequence: 0,
+        red_giant: null,
+        supergiant: null,
+        collapse: null,
+      },
       selectedFaceId: null,
       dragTargetId: null,
       isAnimating: false,
       endState: null,
       activeSlide: undefined,
       lastMerge: undefined,
+      blockedFaceId: null,
+      blockedTime: 0,
+      dragOffset3D: null,
       isPaused: false,
     });
   },
@@ -127,32 +142,54 @@ export const useGameStore = create<GameStore>((set, get) => ({
           isAnimating: true,
           selectedFaceId: null,
           dragTargetId: null,
+          dragOffset3D: null,
           tiles: new Map(state.tiles),
           activeSlide: {
             element: tile.element,
             path: slideResult.path,
             startTime: performance.now(),
-            duration
+            duration,
+            isMerge: slideResult.stoppedReason === 'merge'
           }
         });
 
         // Wait for slide animation
         await new Promise(r => setTimeout(r, duration));
         
-        // Place tile at destination
+        // Place tile at destination and handle merge detection
         const landedId = slideResult.path[slideResult.path.length - 1];
-        state.tiles.set(landedId, { ...tile, faceId: landedId });
+        let mergeRule = null;
+        let mergeLandedId = landedId;
+        const isMerge = slideResult.stoppedReason === 'merge';
 
-        // Check for merge at landing position
-        const mergeRule = detectMerge(landedId, state);
+        if (isMerge) {
+          // If stopped due to a merge, the swiped tile travels into the target face.
+          // To detect the merge correctly without overwriting the target tile,
+          // we temporarily place the swiped tile at the preceding face.
+          const beforeFaceId = slideResult.path[slideResult.path.length - 2];
+          state.tiles.set(beforeFaceId, { ...tile, faceId: beforeFaceId });
+          
+          mergeRule = detectMerge(beforeFaceId, state);
+          mergeLandedId = beforeFaceId;
+          
+          if (!mergeRule) {
+            // Safety fallback: if no merge rule was actually detected, leave the tile at beforeFaceId
+            console.warn('Merge reason stopped, but no merge rule was detected.');
+          }
+        } else {
+          // Normal landing
+          state.tiles.set(landedId, { ...tile, faceId: landedId });
+          mergeRule = detectMerge(landedId, state);
+          mergeLandedId = landedId;
+        }
+
         console.log('Merge rule detected:', mergeRule);
 
         if (mergeRule) {
           const parentElement = tile.element;
-          applyMerge(mergeRule, landedId, state);
+          applyMerge(mergeRule, mergeLandedId, state, isMerge ? landedId : undefined);
           playMerge(parentElement, mergeRule.output);
-          // Optional: wait a bit for merge animation
-          await new Promise(r => setTimeout(r, 200));
+          // Eslint-clean, snappy instant merges just like 2048: no artificial lag or delays!
         }
 
         // Increment turn
@@ -179,6 +216,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
           set({ endState: end, isAnimating: false, activeSlide: undefined, tiles: new Map(state.tiles) });
           return;
         }
+      } else {
+        // Play blocked audio cue
+        playBlocked();
+
+        // Trigger blocked visual shake
+        set({
+          blockedFaceId: fromFaceId,
+          blockedTime: performance.now(),
+          selectedFaceId: null,
+          dragTargetId: null,
+          dragOffset3D: null,
+          isAnimating: false,
+        });
+
+        // Reset after 350ms so shake terminates cleanly
+        setTimeout(() => {
+          set({ blockedFaceId: null });
+        }, 350);
+        return;
       }
 
       set({
@@ -192,7 +248,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
     } catch (e) {
       console.error('Error in endDrag:', e);
-      set({ isAnimating: false, selectedFaceId: null, dragTargetId: null });
+      set({ isAnimating: false, selectedFaceId: null, dragTargetId: null, dragOffset3D: null });
     }
   },
 

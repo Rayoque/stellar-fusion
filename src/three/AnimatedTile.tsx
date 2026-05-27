@@ -6,7 +6,7 @@ import { useGameStore } from '../game/state';
 import { Text } from '@react-three/drei';
 import { ELEMENTS } from '../game/elements';
 
-interface BlobMeshProps {
+export interface BlobMeshProps {
   position: THREE.Vector3;
   color: string;
   opacity: number;
@@ -15,7 +15,7 @@ interface BlobMeshProps {
   time: number;
 }
 
-function BlobMesh({ position, color, opacity, scaleFactor, symbol, time }: BlobMeshProps) {
+export function BlobMesh({ position, color, opacity, scaleFactor, symbol, time }: BlobMeshProps) {
   // Pre-allocate position array and indices once
   const geom = React.useMemo(() => {
     const g = new THREE.BufferGeometry();
@@ -50,10 +50,23 @@ function BlobMesh({ position, color, opacity, scaleFactor, symbol, time }: BlobM
     geom.computeVertexNormals();
   }, [geom, scaleFactor, time]);
 
-  // Align the flat blob perfectly tangent to the sphere's curved surface at its position
+  // Align the flat blob perfectly tangent to the sphere's curved surface and oriented upright (matching static shape)
   const quaternion = React.useMemo(() => {
-    const normal = position.clone().normalize();
-    return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+    const localNormal = position.clone().normalize();
+    
+    let localUp = new THREE.Vector3(0, 1, 0);
+    const dotVal = localUp.dot(localNormal);
+    if (Math.abs(dotVal) > 0.99) {
+      localUp.set(0, 0, -1);
+      const dotVal2 = localUp.dot(localNormal);
+      localUp.sub(localNormal.clone().multiplyScalar(dotVal2)).normalize();
+    } else {
+      localUp.sub(localNormal.clone().multiplyScalar(dotVal)).normalize();
+    }
+    
+    const localRight = new THREE.Vector3().crossVectors(localUp, localNormal).normalize();
+    const m = new THREE.Matrix4().makeBasis(localRight, localUp, localNormal);
+    return new THREE.Quaternion().setFromRotationMatrix(m);
   }, [position]);
 
   return (
@@ -137,8 +150,9 @@ export function AnimatedTile() {
 
     setHasTails({ tail1: t1Active, tail2: t2Active });
 
-    // Dynamic elevation arc (hop) to prevent clipping through neighboring flat faces
-    const hopScale = 1.02 + 0.05 * Math.sin((Math.min(elapsed, duration) / duration) * Math.PI);
+    // Smooth transition from 1.06 (held scale) using sin-based elevation arc
+    const progress = Math.min(elapsed, duration) / duration;
+    const hopScale = 1.06 * (1 - progress) + 1.0 * progress + 0.06 * Math.sin(progress * Math.PI);
     groupRef.current.scale.set(hopScale, hopScale, hopScale);
   });
 
