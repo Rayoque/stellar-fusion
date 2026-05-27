@@ -3,16 +3,18 @@
 @tailwind utilities;
 
 :root {
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Outfit', ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
 }
 
 body {
-  font-family: var(--font-mono);
-  background: #0a0a0f;
-  color: white;
+  font-family: var(--font-sans);
+  background: #050508;
+  color: #f3f4f6;
   touch-action: none; /* Prevent default browser scrolling/gestures on mobile */
   -webkit-user-select: none; /* Prevent selection overlays */
   user-select: none;
+  overflow: hidden;
 }
 
 /* Subtle canvas polish */
@@ -53,5 +55,83 @@ canvas {
     transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(0.1);
     opacity: 0;
   }
+}
+
+/* Monument Valley Inspired Premium Animations */
+@keyframes stellar-pulse {
+  0%, 100% {
+    transform: scale(1) translate(-50%, -50%);
+    opacity: 0.2;
+    filter: blur(40px);
+  }
+  50% {
+    transform: scale(1.15) translate(-45%, -45%);
+    opacity: 0.35;
+    filter: blur(55px);
+  }
+}
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Helper Animation Utility Classes */
+.animate-stellar-pulse {
+  animation: stellar-pulse 8s ease-in-out infinite alternate;
+}
+
+.animate-float-slow {
+  animation: float-slow 5s ease-in-out infinite;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Glassmorphic Utilities */
+.glass-panel {
+  background: rgba(10, 10, 15, 0.45);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-pill {
+  background: rgba(8, 8, 12, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Custom Scrollbar for Guide Modal */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 

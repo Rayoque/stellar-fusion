@@ -24,50 +24,50 @@ export function PauseMenu({ onResume, onMainMenu }: PauseMenuProps) {
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md">
-      <div className="bg-[#111113]/90 border border-white/10 rounded-3xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl relative overflow-hidden">
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+      <div className="bg-[#0f0f13]/90 border border-white/10 rounded-[32px] p-8 max-w-sm w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.6)] relative overflow-hidden animate-fade-in-up">
         {/* Glow effect */}
-        <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-[60px] pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-purple-500/10 rounded-full blur-[60px] pointer-events-none" />
 
         <div className="relative z-10">
-          <div className="uppercase tracking-[4px] text-[10px] text-white/40 mb-2">SYSTEM INTERACTION</div>
-          <h2 className="text-3xl font-semibold tracking-tight mb-8">GAME MENU</h2>
+          <div className="uppercase tracking-[4px] text-[8px] text-white/35 mb-1.5 font-mono">System Interaction</div>
+          <h2 className="text-2xl font-light tracking-[0.16em] mb-8 text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 uppercase">GAME MENU</h2>
 
-          <div className="space-y-3.5 mb-6">
+          <div className="flex flex-col mb-4">
             <button
               onClick={onResume}
-              className="w-full py-3 bg-white text-black rounded-xl font-medium tracking-wide hover:bg-white/90 active:scale-[0.985] transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 bg-white text-black rounded-full font-bold tracking-[1.5px] hover:bg-white/95 active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-xs uppercase shadow-[0_4px_16px_rgba(255,255,255,0.1)] cursor-pointer"
             >
               RESUME FUSION
             </button>
 
             <button
               onClick={handleReset}
-              className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-xl font-medium tracking-wide hover:bg-white/10 active:scale-[0.985] transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-full font-semibold tracking-[1.5px] hover:bg-white/10 active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-xs uppercase cursor-pointer mt-3"
             >
               RESET STAR
             </button>
 
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className={`w-full py-3 border text-white rounded-xl font-medium tracking-wide active:scale-[0.985] transition-all flex items-center justify-center gap-2 px-6 ${
+              className={`w-full py-3 border text-white rounded-full font-semibold tracking-[1.5px] active:scale-[0.97] transition-all flex items-center justify-center gap-2 px-6 text-xs uppercase cursor-pointer mt-3 ${
                 showSettings ? 'bg-white/10 border-white/20' : 'bg-white/5 border-white/10 hover:bg-white/10'
               }`}
             >
               <span>SETTINGS</span>
-              <span className={`text-[10px] transition-transform duration-200 ${showSettings ? 'rotate-90' : ''}`}>
+              <span className={`text-[8px] transition-transform duration-200 ${showSettings ? 'rotate-90' : ''}`}>
                 ▶
               </span>
             </button>
 
             {/* Expanded Settings Panel */}
             {showSettings && (
-              <div className="bg-black/40 border border-white/5 rounded-xl p-4 text-left space-y-4 animate-fadeIn transition-all duration-300">
+              <div className="bg-black/40 border border-white/5 rounded-2xl p-4 text-left space-y-4 animate-fade-in-up mt-3">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="pr-4">
                     <div className="text-xs font-semibold text-white/90">Real-Time Graphics</div>
-                    <div className="text-[10px] text-white/40 mt-0.5 leading-snug">Disable volumetric convective shells to boost performance.</div>
+                    <div className="text-[10px] text-white/40 mt-1 leading-normal">Disable volumetric convective shells to boost performance.</div>
                   </div>
                   <button
                     onClick={() => setShowRealtimeGraphics(!showRealtimeGraphics)}
@@ -87,13 +87,13 @@ export function PauseMenu({ onResume, onMainMenu }: PauseMenuProps) {
 
             <button
               onClick={handleMainMenu}
-              className="w-full py-3 bg-red-950/20 border border-red-500/10 text-red-400 rounded-xl font-medium tracking-wide hover:bg-red-950/40 active:scale-[0.985] transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 bg-red-950/20 border border-red-500/10 text-red-400 rounded-full font-semibold tracking-[1.5px] hover:bg-red-950/40 active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-xs uppercase cursor-pointer mt-3"
             >
               QUIT TO MAIN MENU
             </button>
           </div>
 
-          <div className="text-[9px] text-white/30 tracking-wider uppercase mt-4">
+          <div className="text-[7.5px] text-white/25 tracking-[3px] font-mono uppercase mt-8">
             STELLAR FUSION ENGINE • V0.1.0
           </div>
         </div>

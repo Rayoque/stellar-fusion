@@ -22,44 +22,50 @@ export function EndScreen({ endState, starMass, elementCounts, onPlayAgain }: En
   const totalElements = Object.values(elementCounts).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl">
-      <div className="bg-[#111113] border border-white/10 rounded-3xl p-10 max-w-md w-full mx-4 text-center">
-        <div className="uppercase tracking-[4px] text-xs text-white/50 mb-2">STELLAR END STATE</div>
-        
-        <h1 className="text-5xl font-semibold tracking-tighter mb-3 capitalize">
-          {endState.replace('_', ' ')}
-        </h1>
-        
-        <p className="text-white/70 mb-8 text-[15px] leading-snug">
-          {END_DESCRIPTIONS[endState]}
-        </p>
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+      <div className="bg-[#0f0f13]/90 border border-white/10 rounded-[32px] p-8 sm:p-10 max-w-md w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.65)] relative overflow-hidden animate-fade-in-up">
+        {/* Decorative corner glows */}
+        <div className="absolute -top-32 -left-32 w-64 h-64 bg-cyan-500/10 rounded-full blur-[70px] pointer-events-none" />
+        <div className="absolute -bottom-32 -right-32 w-64 h-64 bg-purple-500/10 rounded-full blur-[70px] pointer-events-none" />
 
-        <div className="mb-8">
-          <div className="text-xs tracking-widest text-white/50 mb-3">FINAL COMPOSITION</div>
-          <div className="space-y-1 text-left max-w-[260px] mx-auto">
-            {Object.entries(elementCounts).filter(([,c]) => c > 0).map(([sym, count]) => (
-              <div key={sym} className="flex justify-between items-center text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded" style={{ background: ELEMENTS[sym as ElementSymbol].color }} />
-                  <span>{ELEMENTS[sym as ElementSymbol].displayName}</span>
+        <div className="relative z-10">
+          <div className="uppercase tracking-[4px] text-[8px] sm:text-[9px] text-white/35 mb-2 font-mono">STELLAR END STATE</div>
+          
+          <h1 className="text-3xl sm:text-4xl font-light tracking-wide mb-3 capitalize text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70">
+            {endState.replace('_', ' ')}
+          </h1>
+          
+          <p className="text-white/50 mb-8 text-xs sm:text-sm leading-relaxed max-w-[280px] sm:max-w-xs mx-auto font-light">
+            {END_DESCRIPTIONS[endState]}
+          </p>
+
+          <div className="bg-white/5 border border-white/5 rounded-2xl p-4 sm:p-5 mb-8 max-w-[280px] sm:max-w-xs mx-auto">
+            <div className="text-[9px] tracking-[2.5px] text-white/35 mb-3.5 uppercase font-mono text-center">FINAL COMPOSITION</div>
+            <div className="space-y-2 text-left">
+              {Object.entries(elementCounts).filter(([,c]) => c > 0).map(([sym, count]) => (
+                <div key={sym} className="flex justify-between items-center text-xs tracking-wide">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full shadow-[0_0_6px_currentColor]" style={{ color: ELEMENTS[sym as ElementSymbol].color, backgroundColor: 'currentColor' }} />
+                    <span className="text-white/70">{ELEMENTS[sym as ElementSymbol].displayName}</span>
+                  </div>
+                  <span className="font-mono tabular-nums font-bold text-white/90">{count}</span>
                 </div>
-                <span className="font-mono tabular-nums">{count}</span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="text-xs text-white/50 mb-6">
-          Initial mass: <span className="font-mono">{starMass.toFixed(1)} M☉</span> • 
-          Total nuclei fused: <span className="font-mono">{totalElements}</span>
-        </div>
+          <div className="text-[9px] text-white/30 mb-8 font-mono tracking-wider">
+            INITIAL MASS: <span className="font-bold text-white/50">{starMass.toFixed(1)} M☉</span> • 
+            TOTAL NUCLEI: <span className="font-bold text-white/50">{totalElements}</span>
+          </div>
 
-        <button
-          onClick={onPlayAgain}
-          className="px-8 py-3 bg-white text-black rounded-2xl font-semibold tracking-wider hover:bg-white/90 active:scale-[0.985] transition-all"
-        >
-          FUSE ANOTHER STAR
-        </button>
+          <button
+            onClick={onPlayAgain}
+            className="w-full sm:w-auto px-8 py-3.5 bg-white text-black hover:bg-white/95 rounded-full font-bold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase shadow-[0_4px_16px_rgba(255,255,255,0.12)] cursor-pointer"
+          >
+            FUSE ANOTHER STAR
+          </button>
+        </div>
       </div>
     </div>
   );

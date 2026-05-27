@@ -62,7 +62,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-[#0a0a0f] text-white font-mono">
+    <div className="relative w-full h-screen h-[100dvh] overflow-hidden bg-[#050508] text-white font-sans select-none antialiased">
       <Scene />
       <TouchIndicator />
 
@@ -73,7 +73,6 @@ export default function App() {
         elementCounts={elementCounts}
         onOpenMenu={() => setPaused(true)}
       />
-
 
       {endState && (
         <EndScreen
@@ -92,7 +91,7 @@ export default function App() {
       )}
 
       {/* Subtle instructions */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs opacity-40 tracking-[3px]">
+      <div className="absolute bottom-[92px] sm:bottom-28 left-1/2 -translate-x-1/2 text-[9px] sm:text-[10px] opacity-35 tracking-[4px] pointer-events-none whitespace-nowrap uppercase font-mono">
         DRAG TILES TO FUSE • BUILD YOUR STAR
       </div>
     </div>

@@ -27,6 +27,13 @@ const PHASE_LABELS: Record<Phase, string> = {
   collapse: 'COLLAPSE',
 };
 
+const PHASE_COLORS: Record<Phase, string> = {
+  main_sequence: '#38bdf8', // Cyan
+  red_giant: '#f97316',     // Orange
+  supergiant: '#fbbf24',    // Amber/Gold
+  collapse: '#a855f7',      // Purple
+};
+
 export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu }: HUDProps) {
   const state = useGameStore();
   const ageInfo = getStarAgeInfo(state);
@@ -46,92 +53,153 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu }: HUDPro
   const ageSG_end = tMS * scale * 0.999;
   const ageCollapse = ageSG_end;
 
+  const currentThemeColor = PHASE_COLORS[phase] || '#38bdf8';
+
   return (
-    <div className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-between items-start pointer-events-none">
-      {/* Left Column: Hamburger Menu & HUD horizontal info box */}
-      <div className="flex items-center gap-3 pointer-events-auto">
-        {/* Hamburger Menu Button */}
+    <div className="absolute inset-0 z-10 pointer-events-none select-none">
+      {/* Top Left: Hamburger Menu Button */}
+      <div className="absolute top-4 left-4 pointer-events-auto">
         <button 
           onClick={onOpenMenu}
-          className="flex items-center justify-center bg-black/40 backdrop-blur-md w-11 h-11 rounded-2xl border border-white/10 cursor-pointer hover:bg-white/10 hover:border-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] active:scale-[0.95] transition-all text-white text-lg select-none"
+          className="flex items-center justify-center bg-black/40 backdrop-blur-md w-11 h-11 rounded-full border border-white/10 cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.92] transition-all text-white text-base select-none shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
+          style={{ borderColor: `${currentThemeColor}25` }}
           title="Open Pause Menu"
         >
           ☰
         </button>
+      </div>
 
-        {/* HUD horizontal bar (Info Box) */}
+      {/* Top Center: HUD Horizontal Stats Pill */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto">
         <div 
           onClick={() => setShowModal(true)}
-          className="flex items-center justify-between bg-black/40 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 cursor-pointer hover:bg-white/10 hover:border-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] active:scale-[0.98] transition-all select-none gap-4"
+          className="flex items-center justify-between glass-pill px-4 py-2 rounded-full cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all select-none gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.35)] border border-white/8"
+          style={{ 
+            borderColor: `${currentThemeColor}30`, 
+            boxShadow: `0 0 16px ${currentThemeColor}08, inset 0 0 10px ${currentThemeColor}05` 
+          }}
           title="Open Stellar Evolution Guide"
         >
-          <div className="flex items-center gap-2">
-            <span className="text-xl">{PHASE_ICONS[phase]}</span>
+          {/* Desktop Layout (sm:flex hidden) */}
+          <div className="hidden sm:flex items-center gap-4">
+            <div className="flex items-center gap-2.5">
+              <span className="text-base" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
+              <div>
+                <div className="text-[7.5px] tracking-[1.5px] text-white/40 leading-none">PHASE</div>
+                <div className="font-semibold tracking-wide text-[10px] leading-tight mt-0.5">{PHASE_LABELS[phase]}</div>
+              </div>
+            </div>
+
+            <div className="h-5 w-px bg-white/15" />
+
             <div>
-              <div className="text-[9px] tracking-[1.5px] text-white/50">PHASE</div>
-              <div className="font-semibold tracking-wide text-xs">{PHASE_LABELS[phase]}</div>
+              <div className="text-[7.5px] tracking-[1.5px] text-white/40 leading-none">MASS</div>
+              <div className="font-mono text-xs mt-0.5 tabular-nums text-white/90">{starMass.toFixed(1)} <span className="text-[8px] text-white/50 align-super">M☉</span></div>
+            </div>
+
+            <div className="h-5 w-px bg-white/15" />
+
+            <div>
+              <div className="text-[7.5px] tracking-[1.5px] text-white/40 leading-none">STAR AGE</div>
+              <div className="font-mono text-xs mt-0.5 tabular-nums font-bold" style={{ color: currentThemeColor }}>{ageInfo.formatted}</div>
+            </div>
+
+            <div className="h-5 w-px bg-white/15" />
+
+            <div>
+              <div className="text-[7.5px] tracking-[1.5px] text-white/40 leading-none">TURN</div>
+              <div className="font-mono text-xs mt-0.5 tabular-nums text-white/90">{turn}</div>
             </div>
           </div>
 
-          <div className="h-6 w-px bg-white/25" />
-
-          <div>
-            <div className="text-[9px] tracking-[1.5px] text-white/50">MASS</div>
-            <div className="font-mono text-sm tabular-nums">{starMass.toFixed(1)} <span className="text-[10px] align-super">M☉</span></div>
-          </div>
-
-          <div className="h-6 w-px bg-white/25" />
-
-          <div>
-            <div className="text-[9px] tracking-[1.5px] text-white/50">STAR AGE</div>
-            <div className="font-mono text-sm tabular-nums text-cyan-400 font-bold">{ageInfo.formatted}</div>
-          </div>
-
-          <div className="h-6 w-px bg-white/25" />
-
-          <div>
-            <div className="text-[9px] tracking-[1.5px] text-white/50">TURN</div>
-            <div className="font-mono text-sm tabular-nums">{turn}</div>
+          {/* Mobile Layout (flex sm:hidden) */}
+          <div className="flex sm:hidden items-center gap-2 text-[9px] font-mono tracking-wider font-semibold uppercase text-white/80 whitespace-nowrap">
+            <span className="text-xs" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
+            <span className="font-bold tracking-widest" style={{ color: currentThemeColor }}>
+              {phase === 'main_sequence' ? 'MAIN SEQ' : PHASE_LABELS[phase]}
+            </span>
+            <span className="opacity-25">•</span>
+            <span className="text-white">{starMass.toFixed(1)} M☉</span>
+            <span className="opacity-25">•</span>
+            <span className="font-bold" style={{ color: currentThemeColor }}>{ageInfo.formatted.replace(' Years', 'Y')}</span>
+            <span className="opacity-25">•</span>
+            <span className="text-white">T{turn}</span>
           </div>
         </div>
       </div>
 
-      {/* Right Column: Element legend */}
-      <div className="bg-black/40 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 text-sm min-w-[180px] pointer-events-auto">
-        <div className="text-[10px] tracking-[2px] text-white/50 mb-2 px-1">ELEMENTS</div>
-        {Object.entries(ELEMENTS).map(([sym, el]) => {
-          const count = elementCounts[sym as ElementSymbol] || 0;
-          const isUnlocked = count > 0 || ['H', 'He'].includes(sym); // basic visibility
-          return (
-            <div key={sym} className={`flex items-center justify-between py-0.5 px-1 rounded ${!isUnlocked ? 'opacity-40' : ''}`}>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: el.color }} />
-                <span className="font-mono w-6">{sym}</span>
-                <span className="text-white/70 text-xs">{el.displayName}</span>
-              </div>
-              <span className="font-mono tabular-nums text-right w-6">{count}</span>
-            </div>
-          );
-        })}
+      {/* Bottom Center: Element inventory dock */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
+        <div className="flex flex-col items-center gap-1.5 pointer-events-none select-none max-w-[95vw] sm:max-w-md md:max-w-xl">
+          {/* Elements Tray */}
+          <div 
+            className="glass-panel px-3.5 py-2.5 rounded-[22px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center gap-2.5 overflow-x-auto max-w-full custom-scrollbar pointer-events-auto border border-white/8"
+            style={{ 
+              borderColor: `${currentThemeColor}15`,
+              boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px ${currentThemeColor}05`
+            }}
+          >
+            {Object.entries(ELEMENTS).map(([sym, el]) => {
+              const count = elementCounts[sym as ElementSymbol] || 0;
+              const isUnlocked = count > 0 || ['H', 'He'].includes(sym);
+              
+              if (isUnlocked) {
+                return (
+                  <div 
+                    key={sym}
+                    className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full border bg-black/40 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95]"
+                    style={{ 
+                      borderColor: el.color,
+                      boxShadow: `0 0 10px ${el.color}15, inset 0 0 6px ${el.color}10`
+                    }}
+                    title={`${el.displayName}: ${count} nuclei`}
+                  >
+                    <span 
+                      className="font-mono text-xs sm:text-sm font-bold tracking-tight"
+                      style={{ color: el.color }}
+                    >
+                      {sym}
+                    </span>
+                    <span className="absolute -top-1 -right-1 bg-[#101015]/90 text-white border border-white/10 font-mono text-[8px] sm:text-[9px] w-4 h-4 rounded-full flex items-center justify-center backdrop-blur-md font-bold tabular-nums">
+                      {count}
+                    </span>
+                  </div>
+                );
+              } else {
+                return (
+                  <div 
+                    key={sym}
+                    className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/10 bg-black/10 opacity-30 select-none cursor-default"
+                    title={`Locked Element (Fuse heavier nuclei to discover)`}
+                  >
+                    <span className="font-mono text-[10px] sm:text-xs text-white/50 font-medium">
+                      {sym}
+                    </span>
+                  </div>
+                );
+              }
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Stellar Life Stage Guide Modal Pop-up Overlay */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex justify-center items-center p-4 pointer-events-auto">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex justify-center items-center p-4 pointer-events-auto">
           {/* Modal Container */}
-          <div className="bg-slate-900/90 border border-white/15 p-6 rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto flex flex-col gap-5 text-white shadow-2xl relative select-none animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-[#0f0f15]/95 border border-white/10 p-6 rounded-[28px] max-w-lg w-full max-h-[85vh] overflow-y-auto custom-scrollbar flex flex-col gap-5 text-white shadow-2xl relative select-none animate-fade-in-up">
             {/* Close Button */}
             <button 
               onClick={() => setShowModal(false)}
-              className="absolute top-4 right-4 text-white/50 hover:text-white hover:bg-white/10 w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-95 text-lg cursor-pointer"
+              className="absolute top-4 right-4 text-white/40 hover:text-white hover:bg-white/5 w-8 h-8 rounded-full border border-white/5 flex items-center justify-center transition-all active:scale-95 text-lg cursor-pointer"
             >
               ✕
             </button>
 
             {/* Header */}
-            <div className="flex flex-col gap-1.5 border-b border-white/10 pb-4 pr-8">
-              <span className="text-[10px] tracking-[2.5px] text-cyan-400 font-bold uppercase">Stellar Physics Journal</span>
-              <h2 className="text-xl font-bold tracking-wide">STELLAR LIFE STAGE GUIDE</h2>
+            <div className="flex flex-col gap-1 border-b border-white/5 pb-4 pr-8">
+              <span className="text-[9px] tracking-[2.5px] text-cyan-400 font-bold uppercase font-mono">Stellar Physics Journal</span>
+              <h2 className="text-lg font-semibold tracking-wide">STELLAR LIFE STAGE GUIDE</h2>
               <p className="text-xs text-white/50 leading-relaxed font-normal mt-1">
                 A star's lifespan is governed entirely by core nuclear fusion. More massive stars burn through their fuel exponentially faster:
               </p>
@@ -141,17 +209,17 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu }: HUDPro
             </div>
 
             {/* Timeline stages list */}
-            <div className="flex flex-col gap-6 relative pl-5 border-l border-white/15 ml-2 text-sm">
+            <div className="flex flex-col gap-6 relative pl-5 border-l border-white/10 ml-2 text-sm">
               {/* 1. Main Sequence */}
               <div className={`relative ${phase === 'main_sequence' ? 'text-cyan-400 font-bold' : 'text-white/60'}`}>
                 {/* Active indicator dot */}
-                <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-black transition-all ${
+                <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
                   phase === 'main_sequence' 
                     ? 'bg-cyan-400 animate-pulse shadow-[0_0_12px_#22d3ee]' 
                     : 'bg-white/20'
                 }`} />
                 <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-base">1. Main Sequence</span>
+                  <span className="text-base font-semibold">1. Main Sequence</span>
                   <span className="font-mono text-xs text-white/40">{ageMS_start.toFixed(1)} to {ageMS_end.toFixed(1)} {unit}</span>
                 </div>
                 <p className="text-xs text-white/45 leading-relaxed font-normal">
@@ -163,14 +231,14 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu }: HUDPro
               {/* 2. Red Giant */}
               <div className={`relative ${phase === 'red_giant' ? 'text-amber-400 font-bold' : 'text-white/60'}`}>
                 {/* Active indicator dot */}
-                <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-black transition-all ${
+                <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
                   phase === 'red_giant' 
                     ? 'bg-amber-400 animate-pulse shadow-[0_0_12px_#fbbf24]' 
                     : 'bg-white/20'
                 }`} />
                 <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-base">2. Red Giant</span>
-                  <span className="font-mono text-xs text-white/44">{ageRG_start.toFixed(1)} to {ageRG_end.toFixed(1)} {unit}</span>
+                  <span className="text-base font-semibold">2. Red Giant</span>
+                  <span className="font-mono text-xs text-white/40">{ageRG_start.toFixed(1)} to {ageRG_end.toFixed(1)} {unit}</span>
                 </div>
                 <p className="text-xs text-white/45 leading-relaxed font-normal">
                   Helium core shrinks & heats up, causing the outer hydrogen layers to expand. Fuses Helium into Carbon and Oxygen.
@@ -181,14 +249,14 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu }: HUDPro
               {/* 3. Supergiant */}
               <div className={`relative ${phase === 'supergiant' ? 'text-red-400 font-bold' : 'text-white/60'}`}>
                 {/* Active indicator dot */}
-                <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-black transition-all ${
+                <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
                   phase === 'supergiant' 
                     ? 'bg-red-400 animate-pulse shadow-[0_0_12px_#f87171]' 
                     : 'bg-white/20'
                 }`} />
                 <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-base">3. Supergiant</span>
-                  <span className="font-mono text-xs text-white/44">{ageSG_start.toFixed(1)} to {ageSG_end.toFixed(1)} {unit}</span>
+                  <span className="text-base font-semibold">3. Supergiant</span>
+                  <span className="font-mono text-xs text-white/40">{ageSG_start.toFixed(1)} to {ageSG_end.toFixed(1)} {unit}</span>
                 </div>
                 <p className="text-xs text-white/45 leading-relaxed font-normal">
                   Advanced core-shell fusion begins. The star burns Carbon, Oxygen, Neon, Magnesium, and Silicon in concentric layers like an onion.
@@ -199,14 +267,14 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu }: HUDPro
               {/* 4. Core Collapse */}
               <div className={`relative ${phase === 'collapse' ? 'text-purple-400 font-bold' : 'text-white/60'}`}>
                 {/* Active indicator dot */}
-                <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-black transition-all ${
+                <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
                   phase === 'collapse' 
                     ? 'bg-purple-400 animate-pulse shadow-[0_0_12px_#c084fc]' 
                     : 'bg-white/20'
                 }`} />
                 <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-base">4. Core Collapse</span>
-                  <span className="font-mono text-xs text-white/44">Above {ageCollapse.toFixed(1)} {unit}</span>
+                  <span className="text-base font-semibold">4. Core Collapse</span>
+                  <span className="font-mono text-xs text-white/40 font-bold">Above {ageCollapse.toFixed(1)} {unit}</span>
                 </div>
                 <p className="text-xs text-white/45 leading-relaxed font-normal">
                   Silicon fuses into Iron. Since Iron fusion consumes energy instead of releasing it, the star collapses under extreme gravity, triggering a violent Supernova!
@@ -218,7 +286,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu }: HUDPro
             {/* Footer Close Button */}
             <button
               onClick={() => setShowModal(false)}
-              className="mt-2 bg-white/10 border border-white/10 hover:bg-white/25 text-white text-xs font-semibold py-2.5 rounded-xl transition-all cursor-pointer text-center"
+              className="mt-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs font-semibold py-2.5 rounded-xl transition-all cursor-pointer text-center active:scale-[0.985]"
             >
               Back to Fusion Board
             </button>
