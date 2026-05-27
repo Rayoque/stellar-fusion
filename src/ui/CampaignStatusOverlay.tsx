@@ -17,11 +17,11 @@ const SUCCESS_MESSAGES: Record<number, string> = {
   3: "The Triple-Alpha barrier is broken. Helium-4 nuclei have merged into a stable Carbon-12 core under immense convective resonance.",
   4: "Carbon nuclei have captured alpha particles. Your red giant has synthesized a rich, heavy Oxygen shell, securing core stability.",
   5: "Curved topological paths navigated. Oxygen has fused with Helium to form a glowing, stable Neon-20 shell layer.",
-  6: "Neon alpha-capture resonance achieved! A beautiful, glowing Magnesium-24 shell layer now sits securely in the supergiant concentric shells.",
+  6: "Neon alpha-capture resonance achieved! A stable, glowing Magnesium-24 shell layer now sits securely in the supergiant concentric shells.",
   7: "Silicon synthesized. High-mass nuclei have successfully merged despite massive slide constraints and gravitational drag.",
   8: "Silicon trap avoided. Two separate, heavy Silicon cores have been synthesized and positioned in the convective shells.",
-  9: "Silicon burned. Iron synthesized in the core. Thermal pressure has ceased, triggering the ultimate, glorious Core Collapse supernova!",
-  10: "Cosmic equilibrium reached. You have successfully balanced and possessed all 8 stable elements on the board simultaneously. You are a Master of Stellar Physics!"
+  9: "Silicon burned. Iron synthesized in the core. Thermal pressure has ceased, triggering a core collapse supernova.",
+  10: "Cosmic equilibrium reached. You have successfully balanced and possessed all 8 stable elements on the board simultaneously."
 };
 
 const FAILURE_MESSAGES: Record<number, string> = {

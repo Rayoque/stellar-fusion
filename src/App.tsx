@@ -200,17 +200,21 @@ export default function App() {
       {/* Subtle discovery dynamic toast notification */}
       {activeToastElement && (
         <div 
-          className="fixed left-1/2 -translate-x-1/2 z-50 glass-pill px-6 py-3 rounded-full border border-cyan-500/20 text-cyan-400 font-bold tracking-[3.5px] text-[8.5px] sm:text-[9.5px] shadow-[0_0_24px_rgba(34,211,238,0.15)] flex items-center justify-center text-center gap-2.5 uppercase font-mono pointer-events-auto cursor-pointer select-none animate-fade-in-up max-w-[90vw] sm:max-w-none"
+          className="fixed left-1/2 -translate-x-1/2 z-50 pointer-events-none flex justify-center w-full max-w-[90vw] sm:max-w-none"
           style={{ top: 'calc(4.8rem + env(safe-area-inset-top, 0px))' }}
-          onClick={() => {
-            dismissToast();
-            setShowCodex(true);
-          }}
-          title="Click to view Codex Journal log"
         >
-          <span className="text-xs">✦</span>
-          <span>NEW ELEMENT SYNTHESIZED: {ELEMENTS[activeToastElement].displayName}</span>
-          <span className="text-xs">✦</span>
+          <div 
+            className="glass-pill px-6 py-3 rounded-full border border-cyan-500/20 text-cyan-400 font-bold tracking-[3.5px] text-[8.5px] sm:text-[9.5px] shadow-[0_0_24px_rgba(34,211,238,0.15)] flex items-center justify-center text-center gap-2.5 uppercase font-mono pointer-events-auto cursor-pointer select-none animate-fade-in-up"
+            onClick={() => {
+              dismissToast();
+              setShowCodex(true);
+            }}
+            title="Click to view Codex Journal log"
+          >
+            <span className="text-xs">✦</span>
+            <span>NEW ELEMENT SYNTHESIZED: {ELEMENTS[activeToastElement].displayName}</span>
+            <span className="text-xs">✦</span>
+          </div>
         </div>
       )}
     </div>

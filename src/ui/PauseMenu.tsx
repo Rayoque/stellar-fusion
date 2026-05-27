@@ -123,7 +123,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
                 <div className="flex items-center justify-between border-t border-white/5 pt-3">
                   <div className="pr-4">
                     <div className="text-xs font-semibold text-white/90">Background Drone</div>
-                    <div className="text-[10px] text-white/40 mt-1 leading-normal">Soothing low-frequency cosmic ambient hum.</div>
+                    <div className="text-[10px] text-white/40 mt-1 leading-normal">Low-frequency atmospheric background drone.</div>
                   </div>
                   <button
                     onClick={handleToggleBgSound}
@@ -170,7 +170,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
           </div>
 
           <div className="text-[7.5px] text-white/25 tracking-[3px] font-mono uppercase mt-8">
-            STELLAR FUSION ENGINE • V0.9.8
+            STELLAR FUSION ENGINE • V0.9.10
           </div>
         </div>
       </div>

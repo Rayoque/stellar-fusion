@@ -91,7 +91,7 @@ export function StartScreen({ onStart, onOpenCampaign }: StartScreenProps) {
               <h2 className="text-lg font-light tracking-[0.12em] mb-3 text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 uppercase">HEADPHONES SUGGESTED</h2>
               
               <p className="text-[11px] text-white/40 leading-relaxed font-light mb-7 max-w-[240px]">
-                For the best cosmic experience, wear headphones to feel the deep, breathing ambient star drones and crisp nuclear fusion sound effects.
+                Stellar Fusion is designed with an immersive ambient soundscape. Headphones are recommended for full immersion.
               </p>
 
               <button

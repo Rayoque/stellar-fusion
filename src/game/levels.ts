@@ -162,7 +162,7 @@ export const LEVELS: Level[] = [
     id: 9,
     title: "Iron Core Collapse",
     author: "Inspired by Serkan Yürekli",
-    description: "Iron fusion consumes energy rather than releasing it, sealing the fate of the star. Achieve the ultimate end state: synthesize a single Iron tile in the core to trigger a glorious supernova collapse!",
+    description: "Iron fusion consumes energy rather than releasing it, sealing the fate of the star. Achieve the ultimate end state: synthesize a single Iron tile in the core to trigger a core collapse supernova.",
     starMass: 29.5,
     maxTurns: 8,
     initialTiles: [
