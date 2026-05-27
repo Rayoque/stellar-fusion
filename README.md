@@ -2,7 +2,7 @@
 
 A 3D fusion puzzle game played on the surface of a soccer ball. Slide hydrogen into hydrogen, build helium, then carbon, then heavier elements, all the way to iron. Spiritual successor to 2048, with real stellar nucleosynthesis as the rule set.
 
-![Stellar Fusion gameplay](doc/screenshot.png)
+![Stellar Fusion gameplay](./signal-2026-05-16-072138_002.jpeg)
 
 ## Play it
 
