@@ -1,6 +1,7 @@
 // src/ui/PauseMenu.tsx
 import React, { useState } from 'react';
 import { useGameStore } from '../game/state';
+import { isBgSoundEnabled, setBgSoundEnabled, isEffectsSoundEnabled, setEffectsSoundEnabled } from '../audio/synth';
 
 interface PauseMenuProps {
   onResume: () => void;
@@ -15,6 +16,20 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
   const setShowRealtimeGraphics = useGameStore(s => s.setShowRealtimeGraphics);
 
   const [showSettings, setShowSettings] = useState(false);
+  const [bgSound, setBgSound] = useState(isBgSoundEnabled());
+  const [effectsSound, setEffectsSound] = useState(isEffectsSoundEnabled());
+
+  const handleToggleBgSound = () => {
+    const nextVal = !bgSound;
+    setBgSound(nextVal);
+    setBgSoundEnabled(nextVal);
+  };
+
+  const handleToggleEffectsSound = () => {
+    const nextVal = !effectsSound;
+    setEffectsSound(nextVal);
+    setEffectsSoundEnabled(nextVal);
+  };
 
   const handleReset = () => {
     reset();
@@ -84,6 +99,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
             {/* Expanded Settings Panel */}
             {showSettings && (
               <div className="bg-black/40 border border-white/5 rounded-2xl p-4 text-left space-y-4 animate-fade-in-up mt-3">
+                {/* Real-Time Graphics Toggle */}
                 <div className="flex items-center justify-between">
                   <div className="pr-4">
                     <div className="text-xs font-semibold text-white/90">Real-Time Graphics</div>
@@ -102,6 +118,46 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
                     />
                   </button>
                 </div>
+
+                {/* Background Sound Toggle */}
+                <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                  <div className="pr-4">
+                    <div className="text-xs font-semibold text-white/90">Background Drone</div>
+                    <div className="text-[10px] text-white/40 mt-1 leading-normal">Soothing low-frequency cosmic ambient hum.</div>
+                  </div>
+                  <button
+                    onClick={handleToggleBgSound}
+                    className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      bgSound ? 'bg-cyan-500' : 'bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        bgSound ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Effects Sound Toggle */}
+                <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                  <div className="pr-4">
+                    <div className="text-xs font-semibold text-white/90">Sound Effects</div>
+                    <div className="text-[10px] text-white/40 mt-1 leading-normal">Nuclei spawning tick, blocked shake, and fusion merges.</div>
+                  </div>
+                  <button
+                    onClick={handleToggleEffectsSound}
+                    className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      effectsSound ? 'bg-cyan-500' : 'bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        effectsSound ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -114,7 +170,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
           </div>
 
           <div className="text-[7.5px] text-white/25 tracking-[3px] font-mono uppercase mt-8">
-            STELLAR FUSION ENGINE • V0.9.1
+            STELLAR FUSION ENGINE • V0.9.3
           </div>
         </div>
       </div>

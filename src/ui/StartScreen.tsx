@@ -22,8 +22,8 @@ export function StartScreen({ onStart, onOpenCampaign }: StartScreenProps) {
           STELLAR FUSION
         </h1>
         
-        <p className="text-sm sm:text-base text-white/50 mb-10 tracking-[0.06em] leading-relaxed max-w-[280px] sm:max-w-sm mx-auto font-light">
-          Drag elements across a soccer-ball star.<br />Fuse according to real stellar physics.
+        <p className="text-xs sm:text-sm text-white/45 mb-10 tracking-[0.08em] leading-relaxed max-w-[280px] sm:max-w-xs mx-auto font-light">
+          Navigate the curved geometry of a thermonuclear star.<br />Synthesize elements and ignite the core.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -42,10 +42,6 @@ export function StartScreen({ onStart, onOpenCampaign }: StartScreenProps) {
             PLAY SCENARIOS
             <span className="text-[10px] select-none">✦</span>
           </button>
-        </div>
-
-        <div className="mt-20 text-[7.5px] sm:text-[8px] text-white/25 tracking-[4px] font-mono uppercase whitespace-nowrap">
-          Truncated Icosahedron • 8 Elements • Fusion Rules
         </div>
       </div>
     </div>

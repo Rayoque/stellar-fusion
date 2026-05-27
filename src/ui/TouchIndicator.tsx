@@ -59,15 +59,15 @@ export function TouchIndicator() {
       // 2. Create the tracking orb programmatically
       const el = document.createElement('div');
       el.className = 'absolute rounded-full border pointer-events-none';
-      el.style.width = '30px';
-      el.style.height = '30px';
+      el.style.width = '16px';
+      el.style.height = '16px';
       el.style.borderColor = colors.primary;
       el.style.backgroundColor = colors.glow;
-      el.style.boxShadow = `0 0 15px ${colors.primary}, inset 0 0 8px ${colors.primary}`;
+      el.style.boxShadow = `0 0 10px ${colors.primary}, inset 0 0 5px ${colors.primary}`;
       el.style.opacity = '0.9';
       el.style.backdropFilter = 'blur(0.5px)';
       // Center the element under the physical finger using translate3d
-      el.style.transform = `translate3d(${x - 15}px, ${y - 15}px, 0)`;
+      el.style.transform = `translate3d(${x - 8}px, ${y - 8}px, 0)`;
 
       container.appendChild(el);
       activeElementsRef.current.set(id, el);
@@ -78,26 +78,26 @@ export function TouchIndicator() {
       rippleGroup.style.left = `${x}px`;
       rippleGroup.style.top = `${y}px`;
 
-      // Main ripple ring
+      // Main ripple ring (smaller, faster)
       const ring1 = document.createElement('div');
       ring1.className = 'absolute rounded-full';
-      ring1.style.width = '50px';
-      ring1.style.height = '50px';
+      ring1.style.width = '24px';
+      ring1.style.height = '24px';
       ring1.style.backgroundColor = 'transparent';
-      ring1.style.border = `2px solid ${colors.primary}`;
-      ring1.style.boxShadow = `0 0 18px ${colors.primary}`;
+      ring1.style.border = `1.5px solid ${colors.primary}`;
+      ring1.style.boxShadow = `0 0 10px ${colors.primary}`;
       ring1.style.transform = 'translate(-50%, -50%)';
-      ring1.style.animation = 'touch-ripple 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards';
+      ring1.style.animation = 'touch-ripple 0.3s cubic-bezier(0.1, 0.8, 0.3, 1) forwards';
 
-      // Large faint secondary ring
+      // Large faint secondary ring (smaller, faster)
       const ring2 = document.createElement('div');
       ring2.className = 'absolute rounded-full';
-      ring2.style.width = '50px';
-      ring2.style.height = '50px';
+      ring2.style.width = '24px';
+      ring2.style.height = '24px';
       ring2.style.backgroundColor = 'transparent';
-      ring2.style.border = `1px solid ${colors.primary}`;
+      ring2.style.border = `0.75px solid ${colors.primary}`;
       ring2.style.transform = 'translate(-50%, -50%)';
-      ring2.style.animation = 'touch-ring 0.7s cubic-bezier(0.15, 0.85, 0.45, 1) forwards';
+      ring2.style.animation = 'touch-ring 0.32s cubic-bezier(0.15, 0.85, 0.45, 1) forwards';
 
       rippleGroup.appendChild(ring1);
       rippleGroup.appendChild(ring2);
@@ -106,17 +106,17 @@ export function TouchIndicator() {
       // Self-destruct ripple elements after their CSS animations complete
       setTimeout(() => {
         rippleGroup.remove();
-      }, 800);
+      }, 400);
 
-      // 4. Programmatically spawn the beautiful drift particles
-      const particleCount = 8;
+      // 4. Programmatically spawn the beautiful drift particles (fewer, smaller, faster)
+      const particleCount = 5;
       for (let i = 0; i < particleCount; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const distance = 30 + Math.random() * 70;
+        const distance = 12 + Math.random() * 28;
         const dx = `${(Math.cos(angle) * distance).toFixed(1)}px`;
         const dy = `${(Math.sin(angle) * distance).toFixed(1)}px`;
         const color = colors.particles[Math.floor(Math.random() * colors.particles.length)];
-        const size = 5 + Math.random() * 6; // 5px to 11px
+        const size = 3 + Math.random() * 3; // 3px to 6px (was 5px to 11px)
 
         const pEl = document.createElement('div');
         pEl.className = 'absolute rounded-full pointer-events-none';
@@ -125,9 +125,9 @@ export function TouchIndicator() {
         pEl.style.width = `${size}px`;
         pEl.style.height = `${size}px`;
         pEl.style.backgroundColor = color;
-        pEl.style.boxShadow = `0 0 8px ${color}, 0 0 14px ${color}`;
+        pEl.style.boxShadow = `0 0 5px ${color}, 0 0 10px ${color}`;
         pEl.style.transform = 'translate(-50%, -50%)';
-        pEl.style.animation = 'particle-drift 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards';
+        pEl.style.animation = 'particle-drift 0.4s cubic-bezier(0.25, 1, 0.5, 1) forwards';
         pEl.style.setProperty('--dx', dx);
         pEl.style.setProperty('--dy', dy);
 
@@ -136,7 +136,7 @@ export function TouchIndicator() {
         // Self-destruct particle element after animation completes
         setTimeout(() => {
           pEl.remove();
-        }, 1000);
+        }, 500);
       }
     };
 
@@ -148,7 +148,7 @@ export function TouchIndicator() {
       // Instantly track active pointer element's position using high-performance translate3d
       const el = activeElementsRef.current.get(id);
       if (el) {
-        el.style.transform = `translate3d(${x - 15}px, ${y - 15}px, 0)`;
+        el.style.transform = `translate3d(${x - 8}px, ${y - 8}px, 0)`;
       }
     };
 

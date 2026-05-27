@@ -125,7 +125,7 @@ export default function App() {
         />
         {showCampaign && (
           <CampaignSelector
-            onClose={() => setShowCampaign(false)}
+            onClose={() => { setShowCampaign(false); window.scrollTo(0, 0); }}
             onSelectLevel={handleLaunchLevel}
           />
         )}
@@ -170,7 +170,7 @@ export default function App() {
       {/* Campaign Scenarios Level Selector Modal */}
       {showCampaign && (
         <CampaignSelector
-          onClose={() => setShowCampaign(false)}
+          onClose={() => { setShowCampaign(false); window.scrollTo(0, 0); }}
           onSelectLevel={handleLaunchLevel}
         />
       )}
@@ -178,7 +178,7 @@ export default function App() {
       {/* Stellar Codex Journal Modal */}
       {showCodex && (
         <Codex
-          onClose={() => setShowCodex(false)}
+          onClose={() => { setShowCodex(false); window.scrollTo(0, 0); }}
         />
       )}
 
@@ -200,7 +200,8 @@ export default function App() {
       {/* Subtle discovery dynamic toast notification */}
       {activeToastElement && (
         <div 
-          className="fixed top-20 left-1/2 -translate-x-1/2 z-50 glass-pill px-5 py-2.5 rounded-full border border-cyan-500/20 text-cyan-400 font-bold tracking-[3px] text-[8.5px] sm:text-[9.5px] shadow-[0_0_20px_rgba(34,211,238,0.15)] flex items-center gap-2.5 uppercase font-mono pointer-events-auto cursor-pointer select-none animate-fade-in-up"
+          className="fixed left-1/2 -translate-x-1/2 z-50 glass-pill px-6 py-3 rounded-full border border-cyan-500/20 text-cyan-400 font-bold tracking-[3.5px] text-[8.5px] sm:text-[9.5px] shadow-[0_0_24px_rgba(34,211,238,0.15)] flex items-center justify-center text-center gap-2.5 uppercase font-mono pointer-events-auto cursor-pointer select-none animate-fade-in-up max-w-[90vw] sm:max-w-none"
+          style={{ top: 'calc(4.8rem + env(safe-area-inset-top, 0px))' }}
           onClick={() => {
             dismissToast();
             setShowCodex(true);
@@ -212,11 +213,6 @@ export default function App() {
           <span className="text-xs">✦</span>
         </div>
       )}
-
-      {/* Subtle instructions */}
-      <div className="absolute bottom-[92px] sm:bottom-28 left-1/2 -translate-x-1/2 text-[9px] sm:text-[10px] opacity-35 tracking-[4px] pointer-events-none whitespace-nowrap uppercase font-mono">
-        DRAG TILES TO FUSE • BUILD YOUR STAR
-      </div>
     </div>
   );
 }

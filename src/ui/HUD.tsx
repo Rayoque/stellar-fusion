@@ -41,6 +41,11 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
   const ageInfo = getStarAgeInfo(state);
   const [showModal, setShowModal] = React.useState(false);
 
+  const handleCloseGuide = () => {
+    setShowModal(false);
+    window.scrollTo(0, 0);
+  };
+
   // Campaign support
   const currentLevelId = useGameStore(s => s.currentLevelId);
   const level = currentLevelId !== null ? LEVELS.find(l => l.id === currentLevelId) : null;
@@ -65,7 +70,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
   return (
     <div className="absolute inset-0 z-10 pointer-events-none select-none">
       {/* Top Left: Hamburger Menu Button */}
-      <div className="absolute top-4 left-4 pointer-events-auto">
+      <div className="absolute left-4 pointer-events-auto" style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
         <button 
           onClick={onOpenMenu}
           className="flex items-center justify-center bg-black/40 backdrop-blur-md w-11 h-11 rounded-full border border-white/10 cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.92] transition-all text-white text-base select-none shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
@@ -77,7 +82,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
       </div>
 
       {/* Top Center: HUD Horizontal Stats Pill & Scenario Objective Banner */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto">
+      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto" style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
         <div 
           onClick={() => setShowModal(true)}
           className="flex items-center justify-between glass-pill px-4 h-11 rounded-full cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all select-none gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.35)] border border-white/8"
@@ -145,8 +150,13 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
       </div>
 
       {/* Bottom Center: Element inventory dock */}
-      <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto" style={{ bottom: 'calc(1.2rem + env(safe-area-inset-bottom, 0px))' }}>
-        <div className="flex flex-col items-center gap-1.5 pointer-events-none select-none max-w-[95vw] sm:max-w-md md:max-w-xl">
+      <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto" style={{ bottom: 'calc(2.2rem + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="flex flex-col items-center gap-3.5 pointer-events-none select-none max-w-[95vw] sm:max-w-md md:max-w-xl">
+          {/* Dynamic Instructions placed directly above the Elements Tray */}
+          <div className="text-[9px] sm:text-[10px] opacity-35 tracking-[4px] font-mono uppercase whitespace-nowrap mb-0.5 select-none">
+            DRAG TILES TO FUSE • BUILD YOUR STAR
+          </div>
+
           {/* Elements Tray */}
           <div 
             className="glass-panel px-3.5 py-3 rounded-[22px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center gap-2.5 overflow-x-auto no-scrollbar max-w-full pointer-events-auto border border-white/8"
@@ -218,7 +228,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
           <div className="bg-[#0f0f15]/95 border border-white/10 p-6 rounded-[28px] max-w-lg w-full max-h-[85vh] overflow-y-auto custom-scrollbar flex flex-col gap-5 text-white shadow-2xl relative select-none animate-fade-in-up">
             {/* Close Button */}
             <button 
-              onClick={() => setShowModal(false)}
+              onClick={handleCloseGuide}
               className="absolute top-4 right-4 text-white/40 hover:text-white hover:bg-white/5 w-8 h-8 rounded-full border border-white/5 flex items-center justify-center transition-all active:scale-95 text-lg cursor-pointer"
             >
               ✕
@@ -313,7 +323,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
 
             {/* Footer Close Button */}
             <button
-              onClick={() => setShowModal(false)}
+              onClick={handleCloseGuide}
               className="mt-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs font-semibold py-2.5 rounded-xl transition-all cursor-pointer text-center active:scale-[0.985]"
             >
               Back to Fusion Board

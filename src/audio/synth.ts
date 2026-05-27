@@ -2,6 +2,8 @@
 import { ELEMENTS } from '../game/elements';
 import type { ElementSymbol } from '../game/types';
 
+let bgSoundEnabled = localStorage.getItem('stellar_bg_sound') !== 'false';
+let effectsSoundEnabled = localStorage.getItem('stellar_effects_sound') !== 'false';
 let audioCtx: AudioContext | null = null;
 
 export function initAudio(): void {
@@ -14,7 +16,7 @@ export function initAudio(): void {
 }
 
 export function playMerge(parent: ElementSymbol, child: ElementSymbol): void {
-  if (!audioCtx) return;
+  if (!effectsSoundEnabled || !audioCtx) return;
 
   const parentPitch = ELEMENTS[parent].pitch;
   const childPitch = ELEMENTS[child].pitch;
@@ -45,7 +47,7 @@ export function playMerge(parent: ElementSymbol, child: ElementSymbol): void {
 }
 
 export function playSpawnTick(): void {
-  if (!audioCtx) return;
+  if (!effectsSoundEnabled || !audioCtx) return;
   const now = audioCtx.currentTime;
 
   const osc = audioCtx.createOscillator();
@@ -63,7 +65,7 @@ export function playSpawnTick(): void {
 }
 
 export function playBlocked(): void {
-  if (!audioCtx) return;
+  if (!effectsSoundEnabled || !audioCtx) return;
   const now = audioCtx.currentTime;
 
   const osc = audioCtx.createOscillator();
@@ -97,7 +99,7 @@ let ambientOsc4: OscillatorNode | null = null;
 let ambientGain: GainNode | null = null;
 
 export function startAmbientDrone(): void {
-  if (!audioCtx || ambientOsc1) return;
+  if (!bgSoundEnabled || !audioCtx || ambientOsc1) return;
 
   ambientOsc1 = audioCtx.createOscillator();
   ambientOsc2 = audioCtx.createOscillator();
@@ -216,3 +218,27 @@ export function createSilentWavUrl(): string {
   const blob = new Blob([buffer], { type: 'audio/wav' });
   return URL.createObjectURL(blob);
 }
+
+export function isBgSoundEnabled(): boolean {
+  return bgSoundEnabled;
+}
+
+export function setBgSoundEnabled(enabled: boolean): void {
+  bgSoundEnabled = enabled;
+  localStorage.setItem('stellar_bg_sound', String(enabled));
+  if (enabled) {
+    startAmbientDrone();
+  } else {
+    stopAmbientDrone();
+  }
+}
+
+export function isEffectsSoundEnabled(): boolean {
+  return effectsSoundEnabled;
+}
+
+export function setEffectsSoundEnabled(enabled: boolean): void {
+  effectsSoundEnabled = enabled;
+  localStorage.setItem('stellar_effects_sound', String(enabled));
+}
+
