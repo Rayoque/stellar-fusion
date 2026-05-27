@@ -16,6 +16,7 @@ export interface Tile {
   faceId: number;
   element: ElementSymbol;
   spawnedAtTurn: number;    // for potential future animations / age
+  spawnReason?: 'spawn' | 'merge' | 'slide';
 }
 
 export type FaceShape = 'pentagon' | 'hexagon';

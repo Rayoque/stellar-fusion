@@ -204,6 +204,7 @@ export function applyMerge(
     faceId: outputFaceId,
     element: rule.output,
     spawnedAtTurn: state.turn,
+    spawnReason: 'merge',
   });
 
   // Update counts (simple recount is safest for correctness)

@@ -13,7 +13,7 @@ export function spawnHydrogen(state: GameState): void {
 
   if (rate <= 0) return;
 
-  const emptyFaces = state.faces.filter(f => !state.tiles.has(f.id));
+  const emptyFaces = state.faces.filter(f => f.shape === 'hexagon' && !state.tiles.has(f.id));
   if (emptyFaces.length === 0) return;
 
   for (let i = 0; i < rate; i++) {
@@ -26,6 +26,7 @@ export function spawnHydrogen(state: GameState): void {
       faceId: target.id,
       element: 'H',
       spawnedAtTurn: state.turn,
+      spawnReason: 'spawn',
     });
 
     emptyFaces.splice(idx, 1);

@@ -82,7 +82,7 @@ export function Tile({ face, tile }: TileProps) {
     // Outer edge is at 0.94 shrinkFactor.
     // 0.82 makes a beautifully inset, concentric inner pentagon marker.
     const shrinkFactor = 0.82;
-    const liftFactor = 1.002;
+    const liftFactor = 1.03;
 
     const liftedCenter = {
       x: center.x * liftFactor,
@@ -139,10 +139,37 @@ export function Tile({ face, tile }: TileProps) {
 
   const groupRef = React.useRef<THREE.Group>(null);
   const tileContentGroupRef = React.useRef<THREE.Group>(null);
+  const textRef = React.useRef<any>(null);
+  const pentagonRef = React.useRef<THREE.Mesh>(null);
+  const smoothOpacityRef = React.useRef(0.12);
 
   const selectedTimeRef = React.useRef<number>(0);
   const prevIsSelectedRef = React.useRef<boolean>(false);
   const smoothPullRef = React.useRef(new THREE.Vector3(0, 0, 0));
+
+  // Spawning / Merging animation hooks
+  const lastTileIdRef = React.useRef<string | null>(null);
+  const animTypeRef = React.useRef<'none' | 'spawn' | 'merge'>('none');
+  const animStartTimeRef = React.useRef<number>(0);
+
+  const currentTileId = tile ? `${tile.element}-${tile.spawnedAtTurn}` : null;
+
+  if (tile && currentTileId !== lastTileIdRef.current) {
+    const reason = tile.spawnReason;
+    if (reason === 'spawn') {
+      animTypeRef.current = 'spawn';
+      animStartTimeRef.current = performance.now();
+    } else if (reason === 'merge') {
+      animTypeRef.current = 'merge';
+      animStartTimeRef.current = performance.now();
+    } else {
+      animTypeRef.current = 'none';
+    }
+    lastTileIdRef.current = currentTileId;
+  } else if (!tile) {
+    lastTileIdRef.current = null;
+    animTypeRef.current = 'none';
+  }
 
   if (isSelected && !prevIsSelectedRef.current) {
     selectedTimeRef.current = performance.now();
@@ -168,6 +195,29 @@ export function Tile({ face, tile }: TileProps) {
     // Keep visible slightly past the horizon (threshold -0.85) to avoid popping,
     // but cull entirely beyond that to prevent any edges/text from clipping.
     groupRef.current.visible = dot > -0.85;
+
+    // Calculate dynamic animScale for spawn/merge transitions
+    let animScale = 1.0;
+    if (tile && animTypeRef.current !== 'none') {
+      const elapsed = performance.now() - animStartTimeRef.current;
+      if (animTypeRef.current === 'spawn') {
+        const duration = 250;
+        const progress = Math.min(elapsed, duration) / duration;
+        if (progress < 1) {
+          animScale = 1.0 - Math.exp(-progress * 5) * Math.cos(progress * Math.PI * 2.5);
+        } else {
+          animTypeRef.current = 'none';
+        }
+      } else if (animTypeRef.current === 'merge') {
+        const duration = 300;
+        const progress = Math.min(elapsed, duration) / duration;
+        if (progress < 1) {
+          animScale = 1.0 + 0.35 * Math.sin(Math.pow(progress, 0.5) * Math.PI) * Math.exp(-progress * 3);
+        } else {
+          animTypeRef.current = 'none';
+        }
+      }
+    }
 
     // Only apply holding/pickup dynamics if the tile is selected/held
     if (isSelected) {
@@ -197,7 +247,8 @@ export function Tile({ face, tile }: TileProps) {
         groupRef.current.scale.set(1.0, 1.0, 1.0);
         
         // Scale and wobble only the floating child tileContentGroup
-        tileContentGroupRef.current.scale.set(1.06 * scaleJiggle, 1.06 * scaleJiggle, 1.06 * scaleJiggle);
+        const totalScale = 1.06 * scaleJiggle * animScale;
+        tileContentGroupRef.current.scale.set(totalScale, totalScale, totalScale);
         
         tileContentGroupRef.current.position.set(
           face.tangentFrame.u.x * (wobbleX + jitterX) + face.tangentFrame.v.x * (wobbleY + jitterY) + smoothPullRef.current.x,
@@ -209,7 +260,7 @@ export function Tile({ face, tile }: TileProps) {
       // Smoothly reset pull ref and tile content group scale/position when not selected
       smoothPullRef.current.set(0, 0, 0);
       if (tileContentGroupRef.current) {
-        tileContentGroupRef.current.scale.set(1.0, 1.0, 1.0);
+        tileContentGroupRef.current.scale.set(animScale, animScale, animScale);
         tileContentGroupRef.current.position.set(0, 0, 0);
       }
     }
@@ -234,6 +285,37 @@ export function Tile({ face, tile }: TileProps) {
     } else {
       // Keep position reset when not blocked
       groupRef.current.position.set(0, 0, 0);
+    }
+
+    // Dynamic screen-up text billboarding using singularity-free geodesic camera-relative formula
+    if (textRef.current) {
+      const localNormal = tempWorldCenter;
+      const camDir = tempCamDir;
+      const qCam = state.camera.quaternion;
+      const qGeodesic = new THREE.Quaternion().setFromUnitVectors(camDir, localNormal);
+      const finalQ = qGeodesic.clone().multiply(qCam);
+      textRef.current.quaternion.copy(finalQ);
+    }
+
+    // Shimmering breathing animation for the pentagon confinement field
+    if (pentagonRef.current) {
+      const elapsed = state.clock.getElapsedTime();
+      const targetBase = (tile && !isSelected) ? 0.0 : 0.12;
+      smoothOpacityRef.current = THREE.MathUtils.lerp(smoothOpacityRef.current, targetBase, 0.12);
+      
+      const pulse = Math.sin(elapsed * 2.2) * 0.04 * (smoothOpacityRef.current / 0.12);
+      const finalOpacity = Math.max(0, smoothOpacityRef.current + pulse);
+      
+      (pentagonRef.current.material as THREE.MeshBasicMaterial).opacity = finalOpacity;
+      pentagonRef.current.traverse((child) => {
+        if (child instanceof THREE.LineSegments && child.material) {
+          const mat = child.material as THREE.LineBasicMaterial;
+          mat.transparent = true;
+          mat.opacity = Math.min(1.0, finalOpacity * 4.5);
+        }
+      });
+      const scalePulse = 1.0 + Math.sin(elapsed * 2.2) * 0.012 * (smoothOpacityRef.current / 0.12);
+      pentagonRef.current.scale.set(scalePulse, scalePulse, scalePulse);
     }
   });
 
@@ -270,15 +352,20 @@ export function Tile({ face, tile }: TileProps) {
           </mesh>
         )}
 
-        {/* Pentagon indicator (only rendered when not a merge target) */}
+        {/* Pentagon indicator (always visible, rendered on top of elements using renderOrder) */}
         {face.shape === 'pentagon' && pentagonGeometry && !isMergeTarget && (
-          <mesh geometry={pentagonGeometry}>
+          <mesh ref={pentagonRef} geometry={pentagonGeometry} renderOrder={2}>
             <meshBasicMaterial 
-              color="#ffffff" 
+              color="#38bdf8" // Confinement field cyan
               transparent 
-              opacity={0.16} 
+              opacity={0.12} 
               side={THREE.DoubleSide}
               depthWrite={false}
+            />
+            <Edges 
+              scale={1.0} 
+              threshold={15} 
+              color="#38bdf8" // Glowing cyan outline
             />
           </mesh>
         )}
@@ -286,7 +373,7 @@ export function Tile({ face, tile }: TileProps) {
         {/* Element symbol */}
         {element && !isMergeTarget && (
           <Text
-            quaternion={textQuaternion}
+            ref={textRef}
             position={[face.center.x * 1.01, face.center.y * 1.01, face.center.z * 1.01]}
             fontSize={0.25}
             color="#ffffff"

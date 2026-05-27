@@ -68,6 +68,28 @@ export function executeSlide(
     if (nextId === null || path.includes(nextId)) break;
 
     const nextFace = state.faces[nextId];
+
+    // Straight line enforcement: if we have already made at least one step,
+    // verify that the new step direction is closely aligned with the first step direction.
+    // This prevents tiles from curving or turning around the hexagonal grid sphere.
+    // We completely bypass this for Hydrogen ('H') to give it a bouncy, organic, fly-around-the-sphere feel!
+    if (element !== 'H' && path.length >= 2) {
+      const firstStart = state.faces[path[0]].center;
+      const firstEnd = state.faces[path[1]].center;
+      const vFirst = normalize(subtract(firstEnd, firstStart));
+      
+      const currentCenter = currentFace.center;
+      const nextCenter = nextFace.center;
+      const vNext = normalize(subtract(nextCenter, currentCenter));
+      
+      const isThroughPentagon = currentFace.shape === 'pentagon' || nextFace.shape === 'pentagon';
+      const stepDot = dot(vFirst, vNext);
+      if (!isThroughPentagon && stepDot < 0.40) {
+        // This step represents a turn/curve — stop the slide!
+        break;
+      }
+    }
+
     const nextTile = state.tiles.get(nextId);
 
     if (!nextTile) {

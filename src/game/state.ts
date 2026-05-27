@@ -84,7 +84,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     } else {
       // Spawn initial ~5 hydrogens
-      const emptyIndices = faces.map((_, i) => i);
+      const emptyIndices = faces.filter(f => f.shape === 'hexagon').map(f => f.id);
       for (let i = 0; i < 5 && emptyIndices.length > 0; i++) {
         const idx = Math.floor(Math.random() * emptyIndices.length);
         const faceId = emptyIndices[idx];
@@ -170,7 +170,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       if (moved) {
         const tile = state.tiles.get(fromFaceId)!;
-        const duration = (slideResult.path.length - 1) * 150;
+        const duration = (slideResult.path.length - 1) * 180;
         
         // Remove tile from original position for animation
         state.tiles.delete(fromFaceId);
@@ -215,8 +215,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
           }
         } else {
           // Normal landing
-          state.tiles.set(landedId, { ...tile, faceId: landedId });
-          mergeRule = detectMerge(landedId, state);
+          state.tiles.set(landedId, { ...tile, faceId: landedId, spawnReason: 'slide' });
+          const isPentagon = state.faces[landedId]?.shape === 'pentagon';
+          if (tile.element === 'H' && isPentagon) {
+            mergeRule = detectMerge(landedId, state);
+          } else {
+            mergeRule = null;
+          }
           mergeLandedId = landedId;
         }
 

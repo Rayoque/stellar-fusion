@@ -50,7 +50,7 @@ export function BlobMesh({ position, color, opacity, scaleFactor, symbol, time }
     geom.computeVertexNormals();
   }, [geom, scaleFactor, time]);
 
-  // Align the flat blob perfectly tangent to the sphere's curved surface and oriented upright (matching static shape)
+  // Align the flat blob perfectly tangent to the sphere's curved surface
   const quaternion = React.useMemo(() => {
     const localNormal = position.clone().normalize();
     
@@ -69,29 +69,56 @@ export function BlobMesh({ position, color, opacity, scaleFactor, symbol, time }
     return new THREE.Quaternion().setFromRotationMatrix(m);
   }, [position]);
 
+  const textRef = React.useRef<any>(null);
+
+  useFrame((state) => {
+    if (textRef.current) {
+      const localNormal = position.clone().normalize();
+      const camDir = state.camera.position.clone().normalize();
+      const qCam = state.camera.quaternion;
+      const qGeodesic = new THREE.Quaternion().setFromUnitVectors(camDir, localNormal);
+      const finalQ = qGeodesic.clone().multiply(qCam);
+      textRef.current.quaternion.copy(finalQ);
+    }
+  });
+
+  // Calculate high-fidelity billboard position slightly elevated above the sphere center
+  const textPos = React.useMemo(() => {
+    const norm = position.clone().normalize();
+    const dist = position.length();
+    return norm.multiplyScalar(dist + 0.015);
+  }, [position]);
+
   return (
-    <mesh position={position} quaternion={quaternion} geometry={geom}>
-      <meshBasicMaterial 
-        color={color} 
-        transparent 
-        opacity={opacity} 
-        depthWrite={false} 
-        side={THREE.DoubleSide} 
-      />
+    <group>
+      {/* Flat tangent plasma blob mesh */}
+      <mesh position={position} quaternion={quaternion} geometry={geom}>
+        <meshBasicMaterial 
+          color={color} 
+          transparent 
+          opacity={opacity} 
+          depthWrite={false} 
+          side={THREE.DoubleSide} 
+        />
+      </mesh>
+      
+      {/* Dynamic screen-up billboarded text */}
       {symbol && (
         <Text
-          position={[0, 0, 0.015]} // Hover text slightly above the blob to prevent z-fighting
+          ref={textRef}
+          position={textPos}
           fontSize={0.24}
           color="#ffffff"
           anchorX="center"
           anchorY="middle"
           outlineWidth={0.012}
           outlineColor="#000000"
+          renderOrder={1}
         >
           {symbol}
         </Text>
       )}
-    </mesh>
+    </group>
   );
 }
 
@@ -141,34 +168,39 @@ export function AnimatedTile() {
       if (tElapsed < 0) return false;
       if (tElapsed >= duration) {
         const endFace = faces[path[path.length - 1]];
-        outVec.set(endFace.center.x, endFace.center.y, endFace.center.z).normalize().multiplyScalar(1.02);
+        if (endFace) outVec.set(endFace.center.x, endFace.center.y, endFace.center.z).normalize().multiplyScalar(1.02);
         return true;
       }
       const segIndex = Math.min(Math.floor(tElapsed / segmentDuration), segmentCount - 1);
       const segT = (tElapsed - segIndex * segmentDuration) / segmentDuration;
       const fromFace = faces[path[segIndex]];
       const toFace = faces[path[segIndex + 1]];
-      
-      outVec.set(fromFace.center.x, fromFace.center.y, fromFace.center.z)
-        .lerp(new THREE.Vector3(toFace.center.x, toFace.center.y, toFace.center.z), segT)
-        .normalize()
-        .multiplyScalar(1.02);
+      if (fromFace && toFace) {
+        outVec.set(fromFace.center.x, fromFace.center.y, fromFace.center.z)
+          .lerp(new THREE.Vector3(toFace.center.x, toFace.center.y, toFace.center.z), segT)
+          .normalize()
+          .multiplyScalar(1.02);
+      }
       return true;
     };
 
-    // 1. Calculate Main Blob Position
-    getPosAtPathTime(elapsed, mainPos.current);
+    // Calculate progress with a beautiful ease-in-out sine easing
+    const progress = Math.min(elapsed, duration) / duration;
+    const easedProgress = -(Math.cos(Math.PI * progress) - 1) / 2; // easeInOutSine
+    const tEased = easedProgress * duration;
 
-    // 2. Calculate Tail 1 Position (delayed by 35ms)
-    const t1Active = getPosAtPathTime(elapsed - 35, tail1Pos.current);
+    // 1. Calculate Main Blob Position using eased timeline
+    getPosAtPathTime(tEased, mainPos.current);
+
+    // 2. Calculate Tail 1 Position (delayed on eased timeline)
+    const t1Active = getPosAtPathTime(tEased - 35, tail1Pos.current);
     
-    // 3. Calculate Tail 2 Position (delayed by 70ms)
-    const t2Active = getPosAtPathTime(elapsed - 70, tail2Pos.current);
+    // 3. Calculate Tail 2 Position (delayed on eased timeline)
+    const t2Active = getPosAtPathTime(tEased - 70, tail2Pos.current);
 
     setHasTails({ tail1: t1Active, tail2: t2Active });
 
     // Smooth transition from 1.06 (held scale) using sin-based elevation arc
-    const progress = Math.min(elapsed, duration) / duration;
     const hopScale = 1.06 * (1 - progress) + 1.0 * progress + 0.06 * Math.sin(progress * Math.PI);
     groupRef.current.scale.set(hopScale, hopScale, hopScale);
   });

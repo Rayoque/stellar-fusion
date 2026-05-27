@@ -1,7 +1,7 @@
 // src/three/Controls.tsx
 import React, { useRef, useEffect } from 'react';
-import { OrbitControls } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
+import { TrackballControls } from '@react-three/drei';
+import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../game/state';
 import { resolveSlideTarget } from '../geometry/slide';
@@ -15,11 +15,94 @@ export function Controls() {
   const faces = useGameStore(s => s.faces);
   const tiles = useGameStore(s => s.tiles);
   const isAnimating = useGameStore(s => s.isAnimating);
+  const activeSlide = useGameStore(s => s.activeSlide);
 
   const dragStartFaceId = useRef<number | null>(null);
   const dragStartPos = useRef<THREE.Vector3 | null>(null);
   const [isDraggingTile, setIsDraggingTile] = React.useState(false);
   const [isPointerDownOnTile, setIsPointerDownOnTile] = React.useState(false);
+  const camStartPos = useRef<THREE.Vector3 | null>(null);
+  const camStartUp = useRef<THREE.Vector3 | null>(null);
+  const slideQuaternion = useRef<THREE.Quaternion | null>(null);
+ 
+  // Relative Proportional Camera Tracking: rotate camera position & up vector smoothly using the slide's geodesic quaternion,
+  // while gradually drifting the sliding shape closer to the center of the viewport (40% drift per slide)
+  useFrame(() => {
+    if (!activeSlide) {
+      camStartPos.current = null;
+      camStartUp.current = null;
+      slideQuaternion.current = null;
+      return;
+    }
+
+    const { path, startTime, duration } = activeSlide;
+    const startFaceId = path[0];
+    const endFaceId = path[path.length - 1];
+    const startFace = faces[startFaceId];
+    const endFace = faces[endFaceId];
+    if (!startFace || !endFace) return;
+
+    // 1. Initialize starting camera states and the geodesic slide rotation quaternion
+    if (camStartPos.current === null) {
+      camStartPos.current = camera.position.clone();
+      camStartUp.current = camera.up.clone();
+      
+      const vStart = new THREE.Vector3(startFace.center.x, startFace.center.y, startFace.center.z).normalize();
+      const vEnd = new THREE.Vector3(endFace.center.x, endFace.center.y, endFace.center.z).normalize();
+      slideQuaternion.current = new THREE.Quaternion().setFromUnitVectors(vStart, vEnd);
+    }
+
+    // 2. Calculate progress with a beautiful, high-fidelity ease-in-out cubic curve (snappy acceleration & soft natural snap)
+    const elapsed = performance.now() - startTime;
+    const progress = Math.min(elapsed, duration) / duration;
+    const eased = progress < 0.5 
+      ? 4 * progress * progress * progress 
+      : 1 - Math.pow(-2 * progress + 2, 3) / 2; // easeInOutCubic
+
+    // 3. Interpolate the slide quaternion (slerp from identity quaternion to full slide rotation)
+    const qProgress = new THREE.Quaternion().slerpQuaternions(
+      new THREE.Quaternion(), // Identity (no rotation)
+      slideQuaternion.current!,
+      eased
+    );
+
+    // 4. Calculate the tile's current position on the unit sphere (same interpolation as AnimatedTile.tsx)
+    const segmentCount = path.length - 1;
+    const segmentDuration = duration / segmentCount;
+    const tEased = eased * duration;
+    const vCurrent = new THREE.Vector3();
+    
+    if (segmentCount > 0) {
+      const segIndex = Math.min(Math.floor(tEased / segmentDuration), segmentCount - 1);
+      const segT = (tEased - segIndex * segmentDuration) / segmentDuration;
+      const fromFace = faces[path[segIndex]];
+      const toFace = faces[path[segIndex + 1]];
+      if (fromFace && toFace) {
+        vCurrent.set(fromFace.center.x, fromFace.center.y, fromFace.center.z)
+          .lerp(new THREE.Vector3(toFace.center.x, toFace.center.y, toFace.center.z), segT)
+          .normalize();
+      } else {
+        vCurrent.set(endFace.center.x, endFace.center.y, endFace.center.z).normalize();
+      }
+    } else {
+      vCurrent.set(endFace.center.x, endFace.center.y, endFace.center.z).normalize();
+    }
+
+    // 5. Blend 100% relative offset position and perfectly centered position to achieve a 40% drift towards center
+    const pRelative = camStartPos.current!.clone().applyQuaternion(qProgress);
+    const currentDist = camStartPos.current!.length();
+    
+    const dirRelative = pRelative.clone().normalize();
+    const dirCentered = vCurrent.clone().normalize();
+    
+    const driftFactor = 0.40; // 40% drift towards screen center per slide
+    const blendedDir = new THREE.Vector3().lerpVectors(dirRelative, dirCentered, eased * driftFactor).normalize();
+
+    // 6. Set camera position and up vector exactly in sync
+    camera.position.copy(blendedDir.multiplyScalar(currentDist));
+    camera.up.copy(camStartUp.current!.clone().applyQuaternion(qProgress));
+    camera.lookAt(0, 0, 0);
+  });
 
   useEffect(() => {
     const dom = gl.domElement;
@@ -194,15 +277,15 @@ export function Controls() {
     };
   }, [camera, gl, scene, startDrag, endDrag, setDragTargetId, faces, tiles, isAnimating, isDraggingTile]);
 
-  return (
-    <OrbitControls
+  return isAnimating ? null : (
+    <TrackballControls
       ref={controlsRef}
-      enablePan={false}
-      enableZoom={true}
-      enableRotate={!isDraggingTile && !isPointerDownOnTile}
+      noPan={true}
+      noZoom={false}
+      noRotate={isDraggingTile || isPointerDownOnTile}
       minDistance={2.5}
       maxDistance={12}
-      dampingFactor={0.1}
+      dynamicDampingFactor={0.15}
       makeDefault
     />
   );

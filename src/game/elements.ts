@@ -2,7 +2,7 @@
 import type { Element, ElementSymbol } from './types';
 
 export const ELEMENTS: Record<ElementSymbol, Element> = {
-  H:  { symbol: 'H',  atomicNumber: 1,  displayName: 'Hydrogen',  color: '#ff6b6b', slideDistance: 8, pitch: 220 },
+  H:  { symbol: 'H',  atomicNumber: 1,  displayName: 'Hydrogen',  color: '#ff6b6b', slideDistance: 32, pitch: 220 },
   He: { symbol: 'He', atomicNumber: 2,  displayName: 'Helium',    color: '#feca57', slideDistance: 5, pitch: 277 },
   C:  { symbol: 'C',  atomicNumber: 6,  displayName: 'Carbon',    color: '#48dbfb', slideDistance: 3, pitch: 330 },
   O:  { symbol: 'O',  atomicNumber: 8,  displayName: 'Oxygen',    color: '#1dd1a1', slideDistance: 2, pitch: 392 },
