@@ -41,6 +41,14 @@ export default function App() {
       initAudio();
       startAmbientDrone();
       
+      // Classic iOS silent-switch ringer bypass hack: playing a brief silent audio clip via the HTML5 Audio interface 
+      // forces mobile Safari to elevate the page's AVAudioSession category from 'Ambient' (which is muted by the ringer switch)
+      // to 'Playback' (which overrides the ringer switch and plays through the speaker).
+      try {
+        const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAIA');
+        silentAudio.play().catch(() => {});
+      } catch (err) {}
+      
       const events = ['click', 'keydown', 'touchstart', 'touchend', 'pointerdown', 'pointerup'];
       for (const ev of events) {
         window.removeEventListener(ev, handleFirstInteraction);

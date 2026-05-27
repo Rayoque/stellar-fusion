@@ -27,11 +27,12 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
-      <div className="bg-[#0f0f13]/90 border border-white/10 rounded-[32px] p-8 max-w-sm w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.6)] relative overflow-hidden animate-fade-in-up isolate">
-        {/* Glow effect */}
-        <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-[60px] pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-purple-500/10 rounded-full blur-[60px] pointer-events-none" />
-
+      <div 
+        className="border border-white/10 rounded-[32px] p-8 max-w-sm w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.6)] relative overflow-hidden animate-fade-in-up isolate"
+        style={{
+          background: 'radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.08), transparent 45%), radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.08), transparent 45%), rgba(15, 15, 19, 0.95)',
+        }}
+      >
         <div className="relative z-10">
           <div className="uppercase tracking-[4px] text-[8px] text-white/35 mb-1.5 font-mono">System Interaction</div>
           <h2 className="text-2xl font-light tracking-[0.16em] mb-8 text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 uppercase">GAME MENU</h2>

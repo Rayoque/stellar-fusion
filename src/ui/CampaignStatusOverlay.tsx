@@ -55,22 +55,13 @@ export function CampaignStatusOverlay({ levelId, status, onNextLevel, onRetry, o
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md select-none pointer-events-auto">
       {/* Modal Container */}
       <div 
-        className="bg-[#0f0f13]/90 border border-white/10 rounded-[32px] p-8 sm:p-10 max-w-md w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.65)] relative overflow-hidden animate-fade-in-up isolate"
+        className="border border-white/10 rounded-[32px] p-8 sm:p-10 max-w-md w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.65)] relative overflow-hidden animate-fade-in-up isolate"
         style={{ 
           borderColor: isWin ? 'rgba(52, 211, 153, 0.2)' : 'rgba(248, 113, 113, 0.2)',
-          boxShadow: `0 16px 48px rgba(0,0,0,0.65), 0 0 24px ${shadowGlow}`
+          boxShadow: `0 16px 48px rgba(0,0,0,0.65), 0 0 24px ${shadowGlow}`,
+          background: `radial-gradient(circle at 0% 0%, ${isWin ? 'rgba(52, 211, 153, 0.06)' : 'rgba(248, 113, 113, 0.06)'}, transparent 45%), radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.06), transparent 45%), rgba(15, 15, 19, 0.95)`,
         }}
       >
-        {/* Dynamic decorative corner glows */}
-        <div 
-          className="absolute -top-32 -left-32 w-64 h-64 rounded-full blur-[70px] pointer-events-none transition-all duration-500"
-          style={{ backgroundColor: isWin ? 'rgba(52, 211, 153, 0.08)' : 'rgba(248, 113, 113, 0.08)' }}
-        />
-        <div 
-          className="absolute -bottom-32 -right-32 w-64 h-64 rounded-full blur-[70px] pointer-events-none transition-all duration-500"
-          style={{ backgroundColor: 'rgba(168, 85, 247, 0.08)' }} // deep purple bottom corner
-        />
-
         <div className="relative z-10">
           <div 
             className="uppercase tracking-[4px] text-[8.5px] sm:text-[9.5px] mb-2 font-mono font-bold"
