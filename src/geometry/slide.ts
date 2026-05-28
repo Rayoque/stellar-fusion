@@ -82,8 +82,9 @@ export function executeSlide(
       const nextCenter = nextFace.center;
       const vNext = normalize(subtract(nextCenter, currentCenter));
       
+      const isThroughPentagon = currentFace.shape === 'pentagon' || nextFace.shape === 'pentagon';
       const stepDot = dot(vFirst, vNext);
-      if (stepDot < 0.40) {
+      if (!isThroughPentagon && stepDot < 0.40) {
         // This step represents a turn/curve — stop the slide!
         break;
       }
@@ -96,11 +97,6 @@ export function executeSlide(
       path.push(nextId);
       currentId = nextId;
       remainingDistance -= 1;
-
-      // If we just entered a pentagon, we must stop the slide here!
-      if (nextFace.shape === 'pentagon') {
-        return { path, stoppedReason: 'empty' };
-      }
 
       // Re-resolve direction from new face (sphere curvature)
       currentDrag = initialDragWorld; // keep original intent or reproject if needed
