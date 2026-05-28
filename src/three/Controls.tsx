@@ -8,7 +8,7 @@ import { resolveSlideTarget } from '../geometry/slide';
 
 export function Controls() {
   const controlsRef = useRef<any>(null);
-  const { camera, gl, scene } = useThree();
+  const { camera, gl, scene, size } = useThree();
   const startDrag = useGameStore(s => s.startDrag);
   const endDrag = useGameStore(s => s.endDrag);
   const setDragTargetId = useGameStore(s => s.setDragTargetId);
@@ -368,11 +368,16 @@ export function Controls() {
 
   const showControls = !(isAnimating || isDraggingTile || isPointerDownOnTile);
 
+  // Decouple rotation speed from viewport size by scaling it proportionally to width
+  const referenceWidth = 400; // width at which default speed (1.0) felt good
+  const dynamicRotateSpeed = (size.width / referenceWidth) * 1.0;
+
   return showControls ? (
     <TrackballControls
       ref={controlsRef}
       enabled={true}
       noPan={true}
+      rotateSpeed={dynamicRotateSpeed}
       minDistance={2.5}
       maxDistance={12}
       dynamicDampingFactor={0.15}
