@@ -29,6 +29,54 @@ export function Controls() {
   const driftVelocity = useRef<number>(0);
   const driftAxis = useRef<THREE.Vector3>(new THREE.Vector3());
 
+  // Keyboard WASD/Arrow active keys tracker
+  const keysPressed = useRef<{ w: boolean; s: boolean; a: boolean; d: boolean }>({
+    w: false,
+    s: false,
+    a: false,
+    d: false,
+  });
+
+  // Keyboard velocity refs for satisfying physical inertia
+  const keyPitchVelocity = useRef<number>(0);
+  const keyYawVelocity = useRef<number>(0);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+      const key = e.key.toLowerCase();
+      if (key === 'w' || e.key === 'ArrowUp') keysPressed.current.w = true;
+      if (key === 's' || e.key === 'ArrowDown') keysPressed.current.s = true;
+      if (key === 'a' || e.key === 'ArrowLeft') keysPressed.current.a = true;
+      if (key === 'd' || e.key === 'ArrowRight') keysPressed.current.d = true;
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (key === 'w' || e.key === 'ArrowUp') keysPressed.current.w = false;
+      if (key === 's' || e.key === 'ArrowDown') keysPressed.current.s = false;
+      if (key === 'a' || e.key === 'ArrowLeft') keysPressed.current.a = false;
+      if (key === 'd' || e.key === 'ArrowRight') keysPressed.current.d = false;
+    };
+
+    const handleBlur = () => {
+      keysPressed.current.w = false;
+      keysPressed.current.s = false;
+      keysPressed.current.a = false;
+      keysPressed.current.d = false;
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
   // Proportional Camera Tracking: rotate camera position & up vector smoothly to track the sliding tile's position,
   // transitioning perfectly and gap-free into the post-slide momentum coasting.
   useFrame((state, delta) => {
@@ -170,6 +218,69 @@ export function Controls() {
         controlsRef.current.update();
       }
       return;
+    }
+
+    // Keyboard WASD/Arrow physics-based rotation with smooth acceleration & deceleration
+    let targetPitch = 0;
+    let targetYaw = 0;
+    const maxSpeed = 2.8; // max orbital rad/s
+
+    if (!activeSlide && !isDraggingTile && !isPointerDownOnTile) {
+      if (keysPressed.current.w) targetPitch = -maxSpeed;
+      if (keysPressed.current.s) targetPitch = maxSpeed;
+      if (keysPressed.current.a) targetYaw = maxSpeed;
+      if (keysPressed.current.d) targetYaw = -maxSpeed;
+    }
+
+    if (isDraggingTile || isPointerDownOnTile || activeSlide) {
+      keyPitchVelocity.current = 0;
+      keyYawVelocity.current = 0;
+    }
+
+    const accelFactor = 8.5; // snappy pickup
+    const decelFactor = 5.5; // elegant deceleration glide
+
+    if (targetPitch !== 0) {
+      keyPitchVelocity.current = THREE.MathUtils.lerp(keyPitchVelocity.current, targetPitch, accelFactor * delta);
+    } else {
+      keyPitchVelocity.current = THREE.MathUtils.lerp(keyPitchVelocity.current, 0, decelFactor * delta);
+    }
+
+    if (targetYaw !== 0) {
+      keyYawVelocity.current = THREE.MathUtils.lerp(keyYawVelocity.current, targetYaw, accelFactor * delta);
+    } else {
+      keyYawVelocity.current = THREE.MathUtils.lerp(keyYawVelocity.current, 0, decelFactor * delta);
+    }
+
+    // Force snap to absolute zero if extremely small to avoid tiny micro-drifts
+    if (Math.abs(keyPitchVelocity.current) < 0.0001) keyPitchVelocity.current = 0;
+    if (Math.abs(keyYawVelocity.current) < 0.0001) keyYawVelocity.current = 0;
+
+    const hasKeyboardMovement = keyPitchVelocity.current !== 0 || keyYawVelocity.current !== 0;
+
+    if (hasKeyboardMovement && !activeSlide && !isDraggingTile && !isPointerDownOnTile) {
+      driftVelocity.current = 0; // Cancel manual drag drift instantly
+
+      // Horizontal Yaw Orbit rotation
+      if (keyYawVelocity.current !== 0) {
+        const localUp = camera.up.clone().normalize();
+        const qYaw = new THREE.Quaternion().setFromAxisAngle(localUp, keyYawVelocity.current * delta);
+        camera.position.applyQuaternion(qYaw);
+        camera.up.applyQuaternion(qYaw);
+      }
+
+      // Vertical Pitch Orbit rotation
+      if (keyPitchVelocity.current !== 0) {
+        const localRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).normalize();
+        const qPitch = new THREE.Quaternion().setFromAxisAngle(localRight, keyPitchVelocity.current * delta);
+        camera.position.applyQuaternion(qPitch);
+        camera.up.applyQuaternion(qPitch);
+      }
+
+      camera.lookAt(0, 0, 0);
+      if (controlsRef.current) {
+        controlsRef.current.update();
+      }
     }
 
     // 2. BACKGROUND MOMENTUM DRIFT PHASE: Coast and decelerate the Buckyball in the slide direction
