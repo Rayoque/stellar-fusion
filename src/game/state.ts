@@ -57,6 +57,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   dragTargetId: null,
   isAnimating: false,
   endState: null,
+  endlessMode: false,
   isPaused: false,
   showRealtimeGraphics: true,
 
@@ -121,6 +122,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       dragTargetId: null,
       isAnimating: false,
       endState: null,
+      endlessMode: false,
       activeSlide: undefined,
       lastMerge: undefined,
       blockedFaceId: null,
@@ -425,6 +427,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set({
       endState: null,
+      endlessMode: true,
       isAnimating: false,
       activeSlide: undefined,
       tiles: nextTiles

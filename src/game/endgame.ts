@@ -19,21 +19,24 @@ export function checkEndState(state: GameState): EndState | null {
     return 'jammed';
   }
 
-  // Iron triggers core collapse → mass-dependent remnant
-  if (state.elementCounts.Fe >= 1) {
-    if (state.starMass < 1.4) return 'failed_collapse';
-    if (state.starMass < 8)   return 'white_dwarf';
-    if (state.starMass < 25)  return 'neutron_star';
-    return 'black_hole';
-  }
+  // Iron and fuel-exhaustion checks are suppressed once the player has chosen
+  // to continue past an end state — prevents the screen from immediately
+  // re-triggering on every subsequent move.
+  if (!state.endlessMode) {
+    if (state.elementCounts.Fe >= 1) {
+      if (state.starMass < 1.4) return 'failed_collapse';
+      if (state.starMass < 8)   return 'white_dwarf';
+      if (state.starMass < 25)  return 'neutron_star';
+      return 'black_hole';
+    }
 
-  // Low-mass natural white dwarf: O accumulated + no more H fuel
-  if (
-    state.starMass < 8 &&
-    state.elementCounts.O >= 4 &&
-    state.elementCounts.H === 0
-  ) {
-    return 'white_dwarf';
+    if (
+      state.starMass < 8 &&
+      state.elementCounts.O >= 4 &&
+      state.elementCounts.H === 0
+    ) {
+      return 'white_dwarf';
+    }
   }
 
   return null;

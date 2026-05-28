@@ -81,6 +81,7 @@ export interface GameState {
   dragTargetId: number | null;
   isAnimating: boolean;
   endState: EndState | null;
+  endlessMode: boolean;
   isPaused: boolean;
   showRealtimeGraphics: boolean;
   activeSlide?: {
