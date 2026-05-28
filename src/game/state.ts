@@ -175,6 +175,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // Remove tile from original position for animation
         state.tiles.delete(fromFaceId);
         
+        const landedId = slideResult.path[slideResult.path.length - 1];
+        const isPentagon = state.faces[landedId]?.shape === 'pentagon';
+        const willSelfFuse = tile.element === 'H' && isPentagon;
+        const willMerge = slideResult.stoppedReason === 'merge' || willSelfFuse;
+
         set({
           isAnimating: true,
           selectedFaceId: null,
@@ -186,7 +191,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
             path: slideResult.path,
             startTime: performance.now(),
             duration,
-            isMerge: slideResult.stoppedReason === 'merge'
+            isMerge: willMerge
           }
         });
 
@@ -194,7 +199,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         await new Promise(r => setTimeout(r, duration));
         
         // Place tile at destination and handle merge detection
-        const landedId = slideResult.path[slideResult.path.length - 1];
         let mergeRule = null;
         let mergeLandedId = landedId;
         const isMerge = slideResult.stoppedReason === 'merge';
@@ -331,6 +335,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
           });
           return;
         }
+
+        // Snappy, lag-free settle delay: exactly 40ms to clear mobile pointer events while maintaining instant response
+        const settleDelay = 40;
+        await new Promise(r => setTimeout(r, settleDelay));
+
+        set({
+          tiles: new Map(state.tiles), // trigger reactivity
+          turn: state.turn,
+          phase: state.phase,
+          elementCounts: { ...state.elementCounts },
+          levelObjectiveMet,
+          levelFailed,
+          activeToastElement,
+          isAnimating: false,
+          activeSlide: undefined,
+          lastMerge: state.lastMerge,
+        });
       } else {
         // Play blocked audio cue
         playBlocked();
@@ -351,19 +372,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }, 350);
         return;
       }
-
-      set({
-        tiles: new Map(state.tiles), // trigger reactivity
-        turn: state.turn,
-        phase: state.phase,
-        elementCounts: { ...state.elementCounts },
-        levelObjectiveMet,
-        levelFailed,
-        activeToastElement,
-        isAnimating: false,
-        activeSlide: undefined,
-        lastMerge: state.lastMerge,
-      });
     } catch (e) {
       console.error('Error in endDrag:', e);
       set({ isAnimating: false, selectedFaceId: null, dragTargetId: null, dragOffset3D: null });

@@ -163,30 +163,33 @@ export function AnimatedTile() {
     if (segmentCount <= 0) return;
     const segmentDuration = duration / segmentCount;
 
-    // Helper to evaluate curved position along the actual path at any elapsed time
+    // Helper to evaluate straight geodesic position along the path from startFace to endFace at any elapsed time
     const getPosAtPathTime = (tElapsed: number, outVec: THREE.Vector3): boolean => {
       if (tElapsed < 0) return false;
+      const startFace = faces[path[0]];
+      const endFace = faces[path[path.length - 1]];
+      if (!startFace || !endFace) return false;
+
       if (tElapsed >= duration) {
-        const endFace = faces[path[path.length - 1]];
-        if (endFace) outVec.set(endFace.center.x, endFace.center.y, endFace.center.z).normalize().multiplyScalar(1.02);
+        outVec.set(endFace.center.x, endFace.center.y, endFace.center.z).normalize().multiplyScalar(1.02);
         return true;
       }
-      const segIndex = Math.min(Math.floor(tElapsed / segmentDuration), segmentCount - 1);
-      const segT = (tElapsed - segIndex * segmentDuration) / segmentDuration;
-      const fromFace = faces[path[segIndex]];
-      const toFace = faces[path[segIndex + 1]];
-      if (fromFace && toFace) {
-        outVec.set(fromFace.center.x, fromFace.center.y, fromFace.center.z)
-          .lerp(new THREE.Vector3(toFace.center.x, toFace.center.y, toFace.center.z), segT)
-          .normalize()
-          .multiplyScalar(1.02);
-      }
+
+      const progress = tElapsed / duration;
+      const vStart = new THREE.Vector3(startFace.center.x, startFace.center.y, startFace.center.z).normalize();
+      const vEnd = new THREE.Vector3(endFace.center.x, endFace.center.y, endFace.center.z).normalize();
+
+      // Slerp directly from start to end for a mathematically straight geodesic arc on the sphere!
+      const q = new THREE.Quaternion().setFromUnitVectors(vStart, vEnd);
+      const qSlerp = new THREE.Quaternion().slerpQuaternions(new THREE.Quaternion(), q, progress);
+      
+      outVec.copy(vStart).applyQuaternion(qSlerp).multiplyScalar(1.02);
       return true;
     };
 
-    // Calculate progress with a beautiful ease-in-out sine easing
+    // Calculate progress with a beautiful ease-out cubic curve (perfectly synchronized with the camera!)
     const progress = Math.min(elapsed, duration) / duration;
-    const easedProgress = -(Math.cos(Math.PI * progress) - 1) / 2; // easeInOutSine
+    const easedProgress = 1 - Math.pow(1 - progress, 3); // easeOutCubic
     const tEased = easedProgress * duration;
 
     // 1. Calculate Main Blob Position using eased timeline
