@@ -245,3 +245,13 @@ export function setEffectsSoundEnabled(enabled: boolean): void {
   localStorage.setItem('stellar_effects_sound', String(enabled));
 }
 
+export function playHeliumLaugh(): void {
+  if (!effectsSoundEnabled) return;
+
+  const audio = new Audio('/hehehe.mp3');
+  audio.volume = 0.495;
+  audio.play().catch(err => {
+    console.warn("Failed to play Helium laugh easter egg (hehehe.mp3 missing?):", err);
+  });
+}
+

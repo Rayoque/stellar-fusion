@@ -8,7 +8,7 @@ import { spawnHydrogen } from './spawn';
 import { checkEndState } from './endgame';
 import { detectMerge, applyMerge } from './rules';
 import { executeSlide } from '../geometry/slide';
-import { playMerge, playBlocked } from '../audio/synth';
+import { playMerge, playBlocked, playHeliumLaugh } from '../audio/synth';
 import { LEVELS } from './levels';
 
 interface GameActions {
@@ -22,6 +22,7 @@ interface GameActions {
   setShowRealtimeGraphics: (show: boolean) => void;
   dismissToast: () => void;
   continueEndless: () => void;
+  undo: () => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -60,6 +61,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   endlessMode: false,
   isPaused: false,
   showRealtimeGraphics: true,
+  history: [],
+  hasPlayedHeliumLaugh: false,
 
   dismissToast: () => {
     set({ activeToastElement: null });
@@ -129,6 +132,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       blockedTime: 0,
       dragOffset3D: null,
       isPaused: false,
+      history: [],
+      hasPlayedHeliumLaugh: false,
     });
   },
 
@@ -175,6 +180,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const tile = state.tiles.get(fromFaceId)!;
         const duration = (slideResult.path.length - 1) * 180;
         
+        // Save pre-move snapshot to history stack
+        const snapshot = {
+          tiles: new Map(state.tiles),
+          turn: state.turn,
+          phase: state.phase,
+          elementCounts: { ...state.elementCounts },
+          levelObjectiveMet: state.levelObjectiveMet,
+          levelFailed: state.levelFailed,
+          endState: state.endState,
+          hasPlayedHeliumLaugh: state.hasPlayedHeliumLaugh,
+        };
+        const nextHistory = [...state.history, snapshot];
+        
         // Remove tile from original position for animation
         state.tiles.delete(fromFaceId);
         
@@ -189,6 +207,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           dragTargetId: null,
           dragOffset3D: null,
           tiles: new Map(state.tiles),
+          history: nextHistory,
           activeSlide: {
             element: tile.element,
             path: slideResult.path,
@@ -258,6 +277,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
           newCounts[t.element]++;
         }
         state.elementCounts = newCounts;
+
+        // Helium "HeHeHe" Easter Egg trigger: requires >= 26 Helium (80% of 32 faces),
+        // plays only once per game, has a 60% chance to trigger each turn,
+        // and plays with a 1-second delay for suspense!
+        if (newCounts.He >= 26 && !state.hasPlayedHeliumLaugh) {
+          if (Math.random() < 0.60) {
+            state.hasPlayedHeliumLaugh = true;
+            set({ hasPlayedHeliumLaugh: true });
+            setTimeout(() => {
+              playHeliumLaugh();
+            }, 1000);
+          }
+        }
 
         // Check and unlock new elements in Codex
         const currentUnlocked = get().unlockedElements;
@@ -431,6 +463,30 @@ export const useGameStore = create<GameStore>((set, get) => ({
       isAnimating: false,
       activeSlide: undefined,
       tiles: nextTiles
+    });
+  },
+
+  undo: () => {
+    const state = get();
+    if (state.isAnimating || state.history.length === 0) return;
+
+    const nextHistory = [...state.history];
+    const snapshot = nextHistory.pop()!;
+
+    set({
+      tiles: snapshot.tiles,
+      turn: snapshot.turn,
+      phase: snapshot.phase,
+      elementCounts: snapshot.elementCounts,
+      levelObjectiveMet: snapshot.levelObjectiveMet,
+      levelFailed: snapshot.levelFailed,
+      endState: snapshot.endState,
+      hasPlayedHeliumLaugh: (snapshot as any).hasPlayedHeliumLaugh ?? false,
+      history: nextHistory,
+      selectedFaceId: null,
+      dragTargetId: null,
+      dragOffset3D: null,
+      activeSlide: undefined,
     });
   },
 }));

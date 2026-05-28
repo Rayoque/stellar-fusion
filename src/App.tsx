@@ -116,24 +116,31 @@ export default function App() {
     }
   };
 
-  // Listen for global 'r' / 'R' key to instantly reset/restart the star
+  // Listen for global keys: 'r' / 'R' to reset, 'b' / 'B' to undo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't reset if typing in an input field (best-practice safety shield)
       const activeEl = document.activeElement;
       if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)) {
         return;
       }
 
-      if (e.key.toLowerCase() === 'r') {
+      const key = e.key.toLowerCase();
+
+      if (key === 'r') {
         if (!showStart) {
           if (currentLevelId !== null) {
             newGame(undefined, currentLevelId);
           } else {
             newGame();
           }
-          // Play organic reset confirmation sound
           playSpawnTick();
+        }
+      }
+
+      if (key === 'b') {
+        if (!showStart) {
+          useGameStore.getState().undo();
+          playSpawnTick(); // Play organic confirmation feedback tick sound
         }
       }
     };

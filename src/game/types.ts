@@ -99,4 +99,14 @@ export interface GameState {
   blockedFaceId?: number | null;
   blockedTime?: number;
   dragOffset3D?: Vec3 | null;
+  history: Array<{
+    tiles: Map<number, Tile>;
+    turn: number;
+    phase: Phase;
+    elementCounts: Record<ElementSymbol, number>;
+    levelObjectiveMet: boolean;
+    levelFailed: boolean;
+    endState: EndState | null;
+  }>;
+  hasPlayedHeliumLaugh: boolean;
 }
