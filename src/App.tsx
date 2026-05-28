@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { Scene } from './three/Scene';
 import { useGameStore } from './game/state';
-import { initAudio, startAmbientDrone, playSpawnTick, createSilentWavUrl } from './audio/synth';
+import { initAudio, startAmbientDrone, playSpawnTick, createSilentWavUrl, updateAmbientDrone } from './audio/synth';
 import { HUD } from './ui/HUD';
 import { EndScreen } from './ui/EndScreen';
 import { StartScreen } from './ui/StartScreen';
@@ -78,6 +78,16 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [activeToastElement, dismissToast]);
+
+  // Dynamic Ambient Drone Phase updates
+  useEffect(() => {
+    // The lessened, somber collapse sound (Bb-minor drone) should ONLY play
+    // during the core collapse stage AFTER going past the splash screen for the end game.
+    // So it plays when the phase is 'collapse' AND the splash screen is NOT active (endState === null).
+    // Conversely, on the splash screen itself (endState !== null), it plays the pre-collapse (Supergiant) sound.
+    const isCoreCollapseActive = phase === 'collapse' && endState === null;
+    updateAmbientDrone(phase, isCoreCollapseActive);
+  }, [phase, endState]);
 
   const handleStart = () => {
     newGame();

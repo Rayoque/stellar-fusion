@@ -190,6 +190,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           levelFailed: state.levelFailed,
           endState: state.endState,
           hasPlayedHeliumLaugh: state.hasPlayedHeliumLaugh,
+          endlessMode: state.endlessMode,
         };
         const nextHistory = [...state.history, snapshot];
         
@@ -266,9 +267,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // Spawn hydrogen(s)
         spawnHydrogen(state);
 
-        // Update phase
-        updatePhase(state);
-
         // Recount elementCounts to keep HUD in sync
         const newCounts: Record<ElementSymbol, number> = {
           H: 0, He: 0, C: 0, O: 0, Ne: 0, Mg: 0, Si: 0, Fe: 0
@@ -277,6 +275,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
           newCounts[t.element]++;
         }
         state.elementCounts = newCounts;
+
+        // Update phase
+        updatePhase(state);
 
         // Helium "HeHeHe" Easter Egg trigger: requires >= 26 Helium (80% of 32 faces),
         // plays only once per game, has a 60% chance to trigger each turn,
@@ -440,7 +441,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     let nextTiles = new Map(state.tiles);
 
-    if (state.endState === 'jammed' || state.endState === 'failed_collapse') {
+    if (state.endState) {
       const faceIds = Array.from(nextTiles.keys());
       faceIds.sort((a, b) => {
         const tA = nextTiles.get(a);
@@ -457,12 +458,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
+    // Recount elementCounts to keep HUD and phase in sync immediately!
+    const newCounts: Record<ElementSymbol, number> = {
+      H: 0, He: 0, C: 0, O: 0, Ne: 0, Mg: 0, Si: 0, Fe: 0
+    };
+    for (const t of nextTiles.values()) {
+      newCounts[t.element]++;
+    }
+
+    // Update phase rules with new counts
+    const tempState = { ...state, tiles: nextTiles, elementCounts: newCounts };
+    updatePhase(tempState);
+
     set({
       endState: null,
       endlessMode: true,
       isAnimating: false,
       activeSlide: undefined,
-      tiles: nextTiles
+      tiles: nextTiles,
+      elementCounts: newCounts,
+      phase: tempState.phase
     });
   },
 
@@ -482,6 +497,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       levelFailed: snapshot.levelFailed,
       endState: snapshot.endState,
       hasPlayedHeliumLaugh: (snapshot as any).hasPlayedHeliumLaugh ?? false,
+      endlessMode: (snapshot as any).endlessMode ?? false,
       history: nextHistory,
       selectedFaceId: null,
       dragTargetId: null,

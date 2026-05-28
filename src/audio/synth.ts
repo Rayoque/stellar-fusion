@@ -35,7 +35,7 @@ export function playMerge(parent: ElementSymbol, child: ElementSymbol): void {
   osc.frequency.exponentialRampToValueAtTime(childPitch, now + 0.32);
 
   gain.gain.value = 0;
-  gain.gain.linearRampToValueAtTime(0.28, now + 0.025);
+  gain.gain.linearRampToValueAtTime(0.22, now + 0.025); // Lowered from 0.28 to prevent audio clipping/popping
   gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
 
   filter.type = 'lowpass';
@@ -100,6 +100,9 @@ let ambientOsc2: OscillatorNode | null = null;
 let ambientOsc3: OscillatorNode | null = null;
 let ambientOsc4: OscillatorNode | null = null;
 let ambientGain: GainNode | null = null;
+let ambientFilter: BiquadFilterNode | null = null;
+let osc3GainNode: GainNode | null = null;
+let osc4GainNode: GainNode | null = null;
 
 export function startAmbientDrone(): void {
   if (!bgSoundEnabled || !audioCtx || ambientOsc1) return;
@@ -110,12 +113,12 @@ export function startAmbientDrone(): void {
   ambientOsc4 = audioCtx.createOscillator();
   ambientGain = audioCtx.createGain();
   
-  const filter = audioCtx.createBiquadFilter();
+  ambientFilter = audioCtx.createBiquadFilter();
   const lfo = audioCtx.createOscillator();
   const lfoGain = audioCtx.createGain();
   
-  const osc3Gain = audioCtx.createGain();
-  const osc4Gain = audioCtx.createGain();
+  osc3GainNode = audioCtx.createGain();
+  osc4GainNode = audioCtx.createGain();
 
   // Bb1 (58 Hz) - Deep sub-bass base
   ambientOsc1.type = 'sine';
@@ -134,8 +137,8 @@ export function startAmbientDrone(): void {
   ambientOsc4.frequency.value = 232;
 
   // Lowpass filter cutoff set to a warm 450 Hz to keep the sound cozy and filter out any high buzz
-  filter.type = 'lowpass';
-  filter.frequency.value = 450;
+  ambientFilter.type = 'lowpass';
+  ambientFilter.frequency.value = 450;
 
   // LFO to slowly modulate pitch for an organic, shifting interstellar drone
   lfo.type = 'sine';
@@ -146,8 +149,8 @@ export function startAmbientDrone(): void {
   ambientGain.gain.value = 0.045;
 
   // Individual gains for delicate balance
-  osc3Gain.gain.value = 0.12; 
-  osc4Gain.gain.value = 0.06; // Soft, warm presence to be heard on built-in speakers
+  osc3GainNode.gain.value = 0.12; 
+  osc4GainNode.gain.value = 0.06; // Soft, warm presence to be heard on built-in speakers
 
   // Connect LFO for gentle pitch modulation across all oscillators
   lfo.connect(lfoGain);
@@ -157,16 +160,16 @@ export function startAmbientDrone(): void {
   lfoGain.connect(ambientOsc4.frequency);
 
   // Connect oscillators to their gain nodes, then to filter, then to master destination
-  ambientOsc1.connect(filter);
-  ambientOsc2.connect(filter);
+  ambientOsc1.connect(ambientFilter);
+  ambientOsc2.connect(ambientFilter);
   
-  ambientOsc3.connect(osc3Gain);
-  osc3Gain.connect(filter);
+  ambientOsc3.connect(osc3GainNode);
+  osc3GainNode.connect(ambientFilter);
 
-  ambientOsc4.connect(osc4Gain);
-  osc4Gain.connect(filter);
+  ambientOsc4.connect(osc4GainNode);
+  osc4GainNode.connect(ambientFilter);
 
-  filter.connect(ambientGain);
+  ambientFilter.connect(ambientGain);
   ambientGain.connect(audioCtx.destination);
 
   // Start all oscillators
@@ -182,7 +185,80 @@ export function stopAmbientDrone(): void {
   if (ambientOsc2) ambientOsc2.stop();
   if (ambientOsc3) ambientOsc3.stop();
   if (ambientOsc4) ambientOsc4.stop();
-  ambientOsc1 = ambientOsc2 = ambientOsc3 = ambientOsc4 = ambientGain = null;
+  ambientOsc1 = ambientOsc2 = ambientOsc3 = ambientOsc4 = ambientGain = ambientFilter = osc3GainNode = osc4GainNode = null;
+}
+
+export function updateAmbientDrone(phase: string, hasCollapsed: boolean): void {
+  if (!bgSoundEnabled || !audioCtx || !ambientGain || !ambientOsc2 || !ambientFilter || !osc3GainNode || !osc4GainNode) return;
+
+  const now = audioCtx.currentTime;
+  const transitionTime = 2.0; // 2 seconds smooth crossfade glide
+
+  if (hasCollapsed) {
+    // SOMBER CORE COLLAPSE: Lessened, cold sub-bass void (minor chord)
+    ambientGain.gain.setValueAtTime(ambientGain.gain.value, now);
+    ambientGain.gain.exponentialRampToValueAtTime(0.022, now + transitionTime);
+
+    // Glide Bb2/F2 perfect fifth (87Hz) to minor third (69.3Hz) for dark, haunting somber tone
+    ambientOsc2.frequency.setValueAtTime(ambientOsc2.frequency.value, now);
+    ambientOsc2.frequency.exponentialRampToValueAtTime(69.3, now + transitionTime);
+
+    // Mute higher warm harmonics
+    osc3GainNode.gain.setValueAtTime(osc3GainNode.gain.value, now);
+    osc3GainNode.gain.exponentialRampToValueAtTime(0.0001, now + transitionTime);
+
+    osc4GainNode.gain.setValueAtTime(osc4GainNode.gain.value, now);
+    osc4GainNode.gain.exponentialRampToValueAtTime(0.0001, now + transitionTime);
+
+    // Dark filter
+    ambientFilter.frequency.setValueAtTime(ambientFilter.frequency.value, now);
+    ambientFilter.frequency.exponentialRampToValueAtTime(250, now + transitionTime);
+  } else {
+    // Restore perfect fifth (87Hz) if transitioning back
+    ambientOsc2.frequency.setValueAtTime(ambientOsc2.frequency.value, now);
+    ambientOsc2.frequency.exponentialRampToValueAtTime(87, now + transitionTime);
+
+    if (phase === 'main_sequence') {
+      // BASE MAIN SEQUENCE
+      ambientGain.gain.setValueAtTime(ambientGain.gain.value, now);
+      ambientGain.gain.exponentialRampToValueAtTime(0.045, now + transitionTime);
+
+      osc3GainNode.gain.setValueAtTime(osc3GainNode.gain.value, now);
+      osc3GainNode.gain.exponentialRampToValueAtTime(0.12, now + transitionTime);
+
+      osc4GainNode.gain.setValueAtTime(osc4GainNode.gain.value, now);
+      osc4GainNode.gain.exponentialRampToValueAtTime(0.06, now + transitionTime);
+
+      ambientFilter.frequency.setValueAtTime(ambientFilter.frequency.value, now);
+      ambientFilter.frequency.exponentialRampToValueAtTime(450, now + transitionTime);
+    } else if (phase === 'red_giant') {
+      // INTENSE RED GIANT (20% more intense relatively: base 0.045 + (0.020 * 1.2))
+      ambientGain.gain.setValueAtTime(ambientGain.gain.value, now);
+      ambientGain.gain.exponentialRampToValueAtTime(0.069, now + transitionTime);
+
+      osc3GainNode.gain.setValueAtTime(osc3GainNode.gain.value, now);
+      osc3GainNode.gain.exponentialRampToValueAtTime(0.192, now + transitionTime);
+
+      osc4GainNode.gain.setValueAtTime(osc4GainNode.gain.value, now);
+      osc4GainNode.gain.exponentialRampToValueAtTime(0.096, now + transitionTime);
+
+      ambientFilter.frequency.setValueAtTime(ambientFilter.frequency.value, now);
+      ambientFilter.frequency.exponentialRampToValueAtTime(630, now + transitionTime);
+    } else if (phase === 'supergiant' || phase === 'collapse') {
+      // MASSIVE SUPERGIANT / CHAOTIC COLLAPSE (20% more intense relatively: base 0.045 + (0.045 * 1.2))
+      ambientGain.gain.setValueAtTime(ambientGain.gain.value, now);
+      ambientGain.gain.exponentialRampToValueAtTime(0.099, now + transitionTime);
+
+      osc3GainNode.gain.setValueAtTime(osc3GainNode.gain.value, now);
+      osc3GainNode.gain.exponentialRampToValueAtTime(0.288, now + transitionTime);
+
+      osc4GainNode.gain.setValueAtTime(osc4GainNode.gain.value, now);
+      osc4GainNode.gain.exponentialRampToValueAtTime(0.168, now + transitionTime);
+
+      ambientFilter.frequency.setValueAtTime(ambientFilter.frequency.value, now);
+      ambientFilter.frequency.exponentialRampToValueAtTime(870, now + transitionTime);
+    }
+  }
 }
 
 /**
