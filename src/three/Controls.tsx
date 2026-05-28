@@ -194,6 +194,9 @@ export function Controls() {
     const dom = gl.domElement;
 
     const onPointerDown = (event: PointerEvent) => {
+      // Cancel background drift on any user interaction
+      driftVelocity.current = 0;
+
       if (isAnimating) return;
 
       const rect = dom.getBoundingClientRect();
@@ -366,7 +369,7 @@ export function Controls() {
   return (
     <TrackballControls
       ref={controlsRef}
-      enabled={true}
+      enabled={!(isAnimating || isDraggingTile || isPointerDownOnTile)}
       noPan={true}
       noZoom={isAnimating || isDraggingTile || isPointerDownOnTile}
       noRotate={isAnimating || isDraggingTile || isPointerDownOnTile}
