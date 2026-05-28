@@ -6,6 +6,7 @@ export interface LevelObjective {
   element?: ElementSymbol;
   count?: number;
   faceId?: number;
+  hint?: string;
 }
 
 export interface Level {
@@ -34,7 +35,12 @@ export const LEVELS: Level[] = [
       { faceId: 11, element: 'H' }
     ],
     objectives: [
-      { type: 'has_element', element: 'He', count: 1 }
+      { 
+        type: 'has_element', 
+        element: 'He', 
+        count: 1,
+        hint: "Combine two Hydrogen ('H') tiles to fuse them into a single Helium ('He') tile. Just drag/swipe Hydrogen tiles adjacent to each other."
+      }
     ]
   },
   {
@@ -50,7 +56,11 @@ export const LEVELS: Level[] = [
       { faceId: 20, element: 'H' }
     ],
     objectives: [
-      { type: 'has_element_on_pentagon', element: 'He' }
+      { 
+        type: 'has_element_on_pentagon', 
+        element: 'He',
+        hint: "Pentagons act as catalyst sites. Slide a Hydrogen tile directly onto any of the 12 pentagonal faces of the buckyball. This immediately triggers self-fusion into Helium ('He')."
+      }
     ]
   },
   {
@@ -67,7 +77,12 @@ export const LEVELS: Level[] = [
       { faceId: 24, element: 'He' }
     ],
     objectives: [
-      { type: 'has_element', element: 'C', count: 1 }
+      { 
+        type: 'has_element', 
+        element: 'C', 
+        count: 1,
+        hint: "Fusing Helium ('He') requires the Triple-Alpha Process. You must arrange three Helium tiles in a tight triangle (so each shares a border with the other two). When they form a triangle, they instantly fuse into Carbon ('C')."
+      }
     ]
   },
   {
@@ -84,7 +99,12 @@ export const LEVELS: Level[] = [
       { faceId: 29, element: 'He' }
     ],
     objectives: [
-      { type: 'has_element', element: 'O', count: 1 }
+      { 
+        type: 'has_element', 
+        element: 'O', 
+        count: 1,
+        hint: "Synthesize Oxygen ('O') by guiding a Helium ('He') tile to slide directly into your Carbon ('C') tile. Avoid sliding them away from each other or getting blocked by convective currents."
+      }
     ]
   },
   {
@@ -101,7 +121,12 @@ export const LEVELS: Level[] = [
       { faceId: 18, element: 'He' }
     ],
     objectives: [
-      { type: 'has_element', element: 'Ne', count: 1 }
+      { 
+        type: 'has_element', 
+        element: 'Ne', 
+        count: 1,
+        hint: "Synthesize Neon ('Ne') by merging Helium ('He') directly into your Oxygen ('O') tile. Guide the Helium tiles carefully through the curved sphere corridors."
+      }
     ]
   },
   {
@@ -120,7 +145,12 @@ export const LEVELS: Level[] = [
       { faceId: 7, element: 'H' }
     ],
     objectives: [
-      { type: 'has_element', element: 'Mg', count: 1 }
+      { 
+        type: 'has_element', 
+        element: 'Mg', 
+        count: 1,
+        hint: "Fuse Helium ('He') into Neon ('Ne') to synthesize Magnesium ('Mg'). You have some Hydrogen ('H') tiles on the board; use them to clear paths or build extra Helium as needed."
+      }
     ]
   },
   {
@@ -136,7 +166,12 @@ export const LEVELS: Level[] = [
       { faceId: 28, element: 'He' }
     ],
     objectives: [
-      { type: 'has_element', element: 'Si', count: 1 }
+      { 
+        type: 'has_element', 
+        element: 'Si', 
+        count: 1,
+        hint: "Fusing Magnesium ('Mg') and Helium ('He') synthesizes Silicon ('Si'). Remember, heavy elements have shorter slide distances: Silicon is extremely heavy and will only move 1 step when swiped, making it highly stable but harder to maneuver."
+      }
     ]
   },
   {
@@ -155,7 +190,12 @@ export const LEVELS: Level[] = [
       { faceId: 31, element: 'H' }
     ],
     objectives: [
-      { type: 'has_element_count', element: 'Si', count: 2 }
+      { 
+        type: 'has_element_count', 
+        element: 'Si', 
+        count: 2,
+        hint: "Synthesize and possess two Silicon ('Si') tiles on the board at the same time. Since Silicon only slides 1 step, they can easily get stuck or block each other, so plan your straight-line avenues well in advance."
+      }
     ]
   },
   {
@@ -170,7 +210,12 @@ export const LEVELS: Level[] = [
       { faceId: 25, element: 'Si' }
     ],
     objectives: [
-      { type: 'has_element', element: 'Fe', count: 1 }
+      { 
+        type: 'has_element', 
+        element: 'Fe', 
+        count: 1,
+        hint: "Merge Helium ('He') into Silicon ('Si') to synthesize Iron ('Fe'). Iron is the heaviest stable core ash and is completely immovable (slide distance of 0). Merging it instantly wins this supernova collapse scenario!"
+      }
     ]
   },
   {
@@ -188,7 +233,10 @@ export const LEVELS: Level[] = [
       { faceId: 28, element: 'He' }
     ],
     objectives: [
-      { type: 'has_all_elements' }
+      { 
+        type: 'has_all_elements',
+        hint: "Have exactly one (or more) of each of the 8 stable elements on the board at the same time: H, He, C, O, Ne, Mg, Si, Fe. Carefully manage the space so that you don't merge everything away or jam the board!"
+      }
     ]
   }
 ];

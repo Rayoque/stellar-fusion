@@ -163,7 +163,7 @@ export function AnimatedTile() {
     if (segmentCount <= 0) return;
     const segmentDuration = duration / segmentCount;
 
-    // Helper to evaluate straight geodesic position along the path from startFace to endFace at any elapsed time
+    // Helper to evaluate weaving geodesic position along the path from startFace to endFace at any elapsed time
     const getPosAtPathTime = (tElapsed: number, outVec: THREE.Vector3): boolean => {
       if (tElapsed < 0) return false;
       const startFace = faces[path[0]];
@@ -183,7 +183,20 @@ export function AnimatedTile() {
       const q = new THREE.Quaternion().setFromUnitVectors(vStart, vEnd);
       const qSlerp = new THREE.Quaternion().slerpQuaternions(new THREE.Quaternion(), q, progress);
       
-      outVec.copy(vStart).applyQuaternion(qSlerp).multiplyScalar(1.02);
+      const posGeodesic = vStart.clone().applyQuaternion(qSlerp);
+
+      // Apply gorgeous weaving/ping-pong lateral displacement along the geodesic line
+      const lateralAxis = new THREE.Vector3().crossVectors(vStart, vEnd).normalize();
+      if (lateralAxis.lengthSq() > 0.1) {
+        const segments = path.length - 1;
+        const weaveFreq = segments * Math.PI; // weaves smoothly back and forth per step
+        const weaveAmp = 0.085; // highly curated side-to-side ping-pong sway amplitude
+        const weaveOffset = Math.sin(progress * weaveFreq) * weaveAmp;
+        
+        posGeodesic.addScaledVector(lateralAxis, weaveOffset).normalize();
+      }
+
+      outVec.copy(posGeodesic).multiplyScalar(1.02);
       return true;
     };
 

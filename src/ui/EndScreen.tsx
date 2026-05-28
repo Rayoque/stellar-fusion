@@ -2,6 +2,7 @@
 import React from 'react';
 import type { EndState, ElementSymbol } from '../game/types';
 import { ELEMENTS } from '../game/elements';
+import { useGameStore } from '../game/state';
 
 interface EndScreenProps {
   endState: EndState;
@@ -18,8 +19,25 @@ const END_DESCRIPTIONS: Record<EndState, string> = {
   jammed: 'The sphere is full. No further fusion reactions are possible.',
 };
 
+const CONTINUE_LABELS: Record<EndState, string> = {
+  white_dwarf: "Expand White Dwarf Core",
+  neutron_star: "Ignite Neutron Degeneracy",
+  black_hole: "Enter Singularity Core",
+  failed_collapse: "Force Super-Ignition",
+  jammed: "Trigger Stellar Wind",
+};
+
+const CONTINUE_DESCRIPTIONS: Record<EndState, string> = {
+  white_dwarf: "Keep fusing your carbon-oxygen ash into a massive super white dwarf.",
+  neutron_star: "Defy degeneracy pressure and keep packing neutrons into exotic heavy matter.",
+  black_hole: "Play beyond the event horizon. Defy gravitational infinity and keep fusing.",
+  failed_collapse: "Inject quantum thermal energy to force iron core fusion to burn.",
+  jammed: "Vaporize the 4 lightest nuclei via a violent solar flare to clear space.",
+};
+
 export function EndScreen({ endState, starMass, elementCounts, onPlayAgain }: EndScreenProps) {
   const totalElements = Object.values(elementCounts).reduce((a, b) => a + b, 0);
+  const continueEndless = useGameStore(s => s.continueEndless);
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
@@ -36,11 +54,11 @@ export function EndScreen({ endState, starMass, elementCounts, onPlayAgain }: En
             {endState.replace('_', ' ')}
           </h1>
           
-          <p className="text-white/50 mb-8 text-xs sm:text-sm leading-relaxed max-w-[280px] sm:max-w-xs mx-auto font-light">
+          <p className="text-white/50 mb-8 text-xs sm:text-sm leading-relaxed max-w-[280px] sm:max-w-xs mx-auto font-light font-normal">
             {END_DESCRIPTIONS[endState]}
           </p>
 
-          <div className="bg-white/5 border border-white/5 rounded-2xl p-4 sm:p-5 mb-8 max-w-[280px] sm:max-w-xs mx-auto">
+          <div className="bg-white/5 border border-white/5 rounded-2xl p-4 sm:p-5 mb-6 max-w-[280px] sm:max-w-xs mx-auto">
             <div className="text-[9px] tracking-[2.5px] text-white/35 mb-3.5 uppercase font-mono text-center">FINAL COMPOSITION</div>
             <div className="space-y-2 text-left">
               {Object.entries(elementCounts).filter(([,c]) => c > 0).map(([sym, count]) => (
@@ -55,17 +73,31 @@ export function EndScreen({ endState, starMass, elementCounts, onPlayAgain }: En
             </div>
           </div>
 
-          <div className="text-[9px] text-white/30 mb-8 font-mono tracking-wider">
+          <div className="text-[9px] text-white/30 mb-6 font-mono tracking-wider">
             INITIAL MASS: <span className="font-bold text-white/50">{starMass.toFixed(1)} M☉</span> • 
             TOTAL NUCLEI: <span className="font-bold text-white/50">{totalElements}</span>
           </div>
 
-          <button
-            onClick={onPlayAgain}
-            className="w-full sm:w-auto px-8 py-3.5 bg-white text-black hover:bg-white/95 rounded-full font-bold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase shadow-[0_4px_16px_rgba(255,255,255,0.12)] cursor-pointer"
-          >
-            FUSE ANOTHER STAR
-          </button>
+          {/* Dual Continuation/Reset Buttons Layout */}
+          <div className="flex flex-col gap-3 max-w-[280px] sm:max-w-xs mx-auto">
+            <button
+              onClick={continueEndless}
+              className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-full font-bold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase shadow-[0_4px_16px_rgba(6,182,212,0.25)] cursor-pointer"
+              title={CONTINUE_DESCRIPTIONS[endState]}
+            >
+              {CONTINUE_LABELS[endState]}
+            </button>
+            <div className="text-[9px] text-cyan-400/70 font-mono tracking-wider max-w-[280px] leading-normal font-medium mb-2 uppercase text-center select-none">
+              {CONTINUE_DESCRIPTIONS[endState]}
+            </div>
+
+            <button
+              onClick={onPlayAgain}
+              className="w-full py-3.5 bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-full font-semibold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase cursor-pointer"
+            >
+              FUSE ANOTHER STAR
+            </button>
+          </div>
         </div>
       </div>
     </div>

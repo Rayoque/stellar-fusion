@@ -21,6 +21,7 @@ interface GameActions {
   setPaused: (paused: boolean) => void;
   setShowRealtimeGraphics: (show: boolean) => void;
   dismissToast: () => void;
+  continueEndless: () => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -398,5 +399,35 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   setShowRealtimeGraphics: (show) => {
     set({ showRealtimeGraphics: show });
+  },
+  continueEndless: () => {
+    const state = get();
+    if (!state.endState) return;
+
+    let nextTiles = new Map(state.tiles);
+
+    if (state.endState === 'jammed' || state.endState === 'failed_collapse') {
+      const faceIds = Array.from(nextTiles.keys());
+      faceIds.sort((a, b) => {
+        const tA = nextTiles.get(a);
+        const tB = nextTiles.get(b);
+        const elA = tA ? ELEMENTS[tA.element].atomicNumber : 99;
+        const elB = tB ? ELEMENTS[tB.element].atomicNumber : 99;
+        return elA - elB;
+      });
+
+      // Shed 4 lightest tiles to free up board space
+      const toRemove = faceIds.slice(0, 4);
+      for (const id of toRemove) {
+        nextTiles.delete(id);
+      }
+    }
+
+    set({
+      endState: null,
+      isAnimating: false,
+      activeSlide: undefined,
+      tiles: nextTiles
+    });
   },
 }));

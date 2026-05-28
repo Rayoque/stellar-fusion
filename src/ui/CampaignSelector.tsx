@@ -11,8 +11,13 @@ interface CampaignSelectorProps {
 export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorProps) {
   const completedLevels = useGameStore(s => s.completedLevels);
   const [selectedLevelId, setSelectedLevelId] = React.useState<number>(1);
+  const [activeHintIdx, setActiveHintIdx] = React.useState<number | null>(null);
 
   const selectedLevel = LEVELS.find(l => l.id === selectedLevelId) || LEVELS[0];
+
+  React.useEffect(() => {
+    setActiveHintIdx(null);
+  }, [selectedLevelId]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex justify-center items-center p-4 animate-fade-in-up select-none pointer-events-auto">
@@ -134,8 +139,9 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
 
               {/* Objectives lists */}
               <div className="flex flex-col gap-2 border-t border-white/5 pt-4">
-                <span className="text-[8px] tracking-[2px] text-white/35 font-mono uppercase mb-0.5">Scenario Objectives</span>
+                <span className="text-[8px] tracking-[2px] text-white/35 font-mono uppercase mb-0.5">Scenario Objectives (Tap to view details)</span>
                 {selectedLevel.objectives.map((obj, i) => {
+                  const isHintActive = activeHintIdx === i;
                   let text = "";
                   if (obj.type === 'has_element') {
                     text = `Fuse and synthesize a stable '${obj.element}' tile.`;
@@ -147,9 +153,21 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
                     text = `Reach complete equilibrium: possess all 8 stable elements on the board simultaneously.`;
                   }
                   return (
-                    <div key={i} className="flex gap-2 items-start text-xs font-light text-cyan-300">
-                      <span className="text-[10px] leading-none mt-0.5">✧</span>
-                      <span className="leading-relaxed">{text}</span>
+                    <div key={i} className="flex flex-col gap-1">
+                      <div 
+                        onClick={() => setActiveHintIdx(isHintActive ? null : i)}
+                        className="flex gap-2 items-start text-xs font-light text-cyan-300 cursor-pointer hover:text-cyan-200 active:scale-[0.99] transition-all select-none"
+                        title="Click to view detailed scientific objective guide"
+                      >
+                        <span className="text-[10px] leading-none mt-0.5">{isHintActive ? '✦' : '✧'}</span>
+                        <span className="leading-relaxed border-b border-dashed border-cyan-400/25 hover:border-cyan-300/60 pb-0.5">{text}</span>
+                      </div>
+                      {isHintActive && obj.hint && (
+                        <div className="pl-4 pr-2 py-2 mt-1 rounded-lg bg-cyan-950/20 border border-cyan-500/10 text-[10.5px] leading-relaxed text-white/70 font-light animate-fade-in-up">
+                          <span className="text-cyan-400 font-semibold font-mono block mb-0.5 text-[8.5px] tracking-[1.5px] uppercase">ASTRONOMICAL GUIDE:</span>
+                          {obj.hint}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

@@ -40,6 +40,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
   const state = useGameStore();
   const ageInfo = getStarAgeInfo(state);
   const [showModal, setShowModal] = React.useState(false);
+  const [showObjectiveModal, setShowObjectiveModal] = React.useState(false);
 
   const handleCloseGuide = () => {
     setShowModal(false);
@@ -143,8 +144,12 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
 
         {/* Campaign Objective Floating Secondary Banner */}
         {level && (
-          <div className="glass-pill px-3 py-1 rounded-full text-[7.5px] font-mono tracking-widest text-cyan-300 font-bold uppercase whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.3)] border border-cyan-500/15 animate-fade-in-up">
-            Objective: {level.objectives[0].type === 'has_element' ? `Synthesize ${level.objectives[0].element}` : level.title}
+          <div 
+            onClick={() => setShowObjectiveModal(true)}
+            className="glass-pill px-3 py-1 rounded-full text-[7.5px] font-mono tracking-widest text-cyan-300 font-bold uppercase whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.3)] border border-cyan-500/15 hover:bg-white/10 active:scale-[0.96] transition-all cursor-pointer pointer-events-auto animate-fade-in-up"
+            title="Click to view detailed scientific scenario objective description"
+          >
+            Objective: {level.objectives[0].type === 'has_element' ? `Synthesize ${level.objectives[0].element}` : level.title} (Tap to view)
           </div>
         )}
       </div>
@@ -323,6 +328,101 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
             {/* Footer Close Button */}
             <button
               onClick={handleCloseGuide}
+              className="mt-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs font-semibold py-2.5 rounded-xl transition-all cursor-pointer text-center active:scale-[0.985]"
+            >
+              Back to Fusion Board
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Scenario Objective Modal Popup */}
+      {showObjectiveModal && level && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex justify-center items-center p-4 pointer-events-auto">
+          {/* Modal Container */}
+          <div 
+            className="border border-white/10 p-6 rounded-[28px] max-w-lg w-full max-h-[85vh] overflow-y-auto custom-scrollbar flex flex-col gap-5 text-white shadow-2xl relative select-none animate-fade-in-up"
+            style={{
+              background: 'radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.08), transparent 45%), radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.08), transparent 45%), rgba(15, 15, 19, 0.95)',
+            }}
+          >
+            {/* Close Button */}
+            <button 
+              onClick={() => setShowObjectiveModal(false)}
+              className="absolute top-4 right-4 text-white/40 hover:text-white hover:bg-white/5 w-8 h-8 rounded-full border border-white/5 flex items-center justify-center transition-all active:scale-95 text-lg cursor-pointer"
+            >
+              ✕
+            </button>
+
+            {/* Header */}
+            <div className="flex flex-col gap-1.5 border-b border-white/5 pb-4 pr-8">
+              <span className="text-[9px] tracking-[2.5px] text-cyan-400 font-bold uppercase font-mono">Scenario Details</span>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[9px] font-mono font-bold text-cyan-400 bg-cyan-950/20 border border-cyan-500/15 px-2.5 py-0.5 rounded-full uppercase leading-none">
+                  Scenario {level.id}
+                </span>
+                <span className="text-[9px] font-mono font-medium text-white/40 tracking-wider leading-none uppercase">
+                  {level.author}
+                </span>
+              </div>
+              <h2 className="text-lg font-semibold tracking-wide mt-1 text-white/95">{level.title}</h2>
+            </div>
+
+            {/* Description */}
+            <p className="text-xs text-white/70 leading-relaxed font-light">
+              {level.description}
+            </p>
+
+            {/* Conditions grid */}
+            <div className="grid grid-cols-3 gap-3 border-t border-white/5 pt-4 text-xs font-mono select-none">
+              <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col gap-1">
+                <span className="text-[7.5px] text-white/40 tracking-wider font-semibold uppercase">Stellar Mass</span>
+                <span className="font-bold text-white/90">{level.starMass.toFixed(1)} M☉</span>
+              </div>
+              <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col gap-1">
+                <span className="text-[7.5px] text-white/40 tracking-wider font-semibold uppercase">Turns Done</span>
+                <span className="font-bold text-white/90">{turn} / {level.maxTurns}</span>
+              </div>
+              <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col gap-1">
+                <span className="text-[7.5px] text-white/40 tracking-wider font-semibold uppercase">Status</span>
+                <span className="font-bold text-cyan-400">ACTIVE</span>
+              </div>
+            </div>
+
+            {/* Detailed Objectives List */}
+            <div className="flex flex-col gap-2.5 border-t border-white/5 pt-4">
+              <span className="text-[8px] tracking-[2px] text-white/35 font-mono uppercase mb-0.5">Scenario Objectives</span>
+              {level.objectives.map((obj, idx) => {
+                let text = "";
+                if (obj.type === 'has_element') {
+                  text = `Fuse and synthesize a stable '${obj.element}' tile.`;
+                } else if (obj.type === 'has_element_on_pentagon') {
+                  text = `Fuse a '${obj.element}' tile on one of the 12 pentagon faces (CNO catalyst).`;
+                } else if (obj.type === 'has_element_count') {
+                  text = `Possess at least ${obj.count} '${obj.element}' tiles on the board simultaneously.`;
+                } else if (obj.type === 'has_all_elements') {
+                  text = `Reach complete equilibrium: possess all 8 stable elements on the board simultaneously.`;
+                }
+                return (
+                  <div key={idx} className="flex flex-col gap-1">
+                    <div className="flex gap-2 items-start text-xs font-light text-cyan-300">
+                      <span className="text-[10px] leading-none mt-0.5">✧</span>
+                      <span className="leading-relaxed">{text}</span>
+                    </div>
+                    {obj.hint && (
+                      <div className="pl-4 pr-2 py-1.5 mt-0.5 rounded-lg bg-cyan-950/20 border border-cyan-500/10 text-[10px] leading-relaxed text-white/60 font-light">
+                        <span className="text-cyan-400 font-semibold font-mono text-[8px] tracking-[1.5px] uppercase block mb-0.5">Tip:</span>
+                        {obj.hint}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Back Button */}
+            <button
+              onClick={() => setShowObjectiveModal(false)}
               className="mt-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs font-semibold py-2.5 rounded-xl transition-all cursor-pointer text-center active:scale-[0.985]"
             >
               Back to Fusion Board

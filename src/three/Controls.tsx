@@ -366,17 +366,17 @@ export function Controls() {
     };
   }, [camera, gl, scene, startDrag, endDrag, setDragTargetId, faces, tiles, isAnimating, isDraggingTile]);
 
-  return (
+  const showControls = !(isAnimating || isDraggingTile || isPointerDownOnTile);
+
+  return showControls ? (
     <TrackballControls
       ref={controlsRef}
-      enabled={!(isAnimating || isDraggingTile || isPointerDownOnTile)}
+      enabled={true}
       noPan={true}
-      noZoom={isAnimating || isDraggingTile || isPointerDownOnTile}
-      noRotate={isAnimating || isDraggingTile || isPointerDownOnTile}
       minDistance={2.5}
       maxDistance={12}
       dynamicDampingFactor={0.15}
       makeDefault
     />
-  );
+  ) : null;
 }
