@@ -39,6 +39,10 @@ const PHASE_COLORS: Record<Phase, string> = {
 export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCodex }: HUDProps) {
   const state = useGameStore();
   const ageInfo = getStarAgeInfo(state);
+  const compactAge = ageInfo.formatted
+    .replace(' Billion Years', 'B')
+    .replace(' Million Years', 'M')
+    .replace(' Years', 'Y');
   const [showModal, setShowModal] = React.useState(false);
   const [showObjectiveModal, setShowObjectiveModal] = React.useState(false);
 
@@ -128,15 +132,15 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
           </div>
 
           {/* Mobile/Compact Layout (flex md:hidden) */}
-          <div className="flex md:hidden items-center gap-2 text-[9px] font-mono tracking-wider font-semibold uppercase text-white/80 whitespace-nowrap">
-            <span className="text-[11px] leading-none flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
+          <div className="flex md:hidden items-center gap-1.5 text-[8.5px] font-mono tracking-wider font-semibold uppercase text-white/80 whitespace-nowrap">
+            <span className="text-[10px] leading-none flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
             <span className="font-bold tracking-widest" style={{ color: currentThemeColor }}>
-              {phase === 'main_sequence' ? 'MAIN SEQ' : PHASE_LABELS[phase]}
+              {phase === 'main_sequence' ? 'MAIN' : phase === 'red_giant' ? 'GIANT' : phase === 'supergiant' ? 'SUPER' : 'COLLAPSE'}
             </span>
             <span className="opacity-25">•</span>
             <span className="text-white">{starMass.toFixed(1)} M☉</span>
             <span className="opacity-25">•</span>
-            <span className="font-bold" style={{ color: currentThemeColor }}>{ageInfo.formatted.replace(' Years', 'Y')}</span>
+            <span className="font-bold" style={{ color: currentThemeColor }}>{compactAge}</span>
             <span className="opacity-25">•</span>
             <span className="text-white">T{turn}{maxTurns !== null ? `/${maxTurns}` : ''}</span>
           </div>
@@ -154,16 +158,19 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
         )}
       </div>
 
-      <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto" style={{ bottom: 'calc(2.6rem + env(safe-area-inset-bottom, 0px))' }}>
-        <div className="flex flex-col items-center gap-3.5 pointer-events-none select-none max-w-[88vw] sm:max-w-md md:max-w-xl">
+      <div 
+        className="absolute left-1/2 -translate-x-1/2 pointer-events-auto" 
+        style={{ bottom: 'calc(0.8rem + env(safe-area-inset-bottom, 0px))' }}
+      >
+        <div className="flex flex-col items-center gap-2 xs:gap-3.5 pointer-events-none select-none max-w-[94vw] xs:max-w-[88vw] sm:max-w-md md:max-w-xl">
           {/* Dynamic Instructions placed directly above the Elements Tray */}
-          <div className="text-[9px] sm:text-[10px] opacity-35 tracking-[4px] font-mono uppercase whitespace-nowrap mb-0.5 select-none">
+          <div className="text-[8px] xs:text-[9px] sm:text-[10px] opacity-35 tracking-[2px] xs:tracking-[4px] font-mono uppercase whitespace-nowrap mb-0.5 select-none">
             DRAG TILES TO FUSE • BUILD YOUR STAR
           </div>
 
           {/* Elements Tray */}
           <div 
-            className="glass-panel px-3.5 py-3 rounded-[22px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center gap-2.5 overflow-x-auto no-scrollbar max-w-full pointer-events-auto border border-white/8"
+            className="glass-panel px-2.5 xs:px-3.5 py-2.5 xs:py-3 rounded-[20px] xs:rounded-[22px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center gap-1.5 xs:gap-2.5 overflow-x-auto no-scrollbar max-w-full pointer-events-auto border border-white/8"
             style={{ 
               borderColor: `${currentThemeColor}15`,
               boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px ${currentThemeColor}05`
@@ -177,7 +184,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                 return (
                   <div 
                     key={sym}
-                    className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full border bg-black/40 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95]"
+                    className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border bg-black/40 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] flex-shrink-0"
                     style={{ 
                       borderColor: el.color,
                       boxShadow: `0 0 10px ${el.color}15, inset 0 0 6px ${el.color}10`
@@ -185,12 +192,12 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                     title={`${el.displayName}: ${count} nuclei`}
                   >
                     <span 
-                      className="font-mono text-xs sm:text-sm font-bold tracking-tight"
+                      className="font-mono text-[10px] xs:text-xs sm:text-sm font-bold tracking-tight"
                       style={{ color: el.color }}
                     >
                       {sym}
                     </span>
-                    <span className="absolute -top-1 -right-1 bg-[#101015]/90 text-white border border-white/10 font-mono text-[8px] sm:text-[9px] w-4 h-4 rounded-full flex items-center justify-center backdrop-blur-md font-bold tabular-nums">
+                    <span className="absolute -top-1 -right-1 bg-[#101015]/90 text-white border border-white/10 font-mono text-[7.5px] xs:text-[8px] sm:text-[9px] w-3.5 h-3.5 xs:w-4 xs:h-4 rounded-full flex items-center justify-center backdrop-blur-md font-bold tabular-nums">
                       {count}
                     </span>
                   </div>
@@ -199,10 +206,10 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                 return (
                   <div 
                     key={sym}
-                    className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/10 bg-black/10 opacity-30 select-none cursor-default"
+                    className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/10 bg-black/10 opacity-30 select-none cursor-default flex-shrink-0"
                     title={`Locked Element (Fuse heavier nuclei to discover)`}
                   >
-                    <span className="font-mono text-[10px] sm:text-xs text-white/50 font-medium">
+                    <span className="font-mono text-[9px] xs:text-[10px] sm:text-xs text-white/50 font-medium">
                       {sym}
                     </span>
                   </div>
@@ -211,15 +218,15 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
             })}
 
             {/* Subtle Divider before Codex Button */}
-            <div className="w-px h-6 bg-white/10 self-center" />
+            <div className="w-px h-5 xs:h-6 bg-white/10 self-center flex-shrink-0" />
 
             {/* Codex Circular shortcut button */}
             <button
               onClick={onOpenCodex}
-              className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] cursor-pointer"
+              className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] cursor-pointer flex-shrink-0"
               title="Open Stellar Codex Journal"
             >
-              <span className="text-sm select-none">📔</span>
+              <span className="text-xs xs:text-sm select-none">📔</span>
             </button>
           </div>
         </div>

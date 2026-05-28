@@ -7,14 +7,20 @@
   --font-mono: 'Outfit', ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
 }
 
-body {
+html,
+body,
+#root {
+  height: 100%;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
   font-family: var(--font-sans);
   background: #050508;
   color: #f3f4f6;
   touch-action: none; /* Prevent default browser scrolling/gestures on mobile */
   -webkit-user-select: none; /* Prevent selection overlays */
   user-select: none;
-  overflow: hidden;
 }
 
 /* Subtle canvas polish */
