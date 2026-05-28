@@ -70,10 +70,7 @@ export function detectMerge(
 
   // Resolve the actual ending/destination face where the merged output tile will be formed.
   // This is crucial for checking if the ending element is actually on a nucleation site.
-  const activeSlide = state.activeSlide;
-  const finalDestFaceId = (activeSlide && activeSlide.isMerge)
-    ? activeSlide.path[activeSlide.path.length - 1]
-    : landedFaceId;
+  const finalDestFaceId = targetFaceId !== undefined ? targetFaceId : landedFaceId;
   const finalDestFace = state.faces[finalDestFaceId];
   const isFinalDestPentagon = finalDestFace?.shape === 'pentagon';
 
@@ -81,9 +78,10 @@ export function detectMerge(
   const targetTile = targetFaceId !== undefined ? state.tiles.get(targetFaceId) : undefined;
   const targetElement = targetTile?.element;
 
-  // 1. Pentagon CNO shortcut: H landing on a pentagon self-fuses immediately!
-  // This takes absolute precedence to preserve its behavior as a quantum self-fusion shortcut.
-  if (landedElement === 'H' && isFinalDestPentagon) {
+  // 1. Pentagon CNO shortcut: H landing on an empty pentagon self-fuses immediately!
+  // This takes absolute precedence to preserve its behavior as a quantum self-fusion shortcut,
+  // but only applies to a lone Hydrogen landing (no target merge tile on the face).
+  if (landedElement === 'H' && isFinalDestPentagon && targetFaceId === undefined) {
     const pentagonRule = MERGE_RULES.find(r => r.requiresPentagon && r.inputs[0] === 'H');
     if (pentagonRule) return pentagonRule;
   }

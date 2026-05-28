@@ -73,6 +73,21 @@ export default function App() {
     };
   }, []);
 
+  // Inactivity/returning player re-onboarding timer (7 days)
+  useEffect(() => {
+    const lastPlayed = localStorage.getItem('stellar_last_played');
+    const now = Date.now();
+    if (lastPlayed) {
+      const daysPassed = (now - parseInt(lastPlayed, 10)) / (1000 * 60 * 60 * 24);
+      if (daysPassed > 7) {
+        // Returning player: soft reset audio recommendation and nucleation tutorial
+        localStorage.removeItem('stellar_headphones_suggested');
+        useGameStore.getState().resetNucleationTutorial();
+      }
+    }
+    localStorage.setItem('stellar_last_played', now.toString());
+  }, []);
+
   // Auto-dismiss the Codex toast after 4.5 seconds
   useEffect(() => {
     if (activeToastElement) {
@@ -96,6 +111,20 @@ export default function App() {
       setShowStatusOverlay(false);
     }
   }, [levelObjectiveMet, levelFailed]);
+
+  const [delayedShowNucleation, setDelayedShowNucleation] = React.useState(false);
+
+  useEffect(() => {
+    if (showNucleationTutorial) {
+      // Delay showing the nucleation pop-up by 2500ms so they see the self-fusion play out!
+      const timer = setTimeout(() => {
+        setDelayedShowNucleation(true);
+      }, 2500);
+      return () => clearTimeout(timer);
+    } else {
+      setDelayedShowNucleation(false);
+    }
+  }, [showNucleationTutorial]);
 
   // Dynamic Ambient Drone Phase updates
   useEffect(() => {
@@ -170,6 +199,12 @@ export default function App() {
           useGameStore.getState().undo();
           playSpawnTick(); // Play organic confirmation feedback tick sound
         }
+      }
+
+      if (key === 'n') {
+        localStorage.removeItem('stellar_headphones_suggested');
+        useGameStore.getState().resetNucleationTutorial();
+        playSpawnTick(); // Play organic confirmation feedback tick sound
       }
     };
 
@@ -259,7 +294,7 @@ export default function App() {
       )}
 
       {/* Nucleation / Pentagon Self-Fusion Catalyst Tutorial Modal (Intuitively freezes active play once after action completes) */}
-      {showNucleationTutorial && (
+      {delayedShowNucleation && (
         <div className="fixed inset-0 z-[100] bg-black/35 flex justify-center items-center p-4 animate-fade-in-up">
           <div 
             className="border border-cyan-500/20 p-6 sm:p-8 rounded-[32px] max-w-md w-full text-center shadow-[0_16px_48px_rgba(6,182,212,0.15)] relative overflow-hidden isolate"

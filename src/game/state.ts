@@ -24,6 +24,7 @@ interface GameActions {
   continueEndless: () => void;
   undo: () => void;
   dismissNucleationTutorial: () => void;
+  resetNucleationTutorial: () => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -526,5 +527,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   dismissNucleationTutorial: () => {
     set({ showNucleationTutorial: false });
+  },
+
+  resetNucleationTutorial: () => {
+    localStorage.removeItem('stellar_seen_nucleation');
+    set({ hasSeenNucleationTutorial: false, showNucleationTutorial: false });
   },
 }));
