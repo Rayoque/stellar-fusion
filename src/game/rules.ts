@@ -1,5 +1,5 @@
 // src/game/rules.ts
-import type { ElementSymbol, GameState } from './types';
+import type { ElementSymbol, GameState, Face } from './types';
 import { ELEMENTS } from './elements';
 
 export type MergePattern = 'pair' | 'triangle' | 'pair_alpha';
@@ -56,7 +56,11 @@ export function canMerge(elementA: ElementSymbol, elementB: ElementSymbol): bool
  * Detect and return applicable merge rule after a tile lands.
  * Order matters: triangle first (for He), then pair/pair_alpha, then pentagon H shortcut.
  */
-export function detectMerge(landedFaceId: number, state: GameState): MergeRule | null {
+export function detectMerge(
+  landedFaceId: number,
+  state: GameState,
+  targetFaceId?: number
+): MergeRule | null {
   const landedTile = state.tiles.get(landedFaceId);
   if (!landedTile) return null;
 
@@ -73,6 +77,10 @@ export function detectMerge(landedFaceId: number, state: GameState): MergeRule |
   const finalDestFace = state.faces[finalDestFaceId];
   const isFinalDestPentagon = finalDestFace?.shape === 'pentagon';
 
+  // Get target element if targetFaceId is provided
+  const targetTile = targetFaceId !== undefined ? state.tiles.get(targetFaceId) : undefined;
+  const targetElement = targetTile?.element;
+
   // 1. Triangle (triple-alpha): only relevant for He landing
   if (landedElement === 'He') {
     const heNeighbors = landedFace.neighbors.filter(nid => {
@@ -80,15 +88,29 @@ export function detectMerge(landedFaceId: number, state: GameState): MergeRule |
       return t && t.element === 'He';
     });
 
-    // Check for any pair of He neighbors that are also adjacent to each other
-    for (let i = 0; i < heNeighbors.length; i++) {
-      for (let j = i + 1; j < heNeighbors.length; j++) {
-        const n1 = heNeighbors[i];
-        const n2 = heNeighbors[j];
-        const n1Face = state.faces[n1];
-        if (n1Face.neighbors.includes(n2)) {
-          // Found a triangle of He
-          return MERGE_RULES.find(r => r.pattern === 'triangle' && r.inputs[0] === 'He') || null;
+    if (targetFaceId !== undefined && targetElement === 'He') {
+      // If targetFaceId is specified, it must be part of the triangle!
+      if (heNeighbors.includes(targetFaceId)) {
+        for (const otherNeighbor of heNeighbors) {
+          if (otherNeighbor !== targetFaceId) {
+            const otherFace: Face = state.faces[otherNeighbor];
+            if (otherFace && otherFace.neighbors.includes(targetFaceId)) {
+              return MERGE_RULES.find(r => r.pattern === 'triangle' && r.inputs[0] === 'He') || null;
+            }
+          }
+        }
+      }
+    } else if (targetFaceId === undefined) {
+      // Check for any pair of He neighbors that are also adjacent to each other
+      for (let i = 0; i < heNeighbors.length; i++) {
+        for (let j = i + 1; j < heNeighbors.length; j++) {
+          const n1 = heNeighbors[i];
+          const n2 = heNeighbors[j];
+          const n1Face = state.faces[n1];
+          if (n1Face.neighbors.includes(n2)) {
+            // Found a triangle of He
+            return MERGE_RULES.find(r => r.pattern === 'triangle' && r.inputs[0] === 'He') || null;
+          }
         }
       }
     }
@@ -103,11 +125,18 @@ export function detectMerge(landedFaceId: number, state: GameState): MergeRule |
 
       const other = a === landedElement ? b : a;
 
-      for (const nid of landedFace.neighbors) {
-        const neighborTile = state.tiles.get(nid);
-        if (neighborTile && neighborTile.element === other) {
-          // For pair_alpha, the 'He' is the alpha particle — order doesn't matter here
+      if (targetFaceId !== undefined) {
+        // Strict matching: only merge with the target face's element if adjacent
+        if (other === targetElement && landedFace.neighbors.includes(targetFaceId)) {
           return rule;
+        }
+      } else {
+        // Fallback: scan all neighbors
+        for (const nid of landedFace.neighbors) {
+          const neighborTile = state.tiles.get(nid);
+          if (neighborTile && neighborTile.element === other) {
+            return rule;
+          }
         }
       }
     }

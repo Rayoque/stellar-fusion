@@ -98,8 +98,9 @@ export function executeSlide(
       currentId = nextId;
       remainingDistance -= 1;
 
-      // Re-resolve direction from new face (sphere curvature)
-      currentDrag = initialDragWorld; // keep original intent or reproject if needed
+      // Continue sliding in the same geodesic direction along the sphere's curvature!
+      const stepDir = subtract(nextFace.center, currentFace.center);
+      currentDrag = normalize(stepDir);
     } else if (canMerge(element, nextTile.element)) {
       // Direct pair or pair-alpha merge combinable. Append target face and stop.
       path.push(nextId);

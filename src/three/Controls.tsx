@@ -79,21 +79,29 @@ export function Controls() {
         const currentDist = camStartPos.current!.length();
 
         const vStart = new THREE.Vector3(startFace.center.x, startFace.center.y, startFace.center.z).normalize();
-        const vEnd = new THREE.Vector3(endFace.center.x, endFace.center.y, endFace.center.z).normalize();
 
-        // 1. Calculate the slide's geodesic rotation quaternion using eased progress
-        const qTileGeodesic = new THREE.Quaternion().setFromUnitVectors(vStart, vEnd);
-        const qTileProgress = new THREE.Quaternion().slerpQuaternions(
-          new THREE.Quaternion(), // Identity
-          qTileGeodesic,
-          eased
-        );
+        // Calculate segment-by-segment geodesic center direction
+        const N = path.length - 1;
+        const segmentProgressRaw = eased * N;
+        const segmentIndex = Math.min(Math.floor(segmentProgressRaw), N - 1);
+        const segmentProgress = segmentProgressRaw - segmentIndex;
+
+        const fStart = faces[path[segmentIndex]];
+        const fEnd = faces[path[segmentIndex + 1]];
+        if (!fStart || !fEnd) return;
+
+        const vCurrStart = new THREE.Vector3(fStart.center.x, fStart.center.y, fStart.center.z).normalize();
+        const vCurrEnd = new THREE.Vector3(fEnd.center.x, fEnd.center.y, fEnd.center.z).normalize();
+
+        const qSeg = new THREE.Quaternion().setFromUnitVectors(vCurrStart, vCurrEnd);
+        const qSegProgress = new THREE.Quaternion().slerpQuaternions(new THREE.Quaternion(), qSeg, segmentProgress);
+        const dirTileCurrent = vCurrStart.clone().applyQuaternion(qSegProgress).normalize();
+
+        // 1. Calculate the overall geodesic rotation from start of slide to current position
+        const qTileProgress = new THREE.Quaternion().setFromUnitVectors(vStart, dirTileCurrent);
 
         // 2. Relative offset direction (keeps the shape exactly at its grabbed screen coordinates)
         const dirRelative = dirStart.clone().applyQuaternion(qTileProgress);
-
-        // 3. Perfectly centered direction (chases the tile center)
-        const dirTileCurrent = vStart.clone().applyQuaternion(qTileProgress);
 
         // 4. Blend by 40% drift factor to achieve the "slurping" center-line drift over time
         const driftFactor = 0.40;

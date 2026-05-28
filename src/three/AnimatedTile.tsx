@@ -163,9 +163,10 @@ export function AnimatedTile() {
     if (segmentCount <= 0) return;
     const segmentDuration = duration / segmentCount;
 
-    // Helper to evaluate weaving geodesic position along the path from startFace to endFace at any elapsed time
+    // Helper to evaluate weaving geodesic position along the path segment-by-segment at any elapsed time
     const getPosAtPathTime = (tElapsed: number, outVec: THREE.Vector3): boolean => {
       if (tElapsed < 0) return false;
+      if (path.length === 0) return false;
       const startFace = faces[path[0]];
       const endFace = faces[path[path.length - 1]];
       if (!startFace || !endFace) return false;
@@ -176,22 +177,30 @@ export function AnimatedTile() {
       }
 
       const progress = tElapsed / duration;
-      const vStart = new THREE.Vector3(startFace.center.x, startFace.center.y, startFace.center.z).normalize();
-      const vEnd = new THREE.Vector3(endFace.center.x, endFace.center.y, endFace.center.z).normalize();
+      const N = path.length - 1;
+      const segmentProgressRaw = progress * N;
+      const segmentIndex = Math.min(Math.floor(segmentProgressRaw), N - 1);
+      const segmentProgress = segmentProgressRaw - segmentIndex;
 
-      // Slerp directly from start to end for a mathematically straight geodesic arc on the sphere!
+      const fStart = faces[path[segmentIndex]];
+      const fEnd = faces[path[segmentIndex + 1]];
+      if (!fStart || !fEnd) return false;
+
+      const vStart = new THREE.Vector3(fStart.center.x, fStart.center.y, fStart.center.z).normalize();
+      const vEnd = new THREE.Vector3(fEnd.center.x, fEnd.center.y, fEnd.center.z).normalize();
+
+      // Slerp directly along the current segment
       const q = new THREE.Quaternion().setFromUnitVectors(vStart, vEnd);
-      const qSlerp = new THREE.Quaternion().slerpQuaternions(new THREE.Quaternion(), q, progress);
+      const qSlerp = new THREE.Quaternion().slerpQuaternions(new THREE.Quaternion(), q, segmentProgress);
       
       const posGeodesic = vStart.clone().applyQuaternion(qSlerp);
 
-      // Apply gorgeous weaving/ping-pong lateral displacement along the geodesic line
+      // Apply gorgeous weaving/ping-pong lateral displacement along the current segment
       const lateralAxis = new THREE.Vector3().crossVectors(vStart, vEnd).normalize();
       if (lateralAxis.lengthSq() > 0.1) {
-        const segments = path.length - 1;
-        const weaveFreq = segments * Math.PI; // weaves smoothly back and forth per step
+        const weaveFreq = Math.PI; // weaves smoothly back and forth per step
         const weaveAmp = 0.085; // highly curated side-to-side ping-pong sway amplitude
-        const weaveOffset = Math.sin(progress * weaveFreq) * weaveAmp;
+        const weaveOffset = Math.sin(segmentProgress * weaveFreq) * weaveAmp;
         
         posGeodesic.addScaledVector(lateralAxis, weaveOffset).normalize();
       }

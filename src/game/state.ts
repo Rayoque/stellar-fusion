@@ -213,7 +213,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           const beforeFaceId = slideResult.path[slideResult.path.length - 2];
           state.tiles.set(beforeFaceId, { ...tile, faceId: beforeFaceId });
           
-          mergeRule = detectMerge(beforeFaceId, state);
+          mergeRule = detectMerge(beforeFaceId, state, landedId);
           mergeLandedId = beforeFaceId;
           
           if (!mergeRule) {
