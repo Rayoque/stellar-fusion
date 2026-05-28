@@ -23,6 +23,7 @@ interface GameActions {
   dismissToast: () => void;
   continueEndless: () => void;
   undo: () => void;
+  dismissNucleationTutorial: () => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -61,6 +62,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   endlessMode: false,
   isPaused: false,
   showRealtimeGraphics: true,
+  showNucleationTutorial: false,
+  hasSeenNucleationTutorial: localStorage.getItem('stellar_seen_nucleation') === 'true',
   history: [],
   hasPlayedHeliumLaugh: false,
 
@@ -132,6 +135,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       blockedTime: 0,
       dragOffset3D: null,
       isPaused: false,
+      showNucleationTutorial: false,
       history: [],
       hasPlayedHeliumLaugh: false,
     });
@@ -139,7 +143,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   startDrag: (faceId) => {
     const state = get();
-    if (state.isAnimating || state.endState || state.isPaused) return;
+    if (state.isAnimating || state.endState || state.isPaused || state.levelObjectiveMet || state.levelFailed) return;
     const tile = state.tiles.get(faceId);
     if (!tile || ELEMENTS[tile.element].slideDistance === 0) return;
 
@@ -253,6 +257,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
 
         console.log('Merge rule detected:', mergeRule);
+        const isNucleation = mergeRule !== null && mergeRule.requiresPentagon === true;
 
         if (mergeRule) {
           const parentElement = tile.element;
@@ -361,13 +366,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
           if (state.currentLevelId !== null && !levelObjectiveMet) {
             levelFailed = true;
           }
+          const triggerTutorial = isNucleation && !state.hasSeenNucleationTutorial;
+          if (triggerTutorial) {
+            localStorage.setItem('stellar_seen_nucleation', 'true');
+          }
           set({ 
             endState: end, 
             levelObjectiveMet,
             levelFailed,
             isAnimating: false, 
             activeSlide: undefined, 
-            tiles: new Map(state.tiles) 
+            tiles: new Map(state.tiles),
+            showNucleationTutorial: triggerTutorial,
+            hasSeenNucleationTutorial: triggerTutorial ? true : state.hasSeenNucleationTutorial,
           });
           return;
         }
@@ -375,6 +386,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // Snappy, lag-free settle delay: exactly 40ms to clear mobile pointer events while maintaining instant response
         const settleDelay = 40;
         await new Promise(r => setTimeout(r, settleDelay));
+
+        const triggerTutorial = isNucleation && !state.hasSeenNucleationTutorial;
+        if (triggerTutorial) {
+          localStorage.setItem('stellar_seen_nucleation', 'true');
+        }
 
         set({
           tiles: new Map(state.tiles), // trigger reactivity
@@ -387,6 +403,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
           isAnimating: false,
           activeSlide: undefined,
           lastMerge: state.lastMerge,
+          showNucleationTutorial: triggerTutorial,
+          hasSeenNucleationTutorial: triggerTutorial ? true : state.hasSeenNucleationTutorial,
         });
       } else {
         // Play blocked audio cue
@@ -504,5 +522,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       dragOffset3D: null,
       activeSlide: undefined,
     });
+  },
+
+  dismissNucleationTutorial: () => {
+    set({ showNucleationTutorial: false });
   },
 }));

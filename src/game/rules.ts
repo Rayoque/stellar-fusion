@@ -81,7 +81,14 @@ export function detectMerge(
   const targetTile = targetFaceId !== undefined ? state.tiles.get(targetFaceId) : undefined;
   const targetElement = targetTile?.element;
 
-  // 1. Triangle (triple-alpha): only relevant for He landing
+  // 1. Pentagon CNO shortcut: H landing on a pentagon self-fuses immediately!
+  // This takes absolute precedence to preserve its behavior as a quantum self-fusion shortcut.
+  if (landedElement === 'H' && isFinalDestPentagon) {
+    const pentagonRule = MERGE_RULES.find(r => r.requiresPentagon && r.inputs[0] === 'H');
+    if (pentagonRule) return pentagonRule;
+  }
+
+  // 2. Triangle (triple-alpha): only relevant for He landing
   if (landedElement === 'He') {
     const heNeighbors = landedFace.neighbors.filter(nid => {
       const t = state.tiles.get(nid);
@@ -116,7 +123,7 @@ export function detectMerge(
     }
   }
 
-  // 2. Pair or pair_alpha: same element neighbor with matching rule
+  // 3. Pair or pair_alpha: same element neighbor with matching rule
   for (const rule of MERGE_RULES) {
     if (rule.pattern === 'pair' || rule.pattern === 'pair_alpha') {
       if (rule.inputs.length !== 2) continue;
@@ -140,13 +147,6 @@ export function detectMerge(
         }
       }
     }
-  }
-
-  // 3. Pentagon CNO shortcut: lone H on pentagon self-fuses.
-  // Strictly enforce that the ending element must actually form on a pentagon nucleation site.
-  if (landedElement === 'H' && isFinalDestPentagon) {
-    const pentagonRule = MERGE_RULES.find(r => r.requiresPentagon && r.inputs[0] === 'H');
-    if (pentagonRule) return pentagonRule;
   }
 
   return null;

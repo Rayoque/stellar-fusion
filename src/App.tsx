@@ -30,6 +30,10 @@ export default function App() {
   const activeToastElement = useGameStore(s => s.activeToastElement);
   const dismissToast = useGameStore(s => s.dismissToast);
 
+  // Nucleation Tutorial state bindings
+  const showNucleationTutorial = useGameStore(s => s.showNucleationTutorial);
+  const dismissNucleationTutorial = useGameStore(s => s.dismissNucleationTutorial);
+
   // UI state variables
   const [showStart, setShowStart] = React.useState(true);
   const [showCampaign, setShowCampaign] = React.useState(false);
@@ -78,6 +82,20 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [activeToastElement, dismissToast]);
+
+  const [showStatusOverlay, setShowStatusOverlay] = React.useState(false);
+
+  useEffect(() => {
+    if (levelObjectiveMet || levelFailed) {
+      // Delay showing the campaign success/fail screen by 1400ms so they see the final merge/landing and board composition!
+      const timer = setTimeout(() => {
+        setShowStatusOverlay(true);
+      }, 1400);
+      return () => clearTimeout(timer);
+    } else {
+      setShowStatusOverlay(false);
+    }
+  }, [levelObjectiveMet, levelFailed]);
 
   // Dynamic Ambient Drone Phase updates
   useEffect(() => {
@@ -225,8 +243,8 @@ export default function App() {
         />
       )}
 
-      {/* Campaign Success & Defeat Overlay Screens */}
-      {currentLevelId !== null && (levelObjectiveMet || levelFailed) && (
+      {/* Campaign Success & Defeat Overlay Screens (delayed for best user experience) */}
+      {currentLevelId !== null && showStatusOverlay && (
         <CampaignStatusOverlay
           levelId={currentLevelId}
           status={levelObjectiveMet ? 'win' : 'fail'}
@@ -238,6 +256,62 @@ export default function App() {
             setShowCampaign(true);
           }}
         />
+      )}
+
+      {/* Nucleation / Pentagon Self-Fusion Catalyst Tutorial Modal (Intuitively freezes active play once after action completes) */}
+      {showNucleationTutorial && (
+        <div className="fixed inset-0 z-[100] bg-black/35 flex justify-center items-center p-4 animate-fade-in-up">
+          <div 
+            className="border border-cyan-500/20 p-6 sm:p-8 rounded-[32px] max-w-md w-full text-center shadow-[0_16px_48px_rgba(6,182,212,0.15)] relative overflow-hidden isolate"
+            style={{
+              background: 'radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.12), transparent 50%), radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.08), transparent 50%), rgba(15, 15, 19, 0.96)',
+            }}
+          >
+            <div className="relative z-10 flex flex-col items-center">
+              {/* Glowing Pentagon Catalyst SVG - Bigger, double-outline exactly matching the in-game tiles! */}
+              <div className="mb-5 flex items-center justify-center select-none">
+                <svg width="84" height="84" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-[0_0_12px_rgba(34,211,238,0.7)] animate-pulse">
+                  <polygon 
+                    points="32,8 54,23 46,49 18,49 10,23" 
+                    fill="rgba(6, 182, 212, 0.12)" 
+                    stroke="#22d3ee" 
+                    strokeWidth="3" 
+                    strokeLinejoin="round"
+                  />
+                  <polygon 
+                    points="32,13 49,25 43,45 21,45 15,25" 
+                    fill="none" 
+                    stroke="rgba(34, 211, 238, 0.4)" 
+                    strokeWidth="1.2" 
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+
+              <h2 className="text-xl sm:text-2xl font-light tracking-wide mb-4 uppercase text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70">
+                Nucleation Site Catalyst
+              </h2>
+
+              <p className="text-white/60 text-xs sm:text-sm leading-relaxed mb-6 font-light font-normal text-center max-w-xs">
+                Your star's topology contains 12 pentagonal faces. Under extreme stellar compression, pentagons act as catalytic <span className="text-cyan-400 font-bold">nucleation sites</span>.
+              </p>
+
+              <div className="bg-black/45 border border-cyan-500/10 rounded-2xl p-4 mb-6 text-left max-w-xs">
+                <span className="text-[8.5px] font-mono font-bold text-cyan-400 tracking-wider block mb-1 uppercase">PHYSICS INSIGHT:</span>
+                <p className="text-[10.5px] leading-relaxed text-white/75 font-light">
+                  A single <span className="text-[#ff6b6b] font-bold">Hydrogen (H)</span> tile landing on a pentagon will immediately undergo self-fusion into <span className="text-[#feca57] font-bold">Helium (He)</span>—no secondary H tile is required!
+                </p>
+              </div>
+
+              <button
+                onClick={dismissNucleationTutorial}
+                className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-full font-bold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase shadow-[0_4px_16px_rgba(6,182,212,0.25)] cursor-pointer"
+              >
+                HARNESS CATALYST
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Subtle discovery dynamic toast notification */}

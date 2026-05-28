@@ -84,6 +84,8 @@ export interface GameState {
   endlessMode: boolean;
   isPaused: boolean;
   showRealtimeGraphics: boolean;
+  showNucleationTutorial: boolean;
+  hasSeenNucleationTutorial: boolean;
   activeSlide?: {
     element: ElementSymbol;
     path: number[];
