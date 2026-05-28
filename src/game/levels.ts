@@ -24,7 +24,7 @@ export const LEVELS: Level[] = [
   {
     id: 1,
     title: "Deuterium Fusion",
-    author: "Inspired by Murat Can Tonta",
+    author: "",
     description: "Embark on a simple path. To ignite your star, you must establish basic nucleosynthesis by combining raw hydrogen cores under gentle gravity.",
     starMass: 1.5,
     maxTurns: 5,
@@ -46,7 +46,7 @@ export const LEVELS: Level[] = [
   {
     id: 2,
     title: "Pentagon Catalyst",
-    author: "Inspired by JinHoo Ahn",
+    author: "",
     description: "In real astrophysics, the catalytic CNO cycle operates under extreme pressure, allowing rapid hydrogen burning. Locate the pentagon faces of your star's topology and slide a single hydrogen into a pentagon to trigger a rapid quantum shortcut!",
     starMass: 3.0,
     maxTurns: 4,
@@ -66,7 +66,7 @@ export const LEVELS: Level[] = [
   {
     id: 3,
     title: "The Triple-Alpha Path",
-    author: "Inspired by Serkan Yürekli",
+    author: "",
     description: "To burn helium, your star must navigate the triple-alpha bottleneck. Three helium nuclei must collide simultaneously to form carbon. Arrange three helium tiles in a tight triangle on the board to spark carbon ignition! Plan your moves carefully; one wrong slide blocks the path.",
     starMass: 6.5,
     maxTurns: 8,
@@ -88,7 +88,7 @@ export const LEVELS: Level[] = [
   {
     id: 4,
     title: "Convective Capture",
-    author: "Inspired by David Staffell",
+    author: "",
     description: "Convection currents inside the red giant shell are pulling elements apart. Feed your carbon core by capturing helium to synthesize oxygen before the core cools.",
     starMass: 8.0,
     maxTurns: 6,
@@ -110,7 +110,7 @@ export const LEVELS: Level[] = [
   {
     id: 5,
     title: "The Neon Shell",
-    author: "Inspired by Martin Ender",
+    author: "",
     description: "As the red giant reaches extreme temperatures, the neon shell begins to burn. Leverage the icosahedral grid's curvature to guide helium through tight pathways into your oxygen core.",
     starMass: 12.0,
     maxTurns: 10,
@@ -132,7 +132,7 @@ export const LEVELS: Level[] = [
   {
     id: 6,
     title: "Magnesium Resonance",
-    author: "Inspired by Serkan Yürekli",
+    author: "",
     description: "Advanced alpha-capture requires exact resonance matching. You must coordinate multiple merges concurrently to synthesize a Magnesium core without jamming the sphere's tight layout.",
     starMass: 15.0,
     maxTurns: 12,
@@ -156,7 +156,7 @@ export const LEVELS: Level[] = [
   {
     id: 7,
     title: "Silicon Synthesis",
-    author: "Inspired by JinHoo Ahn",
+    author: "",
     description: "Your star is rapidly aging. To build the silicon core, you must fuse heavy elements. Silicon has a high mass and moves half as far as Helium. Settle on a flawless, unique solution to slide the final Helium home.",
     starMass: 18.0,
     maxTurns: 10,
@@ -177,7 +177,7 @@ export const LEVELS: Level[] = [
   {
     id: 8,
     title: "The Silicon Trap",
-    author: "Inspired by Martin Ender",
+    author: "",
     description: "Silicon is highly resistant to movement. To prepare for the final collapse, you must synthesize two independent Silicon tiles. Be careful not to let them block each other's paths.",
     starMass: 25.0,
     maxTurns: 15,
@@ -201,7 +201,7 @@ export const LEVELS: Level[] = [
   {
     id: 9,
     title: "Iron Core Collapse",
-    author: "Inspired by Serkan Yürekli",
+    author: "",
     description: "Iron fusion consumes energy rather than releasing it, sealing the fate of the star. Achieve the ultimate end state: synthesize a single Iron tile in the core to trigger a core collapse supernova.",
     starMass: 29.5,
     maxTurns: 8,

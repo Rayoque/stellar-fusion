@@ -36,7 +36,7 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
           <span className="text-[9px] tracking-[3px] text-cyan-400 font-bold uppercase font-mono">Stellar Ignition Map</span>
           <h2 className="text-xl font-light tracking-[0.12em] uppercase">STELLAR CAMPAIGN</h2>
           <p className="text-xs text-white/55 font-light leading-relaxed">
-            Progress through curated cosmic puzzle scenarios. Achieve specific nuclear fusion milestones inspired by famous logic puzzle designers.
+            Progress through curated cosmic puzzle scenarios. Achieve specific nuclear fusion milestones.
           </p>
         </div>
 
