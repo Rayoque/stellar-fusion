@@ -168,18 +168,33 @@ export default function App() {
   }, [phase, endState]);
 
   // Re-assert drone playback when returning to the foreground / after an OS audio
-  // interruption (lock-unlock, Bluetooth handoff, phone call), so it always comes back.
+  // interruption (app-switch, lock-unlock, Bluetooth handoff, phone call).
+  //
+  // visibility/focus/pageshow handle desktop, but iOS Safari will NOT resume a
+  // suspended AudioContext outside a user gesture — so those events alone leave the
+  // drone silent after an app-switch. The fix: also resume on the next real tap/key
+  // (a genuine gesture), which always succeeds. resumeAmbientDrone() is a cheap no-op
+  // when the context is already running, so attaching it to pointer events is fine.
   useEffect(() => {
     const onWake = () => {
       if (document.visibilityState === 'visible') resumeAmbientDrone();
     };
+    const onGesture = () => resumeAmbientDrone();
+
     document.addEventListener('visibilitychange', onWake);
     window.addEventListener('focus', onWake);
     window.addEventListener('pageshow', onWake);
+    // Persistent (not once) — every app-switch needs a fresh gesture-driven resume.
+    window.addEventListener('pointerdown', onGesture);
+    window.addEventListener('touchend', onGesture);
+    window.addEventListener('keydown', onGesture);
     return () => {
       document.removeEventListener('visibilitychange', onWake);
       window.removeEventListener('focus', onWake);
       window.removeEventListener('pageshow', onWake);
+      window.removeEventListener('pointerdown', onGesture);
+      window.removeEventListener('touchend', onGesture);
+      window.removeEventListener('keydown', onGesture);
     };
   }, []);
 
