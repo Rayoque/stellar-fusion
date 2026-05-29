@@ -98,7 +98,11 @@ export function playBlocked(): void {
 let ambientOsc1: OscillatorNode | null = null;
 let ambientOsc2: OscillatorNode | null = null;
 let ambientOsc3: OscillatorNode | null = null;
-let ambientOsc4: OscillatorNode | null = null;
+// osc4 (Bb3, 232 Hz) is split into a binaural pair: L 228.5 Hz / R 235.5 Hz.
+// Average pitch stays 232 Hz, the 7 Hz difference creates a theta-range binaural
+// beat perceived on headphones (brain-generated, no acoustic interference).
+let ambientOsc4L: OscillatorNode | null = null;
+let ambientOsc4R: OscillatorNode | null = null;
 let ambientGain: GainNode | null = null;
 let ambientFilter: BiquadFilterNode | null = null;
 let osc3GainNode: GainNode | null = null;
@@ -110,7 +114,10 @@ export function startAmbientDrone(): void {
   ambientOsc1 = audioCtx.createOscillator();
   ambientOsc2 = audioCtx.createOscillator();
   ambientOsc3 = audioCtx.createOscillator();
-  ambientOsc4 = audioCtx.createOscillator();
+  ambientOsc4L = audioCtx.createOscillator();
+  ambientOsc4R = audioCtx.createOscillator();
+  const panL = audioCtx.createStereoPanner();
+  const panR = audioCtx.createStereoPanner();
   ambientGain = audioCtx.createGain();
   
   ambientFilter = audioCtx.createBiquadFilter();
@@ -132,9 +139,14 @@ export function startAmbientDrone(): void {
   ambientOsc3.type = 'sine';
   ambientOsc3.frequency.value = 174;
 
-  // Bb3 (232 Hz) - Pure warm sine wave (audible on small phone/laptop speakers, smooth and soothing)
-  ambientOsc4.type = 'sine';
-  ambientOsc4.frequency.value = 232;
+  // Bb3 (232 Hz center) - Pure warm sine, split into a binaural pair.
+  // L 228.5 / R 235.5 => 7 Hz theta beat. Avg = 232 Hz so perceived pitch unchanged.
+  ambientOsc4L.type = 'sine';
+  ambientOsc4L.frequency.value = 228.5;
+  ambientOsc4R.type = 'sine';
+  ambientOsc4R.frequency.value = 235.5;
+  panL.pan.value = -1; // hard left
+  panR.pan.value = 1;  // hard right
 
   // Lowpass filter cutoff set to a warm 450 Hz to keep the sound cozy and filter out any high buzz
   ambientFilter.type = 'lowpass';
@@ -157,7 +169,9 @@ export function startAmbientDrone(): void {
   lfoGain.connect(ambientOsc1.frequency);
   lfoGain.connect(ambientOsc2.frequency);
   lfoGain.connect(ambientOsc3.frequency);
-  lfoGain.connect(ambientOsc4.frequency);
+  // Same absolute LFO offset on both binaural tones keeps the difference locked at 7 Hz.
+  lfoGain.connect(ambientOsc4L.frequency);
+  lfoGain.connect(ambientOsc4R.frequency);
 
   // Connect oscillators to their gain nodes, then to filter, then to master destination
   ambientOsc1.connect(ambientFilter);
@@ -166,7 +180,13 @@ export function startAmbientDrone(): void {
   ambientOsc3.connect(osc3GainNode);
   osc3GainNode.connect(ambientFilter);
 
-  ambientOsc4.connect(osc4GainNode);
+  // Binaural pair: each tone panned hard, then summed into shared osc4 gain
+  // (so phase transitions still control level via osc4GainNode). Panner + filter
+  // + master gain all preserve the stereo image through to destination.
+  ambientOsc4L.connect(panL);
+  ambientOsc4R.connect(panR);
+  panL.connect(osc4GainNode);
+  panR.connect(osc4GainNode);
   osc4GainNode.connect(ambientFilter);
 
   ambientFilter.connect(ambientGain);
@@ -176,7 +196,8 @@ export function startAmbientDrone(): void {
   ambientOsc1.start();
   ambientOsc2.start();
   ambientOsc3.start();
-  ambientOsc4.start();
+  ambientOsc4L.start();
+  ambientOsc4R.start();
   lfo.start();
 }
 
@@ -184,8 +205,9 @@ export function stopAmbientDrone(): void {
   if (ambientOsc1) ambientOsc1.stop();
   if (ambientOsc2) ambientOsc2.stop();
   if (ambientOsc3) ambientOsc3.stop();
-  if (ambientOsc4) ambientOsc4.stop();
-  ambientOsc1 = ambientOsc2 = ambientOsc3 = ambientOsc4 = ambientGain = ambientFilter = osc3GainNode = osc4GainNode = null;
+  if (ambientOsc4L) ambientOsc4L.stop();
+  if (ambientOsc4R) ambientOsc4R.stop();
+  ambientOsc1 = ambientOsc2 = ambientOsc3 = ambientOsc4L = ambientOsc4R = ambientGain = ambientFilter = osc3GainNode = osc4GainNode = null;
 }
 
 export function updateAmbientDrone(phase: string, hasCollapsed: boolean): void {
