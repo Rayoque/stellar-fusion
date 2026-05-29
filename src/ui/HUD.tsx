@@ -94,6 +94,65 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
     window.scrollTo(0, 0);
   };
 
+  const trayRef = React.useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+
+  React.useEffect(() => {
+    const tray = trayRef.current;
+    if (!tray) return;
+
+    // Scroll wheel behavior (shifts vertically scrolled wheel horizontally)
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        tray.scrollLeft += e.deltaY;
+      }
+    };
+    tray.addEventListener('wheel', handleWheel, { passive: false });
+
+    // Click and drag mouse behavior
+    let isDown = false;
+    let startX = 0;
+    let scrollLeft = 0;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      isDown = true;
+      setIsDragging(true);
+      startX = e.clientX;
+      scrollLeft = tray.scrollLeft;
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDown) return;
+      const x = e.clientX;
+      const walk = (x - startX) * 1.8; // scroll multiplier
+      tray.scrollLeft = scrollLeft - walk;
+    };
+
+    const handleMouseUp = () => {
+      isDown = false;
+      setIsDragging(false);
+    };
+
+    // Block native image/text drag-drop ghosting to prevent scroll hijacking
+    const handleDragStart = (e: DragEvent) => {
+      e.preventDefault();
+    };
+
+    tray.addEventListener('mousedown', handleMouseDown);
+    tray.addEventListener('dragstart', handleDragStart);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      tray.removeEventListener('wheel', handleWheel);
+      tray.removeEventListener('mousedown', handleMouseDown);
+      tray.removeEventListener('dragstart', handleDragStart);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
   // Campaign support
   const currentLevelId = useGameStore(s => s.currentLevelId);
   const level = currentLevelId !== null ? LEVELS.find(l => l.id === currentLevelId) : null;
@@ -113,9 +172,82 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
   const ageSG_end = tMS * scale * 0.999;
   const ageCollapse = ageSG_end;
 
-  const currentThemeColor = phase === 'main_sequence'
-    ? getMainSequenceColor(starMass)
-    : (PHASE_COLORS[phase] || '#38bdf8');
+  const currentThemeColor = state.astrophysicistMode
+    ? '#00d2d3' // Hot neon cyan for advanced astrophysics!
+    : (phase === 'main_sequence'
+      ? getMainSequenceColor(starMass)
+      : (PHASE_COLORS[phase] || '#38bdf8'));
+
+  // Astrophysicist Mode Custom stats helper
+  const getAstroStats = () => {
+    const isotopesOrder: ElementSymbol[] = [
+      'H', 'D', 'He3', 'He4', 'Be7', 'Be8', 'C12', 'O16', 'Ne20', 
+      'Mg24', 'Si28', 'S32', 'Ar36', 'Ca40', 'Ti44', 'Cr48', 'Fe52', 'Ni56', 'Fe56'
+    ];
+    
+    let heaviest: ElementSymbol = 'H';
+    for (const sym of isotopesOrder) {
+      if ((elementCounts[sym] || 0) > 0) {
+        heaviest = sym;
+      }
+    }
+
+    const tempMap: Partial<Record<ElementSymbol, string>> = {
+      H: '15M K',
+      D: '20M K',
+      He3: '80M K',
+      He4: '100M K',
+      Be7: '150M K',
+      Be8: '180M K',
+      C12: '600M K',
+      O16: '1.2B K',
+      Ne20: '1.5B K',
+      Mg24: '1.8B K',
+      Si28: '2.2B K',
+      S32: '2.5B K',
+      Ar36: '2.8B K',
+      Ca40: '3.0B K',
+      Ti44: '3.2B K',
+      Cr48: '3.4B K',
+      Fe52: '3.6B K',
+      Ni56: '3.8B K',
+      Fe56: '4.0B K',
+    };
+
+    const densityMap: Partial<Record<ElementSymbol, string>> = {
+      H: '150 g/cm³',
+      D: '200 g/cm³',
+      He3: '1.0k g/cm³',
+      He4: '2.0k g/cm³',
+      Be7: '5.0k g/cm³',
+      Be8: '10k g/cm³',
+      C12: '200k g/cm³',
+      O16: '2.0M g/cm³',
+      Ne20: '4.0M g/cm³',
+      Mg24: '6.0M g/cm³',
+      Si28: '10M g/cm³',
+      S32: '15M g/cm³',
+      Ar36: '20M g/cm³',
+      Ca40: '30M g/cm³',
+      Ti44: '40M g/cm³',
+      Cr48: '50M g/cm³',
+      Fe52: '70M g/cm³',
+      Ni56: '90M g/cm³',
+      Fe56: '100M g/cm³',
+    };
+
+    return {
+      heaviest,
+      temp: tempMap[heaviest] || '15M K',
+      density: densityMap[heaviest] || '150 g/cm³',
+    };
+  };
+
+  const astroStats = getAstroStats();
+
+  const activeIsotopes: ElementSymbol[] = state.astrophysicistMode
+    ? ['H', 'D', 'He3', 'He4', 'Be7', 'Be8', 'C12', 'O16', 'Ne20', 'Mg24', 'Si28', 'S32', 'Ar36', 'Ca40', 'Ti44', 'Cr48', 'Fe52', 'Ni56', 'Fe56']
+    : ['H', 'He', 'C', 'O', 'Ne', 'Mg', 'Si', 'Fe'];
 
   return (
     <div className="absolute inset-0 z-10 pointer-events-none select-none">
@@ -131,6 +263,31 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
         </button>
       </div>
 
+      {/* Top Right: Score & Best Score Pill */}
+      {currentLevelId === null && (
+        <div className="absolute right-4 pointer-events-auto hud-top-container flex items-center gap-2">
+          <div 
+            className="flex flex-col items-center justify-center bg-black/40 backdrop-blur-md px-3.5 h-11 rounded-2xl border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)] font-mono"
+            style={{ borderColor: `${currentThemeColor}20` }}
+          >
+            <div className="text-[6.5px] tracking-[1px] text-white/40 leading-none">SCORE</div>
+            <div className="text-[12px] font-bold text-white leading-tight mt-0.5 tabular-nums">
+              {state.score % 1 === 0 ? state.score.toString() : state.score.toFixed(1)}
+            </div>
+          </div>
+
+          <div 
+            className="flex flex-col items-center justify-center bg-black/40 backdrop-blur-md px-3.5 h-11 rounded-2xl border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)] font-mono"
+            style={{ borderColor: `${currentThemeColor}20` }}
+          >
+            <div className="text-[6.5px] tracking-[1px] text-white/40 leading-none">BEST</div>
+            <div className="text-[12px] font-bold text-cyan-400 leading-tight mt-0.5 tabular-nums">
+              {state.highScore % 1 === 0 ? state.highScore.toString() : state.highScore.toFixed(1)}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Center: HUD Horizontal Stats Pill & Scenario Objective Banner */}
       <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto hud-top-container">
         <div 
@@ -144,27 +301,55 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
         >
           {/* Desktop Layout (md:flex hidden with fluid gaps/text on medium-to-large viewports) */}
           <div className="hidden md:flex items-center gap-2.5 lg:gap-4">
-            <div className="flex items-center gap-1.5 lg:gap-2.5">
-              <span className="text-sm lg:text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
-              <div>
-                <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">PHASE</div>
-                <div className="font-semibold tracking-wide text-[9px] lg:text-[10px] leading-tight mt-0.5 whitespace-nowrap">{PHASE_LABELS[phase]}</div>
-              </div>
-            </div>
+            {state.astrophysicistMode ? (
+              <>
+                <div className="flex items-center gap-1.5 lg:gap-2.5">
+                  <span className="text-sm lg:text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>☢</span>
+                  <div>
+                    <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">ERA</div>
+                    <div className="font-semibold tracking-wide text-[9px] lg:text-[10px] leading-tight mt-0.5 whitespace-nowrap">Fe26 ASTRO</div>
+                  </div>
+                </div>
 
-            <div className="h-5 w-px bg-white/15" />
+                <div className="h-5 w-px bg-white/15" />
 
-            <div>
-              <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">MASS</div>
-              <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums text-white/90 whitespace-nowrap">{starMass.toFixed(1)} <span className="text-[7.5px] lg:text-[8px] text-white/50 align-super">M☉</span></div>
-            </div>
+                <div>
+                  <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">DENSITY</div>
+                  <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums text-white/90 whitespace-nowrap">{astroStats.density}</div>
+                </div>
 
-            <div className="h-5 w-px bg-white/15" />
+                <div className="h-5 w-px bg-white/15" />
 
-            <div>
-              <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">STAR AGE</div>
-              <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums font-bold whitespace-nowrap" style={{ color: currentThemeColor }}>{ageInfo.formatted}</div>
-            </div>
+                <div>
+                  <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">CORE TEMP</div>
+                  <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums font-bold whitespace-nowrap" style={{ color: currentThemeColor }}>{astroStats.temp}</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5 lg:gap-2.5">
+                  <span className="text-sm lg:text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
+                  <div>
+                    <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">PHASE</div>
+                    <div className="font-semibold tracking-wide text-[9px] lg:text-[10px] leading-tight mt-0.5 whitespace-nowrap">{PHASE_LABELS[phase]}</div>
+                  </div>
+                </div>
+
+                <div className="h-5 w-px bg-white/15" />
+
+                <div>
+                  <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">MASS</div>
+                  <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums text-white/90 whitespace-nowrap">{starMass.toFixed(1)} <span className="text-[7.5px] lg:text-[8px] text-white/50 align-super">M☉</span></div>
+                </div>
+
+                <div className="h-5 w-px bg-white/15" />
+
+                <div>
+                  <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">STAR AGE</div>
+                  <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums font-bold whitespace-nowrap" style={{ color: currentThemeColor }}>{ageInfo.formatted}</div>
+                </div>
+              </>
+            )}
 
             <div className="h-5 w-px bg-white/15" />
 
@@ -178,14 +363,27 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
 
           {/* Mobile/Compact Layout (flex md:hidden) */}
           <div className="flex md:hidden items-center gap-1.5 text-[8.5px] font-mono tracking-wider font-semibold uppercase text-white/80 whitespace-nowrap">
-            <span className="text-[10px] leading-none flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
-            <span className="font-bold tracking-widest" style={{ color: currentThemeColor }}>
-              {phase === 'main_sequence' ? 'MAIN' : phase === 'red_giant' ? 'GIANT' : phase === 'supergiant' ? 'SUPER' : 'COLLAPSE'}
-            </span>
-            <span className="opacity-25">•</span>
-            <span className="text-white">{starMass.toFixed(1)} M☉</span>
-            <span className="opacity-25">•</span>
-            <span className="font-bold" style={{ color: currentThemeColor }}>{compactAge}</span>
+            {state.astrophysicistMode ? (
+              <>
+                <span className="text-[10px] leading-none flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>☢</span>
+                <span className="font-bold tracking-widest" style={{ color: currentThemeColor }}>FE26</span>
+                <span className="opacity-25">•</span>
+                <span className="text-white">{astroStats.density}</span>
+                <span className="opacity-25">•</span>
+                <span className="font-bold" style={{ color: currentThemeColor }}>{astroStats.temp}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-[10px] leading-none flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
+                <span className="font-bold tracking-widest" style={{ color: currentThemeColor }}>
+                  {phase === 'main_sequence' ? 'MAIN' : phase === 'red_giant' ? 'GIANT' : phase === 'supergiant' ? 'SUPER' : 'COLLAPSE'}
+                </span>
+                <span className="opacity-25">•</span>
+                <span className="text-white">{starMass.toFixed(1)} M☉</span>
+                <span className="opacity-25">•</span>
+                <span className="font-bold" style={{ color: currentThemeColor }}>{compactAge}</span>
+              </>
+            )}
             <span className="opacity-25">•</span>
             <span className="text-white">T{turn}{maxTurns !== null ? `/${maxTurns}` : ''}</span>
           </div>
@@ -209,74 +407,85 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
         <div className="flex flex-col items-center gap-2 xs:gap-3.5 pointer-events-none select-none max-w-[94vw] xs:max-w-[88vw] sm:max-w-md md:max-w-xl">
           {/* Dynamic Instructions placed directly above the Elements Tray */}
           <div className="text-[8px] xs:text-[9px] sm:text-[10px] opacity-35 tracking-[2px] xs:tracking-[4px] font-mono uppercase whitespace-nowrap mb-0.5 select-none">
-            DRAG TILES TO FUSE • BUILD YOUR STAR
+            {state.astrophysicistMode ? 'FUSE NUCLEI ALL THE WAY TO IRON-56' : 'DRAG TILES TO FUSE • BUILD YOUR STAR'}
           </div>
 
-          {/* Elements Tray */}
+          {/* Elements Tray Wrapper Container */}
           <div 
-            className="glass-panel px-2.5 xs:px-3.5 py-2.5 xs:py-3 rounded-[20px] xs:rounded-[22px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center gap-1.5 xs:gap-2.5 overflow-x-auto no-scrollbar max-w-full pointer-events-auto border border-white/8"
+            className="glass-panel rounded-[20px] xs:rounded-[22px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center overflow-hidden w-full max-w-full pointer-events-auto border border-white/8"
             style={{ 
               borderColor: `${currentThemeColor}15`,
               boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px ${currentThemeColor}05`
             }}
           >
-            {Object.entries(ELEMENTS).map(([sym, el]) => {
-              const count = elementCounts[sym as ElementSymbol] || 0;
-              const isUnlocked = count > 0 || ['H', 'He'].includes(sym);
-              
-              if (isUnlocked) {
-                return (
-                  <div 
-                    key={sym}
-                    className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border bg-black/40 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] flex-shrink-0"
-                    style={{ 
-                      borderColor: el.color,
-                      boxShadow: `0 0 10px ${el.color}15, inset 0 0 6px ${el.color}10`
-                    }}
-                    title={`${el.displayName}: ${count} nuclei`}
-                  >
-                    <span 
-                      className="font-mono text-[10px] xs:text-xs sm:text-sm font-bold tracking-tight"
-                      style={{ color: el.color }}
-                    >
-                      {sym}
-                    </span>
-                    <span className="absolute -top-1 -right-1 bg-[#101015]/90 text-white border border-white/10 font-mono text-[7.5px] xs:text-[8px] sm:text-[9px] w-3.5 h-3.5 xs:w-4 xs:h-4 rounded-full flex items-center justify-center backdrop-blur-md font-bold tabular-nums">
-                      {count}
-                    </span>
-                  </div>
-                );
-              } else {
-                return (
-                  <div 
-                    key={sym}
-                    className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/10 bg-black/10 opacity-30 select-none cursor-default flex-shrink-0"
-                    title={`Locked Element (Fuse heavier nuclei to discover)`}
-                  >
-                    <span className="font-mono text-[9px] xs:text-[10px] sm:text-xs text-white/50 font-medium">
-                      {sym}
-                    </span>
-                  </div>
-                );
-              }
-            })}
-
-            {/* Subtle Divider before Codex Button */}
-            <div className="w-px h-5 xs:h-6 bg-white/10 self-center flex-shrink-0" />
-
-            {/* Codex Circular shortcut button */}
-            <button
-              onClick={onOpenCodex}
-              className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] cursor-pointer flex-shrink-0"
-              title="Open Stellar Codex Journal"
+            {/* Scrollable Elements List */}
+            <div 
+              ref={trayRef}
+              className="flex items-center gap-1.5 xs:gap-2.5 overflow-x-auto no-scrollbar pl-2.5 xs:pl-3.5 py-2.5 xs:py-3 pr-1.5 xs:pr-2.5 flex-grow min-w-0"
+              style={{
+                cursor: isDragging ? 'grabbing' : 'grab',
+                userSelect: 'none',
+              }}
             >
-              <span className="text-xs xs:text-sm select-none">📔</span>
-            </button>
+              {activeIsotopes.map((sym) => {
+                const el = ELEMENTS[sym];
+                const count = elementCounts[sym] || 0;
+                const isUnlocked = count > 0 || (state.astrophysicistMode ? sym === 'H' : ['H', 'He'].includes(sym));
+                
+                if (isUnlocked) {
+                  return (
+                    <div 
+                      key={sym}
+                      className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border bg-black/40 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] flex-shrink-0"
+                      style={{ 
+                        borderColor: el.color,
+                        boxShadow: `0 0 10px ${el.color}15, inset 0 0 6px ${el.color}10`
+                      }}
+                      title={`${el.displayName}: ${count} nuclei`}
+                    >
+                      <span 
+                        className="font-mono text-[10px] xs:text-xs sm:text-sm font-bold tracking-tight"
+                        style={{ color: el.color }}
+                      >
+                        {sym}
+                      </span>
+                      <span className="absolute -top-1 -right-1 bg-[#101015]/90 text-white border border-white/10 font-mono text-[7.5px] xs:text-[8px] sm:text-[9px] w-3.5 h-3.5 xs:w-4 xs:h-4 rounded-full flex items-center justify-center backdrop-blur-md font-bold tabular-nums">
+                        {count}
+                      </span>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div 
+                      key={sym}
+                      className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/10 bg-black/10 opacity-30 select-none cursor-default flex-shrink-0"
+                      title={`Locked Element (Fuse heavier nuclei to discover)`}
+                    >
+                      <span className="font-mono text-[9px] xs:text-[10px] sm:text-xs text-white/50 font-medium">
+                        {sym}
+                      </span>
+                    </div>
+                  );
+                }
+              })}
+            </div>
+
+            {/* Static Divider & Codex Circular shortcut button */}
+            <div className="flex items-center gap-1.5 xs:gap-2.5 py-2.5 xs:py-3 pr-2.5 xs:pr-3.5 pl-1.5 xs:pl-2.5 flex-shrink-0 border-l border-white/5 bg-black/20">
+              {/* Codex Circular shortcut button */}
+              <button
+                onClick={onOpenCodex}
+                className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] cursor-pointer flex-shrink-0"
+                title={state.astrophysicistMode ? "Open Astrophysicist Codex" : "Open Stellar Codex Journal"}
+              >
+                <span className="text-xs xs:text-sm select-none">📔</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Stellar Life Stage Guide Modal Pop-up Overlay */}
+      {/* Stellar Life Stage / Advanced Fe26 Guide Modal Pop-up Overlay */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex justify-center items-center p-4 pointer-events-auto">
           {/* Modal Container */}
@@ -289,99 +498,193 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
               ✕
             </button>
 
-            {/* Header */}
-            <div className="flex flex-col gap-1 border-b border-white/5 pb-4 pr-8">
-              <span className="text-[9px] tracking-[2.5px] text-cyan-400 font-bold uppercase font-mono">Stellar Physics Journal</span>
-              <h2 className="text-lg font-semibold tracking-wide">STELLAR LIFE STAGE GUIDE</h2>
-              <p className="text-xs text-white/50 leading-relaxed font-normal mt-1">
-                A star's lifespan is governed entirely by core nuclear fusion. More massive stars burn through their fuel exponentially faster:
-              </p>
-              <div className="bg-white/5 border border-white/5 p-2 rounded-xl text-xs font-semibold text-cyan-300 font-mono mt-1 text-center">
-                This {starMass.toFixed(1)} Solar Mass Star's Lifespan Model
-              </div>
-            </div>
-
-            {/* Timeline stages list */}
-            <div className="flex flex-col gap-6 relative pl-5 border-l border-white/10 ml-2 text-sm">
-              {/* 1. Main Sequence */}
-              <div className={`relative ${phase === 'main_sequence' ? 'text-cyan-400 font-bold' : 'text-white/60'}`}>
-                {/* Active indicator dot */}
-                <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
-                  phase === 'main_sequence' 
-                    ? 'bg-cyan-400 animate-pulse shadow-[0_0_12px_#22d3ee]' 
-                    : 'bg-white/20'
-                }`} />
-                <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-base font-semibold">1. Main Sequence</span>
-                  <span className="font-mono text-xs text-white/40">{ageMS_start.toFixed(1)} to {ageMS_end.toFixed(1)} {unit}</span>
+            {state.astrophysicistMode ? (
+              <>
+                {/* Header */}
+                <div className="flex flex-col gap-1 border-b border-white/5 pb-4 pr-8">
+                  <span className="text-[9px] tracking-[2.5px] text-cyan-400 font-bold uppercase font-mono">Astrophysicist Journal</span>
+                  <h2 className="text-lg font-semibold tracking-wide">NUCLEAR FUSION GUIDE</h2>
+                  <p className="text-xs text-white/50 leading-relaxed font-normal mt-1">
+                    Fusing isotopes in advanced stellar cores. Follow the nucleosynthesis alpha-process chain all the way to Iron-56:
+                  </p>
                 </div>
-                <p className="text-xs text-white/45 leading-relaxed font-normal">
-                  Hydrogen core fusion sustains stable gravitational equilibrium. This is the longest and most stable phase of a star's life.
-                  <span className="block mt-1 text-[10px] text-cyan-400/80 font-mono">Unlocks: H, He</span>
-                </p>
-              </div>
 
-              {/* 2. Red Giant */}
-              <div className={`relative ${phase === 'red_giant' ? 'text-amber-400 font-bold' : 'text-white/60'}`}>
-                {/* Active indicator dot */}
-                <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
-                  phase === 'red_giant' 
-                    ? 'bg-amber-400 animate-pulse shadow-[0_0_12px_#fbbf24]' 
-                    : 'bg-white/20'
-                }`} />
-                <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-base font-semibold">2. Red Giant</span>
-                  <span className="font-mono text-xs text-white/40">{ageRG_start.toFixed(1)} to {ageRG_end.toFixed(1)} {unit}</span>
-                </div>
-                <p className="text-xs text-white/45 leading-relaxed font-normal">
-                  Helium core shrinks & heats up, causing the outer hydrogen layers to expand. Fuses Helium into Carbon and Oxygen.
-                  <span className="block mt-1 text-[10px] text-amber-400/80 font-mono">Trigger: Accumulate 8 Helium tiles | Unlocks: C, O</span>
-                </p>
-              </div>
+                 {/* Fusion pathway rules list */}
+                <div className="flex flex-col gap-4 text-xs font-normal max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="bg-white/5 border border-white/5 p-3 rounded-2xl">
+                    <span className="text-[9px] font-mono font-bold text-cyan-400 block mb-1">UNSTABLE ISOTOPES (MULTI-TURN DECAY):</span>
+                    <p className="text-[11px] leading-relaxed text-white/70">
+                      Unstable elements decay back to their stable precursors after a randomized number of turns. Fusing them quickly is key! Parking an unstable isotope on any of the 12 pentagon faces acts as a powerful magnetic confinement shield, freezing its decay timer completely so it never decays.
+                    </p>
+                    <ul className="list-disc list-inside mt-2 text-[10.5px] text-white/60 space-y-1 font-mono">
+                      <li>Be7 → He4 (Unstable)</li>
+                      <li>Be8 → He4 (Unstable)</li>
+                      <li>Ne20 → O16 (Unstable)</li>
+                      <li>Fe52 → Cr48 (Unstable)</li>
+                      <li>Ni56 → Fe56 (Unstable - decays to stable ash!)</li>
+                    </ul>
+                  </div>
 
-              {/* 3. Supergiant */}
-              <div className={`relative ${phase === 'supergiant' ? 'text-red-400 font-bold' : 'text-white/60'}`}>
-                {/* Active indicator dot */}
-                <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
-                  phase === 'supergiant' 
-                    ? 'bg-red-400 animate-pulse shadow-[0_0_12px_#f87171]' 
-                    : 'bg-white/20'
-                }`} />
-                <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-base font-semibold">3. Supergiant</span>
-                  <span className="font-mono text-xs text-white/40">{ageSG_start.toFixed(1)} to {ageSG_end.toFixed(1)} {unit}</span>
-                </div>
-                <p className="text-xs text-white/45 leading-relaxed font-normal">
-                  Advanced core-shell fusion begins. The star burns Carbon, Oxygen, Neon, Magnesium, and Silicon in concentric layers like an onion.
-                  <span className="block mt-1 text-[10px] text-red-400/80 font-mono">Trigger: Star Mass ≥ 8 & 4 Carbon tiles | Unlocks: Ne, Mg, Si</span>
-                </p>
-              </div>
+                  <div className="bg-white/5 border border-white/5 p-3 rounded-2xl flex flex-col gap-2">
+                    <span className="text-[9px] font-mono font-bold text-cyan-400 block">STELLAR CORE BURNING PHASES:</span>
+                    <p className="text-[11px] leading-relaxed text-white/70">
+                      Massive stellar cores contract and heat up, triggering sequential shell burning phases of progressive density and temperature:
+                    </p>
+                    <div className="space-y-2 mt-1">
+                      <div className="border-l border-[#ff7f50]/40 pl-2.5">
+                        <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-[#ff7f50]">1. Hydrogen Burning Stage</span><span className="text-[9px] text-white/40">15M - 40M K</span></div>
+                        <p className="text-[10px] text-white/50 mt-0.5 leading-relaxed">Fuses Hydrogen (H) into Helium-4 (He4) using the CNO cycle catalyst.</p>
+                      </div>
+                      <div className="border-l border-[#fbbf24]/40 pl-2.5">
+                        <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-[#fbbf24]">2. Helium Burning Stage</span><span className="text-[9px] text-white/40">100M - 200M K</span></div>
+                        <p className="text-[10px] text-white/50 mt-0.5 leading-relaxed">Triple-alpha process fuses Helium-4 (He4) into Carbon (C12) and Oxygen (O16).</p>
+                      </div>
+                      <div className="border-l border-[#fb7185]/40 pl-2.5">
+                        <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-[#fb7185]">3. Carbon & Neon Burning</span><span className="text-[9px] text-white/40">600M - 1.5B K</span></div>
+                        <p className="text-[10px] text-white/50 mt-0.5 leading-relaxed">Fuses Carbon into Neon (Ne20) and Magnesium (Mg24). High temps trigger Neon decay.</p>
+                      </div>
+                      <div className="border-l border-[#38bdf8]/40 pl-2.5">
+                        <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-[#38bdf8]">4. Oxygen & Silicon Burning</span><span className="text-[9px] text-white/40">1.5B - 4.0B K</span></div>
+                        <p className="text-[10px] text-white/50 mt-0.5 leading-relaxed">Fuses Oxygen into Silicon (Si28), feeding the alpha-process nucleosynthesis chain.</p>
+                      </div>
+                    </div>
+                  </div>
 
-              {/* 4. Core Collapse */}
-              <div className={`relative ${phase === 'collapse' ? 'text-purple-400 font-bold' : 'text-white/60'}`}>
-                {/* Active indicator dot */}
-                <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
-                  phase === 'collapse' 
-                    ? 'bg-purple-400 animate-pulse shadow-[0_0_12px_#c084fc]' 
-                    : 'bg-white/20'
-                }`} />
-                <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-base font-semibold">4. Core Collapse</span>
-                  <span className="font-mono text-xs text-white/40 font-bold">Above {ageCollapse.toFixed(1)} {unit}</span>
+                  <div className="bg-white/5 border border-white/5 p-3 rounded-2xl">
+                    <span className="text-[9px] font-mono font-bold text-cyan-400 block mb-1">STABLE ASH:</span>
+                    <p className="text-[11px] leading-relaxed text-white/70">
+                      <span className="text-[#57606f] font-bold">Iron-56 (Fe56)</span> is completely stable and immovable (<span className="font-mono">slideDistance: 0</span>). Keep it unslideable to structure your core strategy!
+                    </p>
+                  </div>
+
+                  <table className="w-full text-left font-mono text-[10.5px] border-collapse text-white/80">
+                    <thead>
+                      <tr className="border-b border-white/10 text-white/40">
+                        <th className="pb-1 text-left">Output</th>
+                        <th className="pb-1 text-left">Reactants</th>
+                        <th className="pb-1 text-right">Stability</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      <tr><td className="py-1.5 text-cyan-300">D</td><td className="py-1.5">H + H</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">He3</td><td className="py-1.5">D + H</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">He4</td><td className="py-1.5">He3 + He3</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-amber-400">Be7</td><td className="py-1.5">He4 + He3</td><td className="py-1.5 text-right text-amber-400">Unstable</td></tr>
+                      <tr><td className="py-1.5 text-amber-400">Be8</td><td className="py-1.5">He4 + He4</td><td className="py-1.5 text-right text-amber-400">Unstable</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">C12</td><td className="py-1.5">Be8 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">O16</td><td className="py-1.5">C12 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-amber-400">Ne20</td><td className="py-1.5">O16 + He4</td><td className="py-1.5 text-right text-amber-400">Unstable</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">Mg24</td><td className="py-1.5">Ne20 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">Si28</td><td className="py-1.5">Mg24 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">S32</td><td className="py-1.5">Si28 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">Ar36</td><td className="py-1.5">S32 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">Ca40</td><td className="py-1.5">Ar36 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">Ti44</td><td className="py-1.5">Ca40 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">Cr48</td><td className="py-1.5">Ti44 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-amber-400">Fe52</td><td className="py-1.5">Cr48 + He4</td><td className="py-1.5 text-right text-amber-400">Unstable</td></tr>
+                      <tr><td className="py-1.5 text-amber-400">Ni56</td><td className="py-1.5">Fe52 + He4</td><td className="py-1.5 text-right text-amber-400">Unstable</td></tr>
+                      <tr><td className="py-1.5 text-purple-400 font-bold">Fe56</td><td className="py-1.5 font-bold">Ni56 Decay</td><td className="py-1.5 text-right text-purple-400 font-bold">Stable Ash</td></tr>
+                    </tbody>
+                  </table>
                 </div>
-                <p className="text-xs text-white/45 leading-relaxed font-normal">
-                  Silicon fuses into Iron. Since Iron fusion consumes energy instead of releasing it, the star collapses under extreme gravity, triggering a violent Supernova!
-                  <span className="block mt-1 text-[10px] text-purple-400/80 font-mono">Trigger: Create 1 Iron tile | Target: Core Collapse</span>
-                </p>
-              </div>
-            </div>
+              </>
+            ) : (
+              <>
+                {/* Header */}
+                <div className="flex flex-col gap-1 border-b border-white/5 pb-4 pr-8">
+                  <span className="text-[9px] tracking-[2.5px] text-cyan-400 font-bold uppercase font-mono">Stellar Physics Journal</span>
+                  <h2 className="text-lg font-semibold tracking-wide">STELLAR LIFE STAGE GUIDE</h2>
+                  <p className="text-xs text-white/50 leading-relaxed font-normal mt-1">
+                    A star's lifespan is governed entirely by core nuclear fusion. More massive stars burn through their fuel exponentially faster:
+                  </p>
+                  <div className="bg-white/5 border border-white/5 p-2 rounded-xl text-xs font-semibold text-cyan-300 font-mono mt-1 text-center">
+                    This {starMass.toFixed(1)} Solar Mass Star's Lifespan Model
+                  </div>
+                </div>
+
+                {/* Timeline stages list */}
+                <div className="flex flex-col gap-6 relative pl-5 border-l border-white/10 ml-2 text-sm">
+                  {/* 1. Main Sequence */}
+                  <div className={`relative ${phase === 'main_sequence' ? 'text-cyan-400 font-bold' : 'text-white/60'}`}>
+                    {/* Active indicator dot */}
+                    <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
+                      phase === 'main_sequence' 
+                        ? 'bg-cyan-400 animate-pulse shadow-[0_0_12px_#22d3ee]' 
+                        : 'bg-white/20'
+                    }`} />
+                    <div className="flex justify-between items-baseline mb-1">
+                      <span className="text-base font-semibold">1. Main Sequence</span>
+                      <span className="font-mono text-xs text-white/40">{ageMS_start.toFixed(1)} to {ageMS_end.toFixed(1)} {unit}</span>
+                    </div>
+                    <p className="text-xs text-white/45 leading-relaxed font-normal">
+                      Hydrogen core fusion sustains stable gravitational equilibrium. This is the longest and most stable phase of a star's life.
+                      <span className="block mt-1 text-[10px] text-cyan-400/80 font-mono">Unlocks: H, He</span>
+                    </p>
+                  </div>
+
+                  {/* 2. Red Giant */}
+                  <div className={`relative ${phase === 'red_giant' ? 'text-amber-400 font-bold' : 'text-white/60'}`}>
+                    {/* Active indicator dot */}
+                    <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
+                      phase === 'red_giant' 
+                        ? 'bg-amber-400 animate-pulse shadow-[0_0_12px_#fbbf24]' 
+                        : 'bg-white/20'
+                    }`} />
+                    <div className="flex justify-between items-baseline mb-1">
+                      <span className="text-base font-semibold">2. Red Giant</span>
+                      <span className="font-mono text-xs text-white/40">{ageRG_start.toFixed(1)} to {ageRG_end.toFixed(1)} {unit}</span>
+                    </div>
+                    <p className="text-xs text-white/45 leading-relaxed font-normal">
+                      Helium core shrinks & heats up, causing the outer hydrogen layers to expand. Fuses Helium into Carbon and Oxygen.
+                      <span className="block mt-1 text-[10px] text-amber-400/80 font-mono">Trigger: Accumulate 8 Helium tiles | Unlocks: C, O</span>
+                    </p>
+                  </div>
+
+                  {/* 3. Supergiant */}
+                  <div className={`relative ${phase === 'supergiant' ? 'text-red-400 font-bold' : 'text-white/60'}`}>
+                    {/* Active indicator dot */}
+                    <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
+                      phase === 'supergiant' 
+                        ? 'bg-red-400 animate-pulse shadow-[0_0_12px_#f87171]' 
+                        : 'bg-white/20'
+                    }`} />
+                    <div className="flex justify-between items-baseline mb-1">
+                      <span className="text-base font-semibold">3. Supergiant</span>
+                      <span className="font-mono text-xs text-white/40">{ageSG_start.toFixed(1)} to {ageSG_end.toFixed(1)} {unit}</span>
+                    </div>
+                    <p className="text-xs text-white/45 leading-relaxed font-normal">
+                      Advanced core-shell fusion begins. The star burns Carbon, Oxygen, Neon, Magnesium, and Silicon in concentric layers like an onion.
+                      <span className="block mt-1 text-[10px] text-red-400/80 font-mono">Trigger: Star Mass ≥ 8 & 4 Carbon tiles | Unlocks: Ne, Mg, Si</span>
+                    </p>
+                  </div>
+
+                  {/* 4. Core Collapse */}
+                  <div className={`relative ${phase === 'collapse' ? 'text-purple-400 font-bold' : 'text-white/60'}`}>
+                    {/* Active indicator dot */}
+                    <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
+                      phase === 'collapse' 
+                        ? 'bg-purple-400 animate-pulse shadow-[0_0_12px_#c084fc]' 
+                        : 'bg-white/20'
+                    }`} />
+                    <div className="flex justify-between items-baseline mb-1">
+                      <span className="text-base font-semibold">4. Core Collapse</span>
+                      <span className="font-mono text-xs text-white/40 font-bold">Above {ageCollapse.toFixed(1)} {unit}</span>
+                    </div>
+                    <p className="text-xs text-white/45 leading-relaxed font-normal">
+                      Silicon fuses into Iron. Since Iron fusion consumes energy instead of releasing it, the star collapses under extreme gravity, triggering a violent Supernova!
+                      <span className="block mt-1 text-[10px] text-purple-400/80 font-mono">Trigger: Create 1 Iron tile | Target: Core Collapse</span>
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Footer Close Button */}
             <button
               onClick={handleCloseGuide}
               className="mt-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs font-semibold py-2.5 rounded-xl transition-all cursor-pointer text-center active:scale-[0.985]"
             >
-              Back to Fusion Board
+              {state.astrophysicistMode ? 'Close Fusion Table' : 'Back to Fusion Board'}
             </button>
           </div>
         </div>

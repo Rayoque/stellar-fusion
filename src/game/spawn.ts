@@ -9,7 +9,7 @@ import { currentPhaseRule } from './phases';
  */
 export function spawnHydrogen(state: GameState): void {
   const phaseRule = currentPhaseRule(state);
-  const rate = phaseRule.hSpawnRate;
+  const rate = state.astrophysicistMode ? 1 : phaseRule.hSpawnRate;
 
   if (rate <= 0) return;
 

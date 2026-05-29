@@ -8,7 +8,7 @@ interface CodexProps {
   onClose: () => void;
 }
 
-const ELEMENT_DESCRIPTIONS: Record<ElementSymbol, string> = {
+const ELEMENT_DESCRIPTIONS: Partial<Record<ElementSymbol, string>> = {
   H: "Hydrogen. The most abundant chemical substance in the universe. It serves as the fundamental thermodynamic fuel of all main-sequence stars, sustaining stable gravitational equilibrium.",
   He: "Helium. Formed through hydrogen core fusion. Once hydrogen fuel is exhausted, core contraction heats the stellar core, triggering helium ignition and red giant expansion.",
   C: "Carbon. Synthesized via the Triple-Alpha Process, where three helium nuclei collide in a rare, high-pressure resonance. This ignition marks the birth of red giant core burning.",
@@ -21,14 +21,22 @@ const ELEMENT_DESCRIPTIONS: Record<ElementSymbol, string> = {
 
 export function Codex({ onClose }: CodexProps) {
   const unlockedElements = useGameStore(s => s.unlockedElements);
+  const isAstro = useGameStore(s => s.astrophysicistMode);
   const [selectedSym, setSelectedSym] = React.useState<ElementSymbol | null>(null);
 
-  // Auto-select the first unlocked element
+  const activeIsotopes: ElementSymbol[] = isAstro
+    ? ['H', 'D', 'He3', 'He4', 'Be7', 'Be8', 'C12', 'O16', 'Ne20', 'Mg24', 'Si28', 'S32', 'Ar36', 'Ca40', 'Ti44', 'Cr48', 'Fe52', 'Ni56', 'Fe56']
+    : ['H', 'He', 'C', 'O', 'Ne', 'Mg', 'Si', 'Fe'];
+
+  // Auto-select the first unlocked element that is in the active list
   React.useEffect(() => {
-    if (unlockedElements.length > 0 && !selectedSym) {
-      setSelectedSym(unlockedElements[0]);
+    const firstUnlockedInActive = unlockedElements.find(x => activeIsotopes.includes(x));
+    if (firstUnlockedInActive && !selectedSym) {
+      setSelectedSym(firstUnlockedInActive);
     }
-  }, [unlockedElements, selectedSym]);
+  }, [unlockedElements, selectedSym, activeIsotopes]);
+
+  const unlockedCount = unlockedElements.filter(x => activeIsotopes.includes(x)).length;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex justify-center items-center p-4 animate-fade-in-up select-none pointer-events-auto">
@@ -45,7 +53,9 @@ export function Codex({ onClose }: CodexProps) {
         {/* Header */}
         <div className="flex flex-col gap-1 border-b border-white/5 pb-4 pr-8">
           <span className="text-[9px] tracking-[3px] text-cyan-400 font-bold uppercase font-mono">Stellar Physics Journal</span>
-          <h2 className="text-xl font-light tracking-[0.12em] uppercase">STELLAR CODEX</h2>
+          <h2 className="text-xl font-light tracking-[0.12em] uppercase">
+            {isAstro ? 'ASTROPHYSICIST CODEX' : 'STELLAR CODEX'}
+          </h2>
           <p className="text-xs text-white/55 font-light leading-relaxed">
             Nuclear nucleosynthesis drives stellar evolution. Fuse elements on the 3D board to unlock entries in this astrophysical journal.
           </p>
@@ -53,18 +63,19 @@ export function Codex({ onClose }: CodexProps) {
 
         {/* Content Body: Split layout on desktop, stacked on mobile */}
         <div className="flex flex-col md:flex-row gap-6 flex-1 overflow-hidden min-h-0">
-          {/* Left Panel: Grid of 8 elements */}
-          <div className="flex-1 md:max-w-[280px]">
+          {/* Left Panel: Grid of elements */}
+          <div className="flex-1 md:max-w-[280px] overflow-y-auto pr-1 custom-scrollbar">
             <div className="grid grid-cols-4 gap-2.5">
-              {Object.entries(ELEMENTS).map(([sym, el]) => {
-                const isUnlocked = unlockedElements.includes(sym as ElementSymbol);
+              {activeIsotopes.map((sym) => {
+                const el = ELEMENTS[sym];
+                const isUnlocked = unlockedElements.includes(sym);
                 const isSelected = selectedSym === sym;
                 
                 if (isUnlocked) {
                   return (
                     <button
                       key={sym}
-                      onClick={() => setSelectedSym(sym as ElementSymbol)}
+                      onClick={() => setSelectedSym(sym)}
                       className={`aspect-square rounded-2xl border transition-all flex flex-col items-center justify-center gap-1 active:scale-95 cursor-pointer ${
                         isSelected 
                           ? 'bg-white/10 border-white/30 shadow-[0_0_12px_rgba(255,255,255,0.08)]' 
@@ -97,7 +108,7 @@ export function Codex({ onClose }: CodexProps) {
             </div>
 
             <div className="mt-4 hidden md:block text-[8px] font-mono text-white/30 tracking-widest leading-relaxed uppercase border-t border-white/5 pt-4">
-              Progression: {unlockedElements.length} / 8 Elements Discovered
+              Progression: {unlockedCount} / {activeIsotopes.length} Elements Discovered
             </div>
           </div>
 
@@ -108,7 +119,7 @@ export function Codex({ onClose }: CodexProps) {
                 <div className="flex items-center gap-3">
                   {/* Element Glowing Badge */}
                   <div 
-                    className="w-12 h-12 rounded-full border flex items-center justify-center shadow-lg font-mono text-lg font-bold select-none bg-black/30"
+                    className="w-12 h-12 rounded-full border flex items-center justify-center shadow-lg font-mono text-lg font-bold select-none bg-black/30 animate-pulse"
                     style={{ 
                       borderColor: ELEMENTS[selectedSym].color,
                       color: ELEMENTS[selectedSym].color,
@@ -128,7 +139,8 @@ export function Codex({ onClose }: CodexProps) {
                 </div>
 
                 <p className="text-xs text-white/60 font-light leading-relaxed flex-1 border-t border-white/5 pt-4">
-                  {ELEMENT_DESCRIPTIONS[selectedSym]}
+                  {ELEMENT_DESCRIPTIONS[selectedSym] || 
+                    `${ELEMENTS[selectedSym].displayName} (${selectedSym}). An advanced nuclear isotope participating in the astrophysicist fusion pathways. Synthesized in the extreme thermal and pressure environments of mature stellar cores.`}
                 </p>
                 
                 <div className="text-[9px] font-mono text-cyan-400 bg-cyan-950/20 border border-cyan-500/10 px-3 py-1.5 rounded-xl flex justify-between items-center select-none font-semibold">
@@ -149,7 +161,7 @@ export function Codex({ onClose }: CodexProps) {
 
         {/* Footer for Mobile progress summary */}
         <div className="md:hidden flex justify-between items-center text-[8px] font-mono text-white/35 tracking-widest border-t border-white/5 pt-2 uppercase">
-          <span>Unlocks: {unlockedElements.length} / 8</span>
+          <span>Progression: {unlockedCount} / {activeIsotopes.length}</span>
           <span>Stellar Fusion Engine</span>
         </div>
       </div>

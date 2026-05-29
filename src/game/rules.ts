@@ -35,11 +35,51 @@ export const MERGE_RULES: MergeRule[] = [
   { inputs: ['Si', 'Si'], output: 'Fe', pattern: 'pair' },
 ];
 
+export const ASTRO_MERGE_RULES: MergeRule[] = [
+  // H + H -> D
+  { inputs: ['H', 'H'], output: 'D', pattern: 'pair' },
+  // D + H -> He3
+  { inputs: ['D', 'H'], output: 'He3', pattern: 'pair' },
+  // He3 + He3 -> He4
+  { inputs: ['He3', 'He3'], output: 'He4', pattern: 'pair' },
+  // He4 + He3 -> Be7
+  { inputs: ['He4', 'He3'], output: 'Be7', pattern: 'pair' },
+  // He4 + He4 -> Be8
+  { inputs: ['He4', 'He4'], output: 'Be8', pattern: 'pair' },
+  // Be8 + He4 -> C12
+  { inputs: ['Be8', 'He4'], output: 'C12', pattern: 'pair' },
+  // C12 + He4 -> O16
+  { inputs: ['C12', 'He4'], output: 'O16', pattern: 'pair' },
+  // O16 + He4 -> Ne20
+  { inputs: ['O16', 'He4'], output: 'Ne20', pattern: 'pair' },
+  // Ne20 + He4 -> Mg24
+  { inputs: ['Ne20', 'He4'], output: 'Mg24', pattern: 'pair' },
+  // Si28 + He4 -> S32
+  { inputs: ['Si28', 'He4'], output: 'S32', pattern: 'pair' },
+  // S32 + He4 -> Ar36
+  { inputs: ['S32', 'He4'], output: 'Ar36', pattern: 'pair' },
+  // Ar36 + He4 -> Ca40
+  { inputs: ['Ar36', 'He4'], output: 'Ca40', pattern: 'pair' },
+  // Ca40 + He4 -> Ti44
+  { inputs: ['Ca40', 'He4'], output: 'Ti44', pattern: 'pair' },
+  // Ti44 + He4 -> Cr48
+  { inputs: ['Ti44', 'He4'], output: 'Cr48', pattern: 'pair' },
+  // Cr48 + He4 -> Fe52
+  { inputs: ['Cr48', 'He4'], output: 'Fe52', pattern: 'pair' },
+  // Fe52 + He4 -> Ni56
+  { inputs: ['Fe52', 'He4'], output: 'Ni56', pattern: 'pair' },
+  // O16 + O16 -> Si28
+  { inputs: ['O16', 'O16'], output: 'Si28', pattern: 'pair' },
+  // C12 + C12 -> Ne20
+  { inputs: ['C12', 'C12'], output: 'Ne20', pattern: 'pair' }
+];
+
 /**
  * Check if two elements have a potential pair or pair_alpha merge rule.
  */
-export function canMerge(elementA: ElementSymbol, elementB: ElementSymbol): boolean {
-  for (const rule of MERGE_RULES) {
+export function canMerge(elementA: ElementSymbol, elementB: ElementSymbol, isAstro: boolean = false): boolean {
+  const rules = isAstro ? ASTRO_MERGE_RULES : MERGE_RULES;
+  for (const rule of rules) {
     if (rule.pattern === 'pair' || rule.pattern === 'pair_alpha') {
       if (rule.inputs.length !== 2) continue;
       const [a, b] = rule.inputs;
@@ -61,6 +101,31 @@ export function detectMerge(
   state: GameState,
   targetFaceId?: number
 ): MergeRule | null {
+  if (state.astrophysicistMode) {
+    if (targetFaceId === undefined) {
+      const landedTile = state.tiles.get(landedFaceId);
+      if (landedTile && landedTile.element === 'H' && state.faces[landedFaceId]?.shape === 'pentagon') {
+        // CNO catalyst self-fusion: Hydrogen on pentagon instantly fuses to Helium-4!
+        return { inputs: ['H'], output: 'He4', pattern: 'pair', requiresPentagon: true };
+      }
+      return null;
+    }
+    const landedTile = state.tiles.get(landedFaceId);
+    const targetTile = state.tiles.get(targetFaceId);
+    if (!landedTile || !targetTile) return null;
+
+    const landedElement = landedTile.element;
+    const targetElement = targetTile.element;
+
+    for (const rule of ASTRO_MERGE_RULES) {
+      const [a, b] = rule.inputs;
+      if ((a === landedElement && b === targetElement) || (a === targetElement && b === landedElement)) {
+        return rule;
+      }
+    }
+    return null;
+  }
+
   const landedTile = state.tiles.get(landedFaceId);
   if (!landedTile) return null;
 
@@ -150,6 +215,46 @@ export function detectMerge(
   return null;
 }
 
+export const SCORE_VALUES: Record<ElementSymbol, number> = {
+  H: 0,
+  He: 4,     // mass 4
+  C: 12,     // mass 12
+  O: 16,     // mass 16
+  Ne: 20,    // mass 20
+  Mg: 24,    // mass 24
+  Si: 28,    // mass 28
+  Fe: 56,    // mass 56
+
+  // Astro Mode (Half-mass scoring rules from Fe26)
+  D: 1.0,    // mass 2 / 2
+  He3: 1.5,  // mass 3 / 2
+  He4: 2.0,  // mass 4 / 2
+  Be7: 3.0,  // mass 7 / 2 (aligned to user's 3-point report)
+  Be8: 4.0,  // mass 8 / 2
+  C12: 6.0,  // mass 12 / 2
+  O16: 8.0,  // mass 16 / 2
+  Ne20: 10.0, // mass 20 / 2
+  Mg24: 12.0, // mass 24 / 2
+  Si28: 14.0, // mass 28 / 2
+  S32: 16.0,  // mass 32 / 2
+  Ar36: 18.0,  // mass 36 / 2
+  Ca40: 20.0,  // mass 40 / 2
+  Ti44: 22.0,  // mass 44 / 2
+  Cr48: 24.0,  // mass 48 / 2
+  Fe52: 26.0,  // mass 52 / 2
+  Ni56: 28.0,  // mass 56 / 2
+  Fe56: 28.0   // mass 56 / 2
+};
+
+export function getDecayTurns(element: ElementSymbol): number | undefined {
+  if (element === 'Be7') return 12 + Math.floor(Math.random() * 11); // 12 to 22
+  if (element === 'Be8') return 3 + Math.floor(Math.random() * 4);   // 3 to 6
+  if (element === 'Ne20') return 5 + Math.floor(Math.random() * 6);  // 5 to 10
+  if (element === 'Fe52') return 4 + Math.floor(Math.random() * 5);  // 4 to 8
+  if (element === 'Ni56') return 3 + Math.floor(Math.random() * 3);  // 3 to 5
+  return undefined;
+}
+
 /**
  * Apply a merge rule: remove inputs, place output, update counts.
  * Assumes the rule was validated by detectMerge.
@@ -227,18 +332,25 @@ export function applyMerge(
 
   // Place output tile on landed face or overridden face
   const outputFaceId = overrideOutputFaceId !== undefined ? overrideOutputFaceId : landedFaceId;
+  const decayTurns = getDecayTurns(rule.output);
   state.tiles.set(outputFaceId, {
     faceId: outputFaceId,
     element: rule.output,
     spawnedAtTurn: state.turn,
     spawnReason: 'merge',
+    decayTurns,
   });
 
-  // Update counts (simple recount is safest for correctness)
-  const newCounts: Record<ElementSymbol, number> = {
-    H: 0, He: 0, C: 0, O: 0, Ne: 0, Mg: 0, Si: 0, Fe: 0
-  };
+  // Add score
+  const points = SCORE_VALUES[rule.output] || 0;
+  state.score = (state.score || 0) + points;
+
+  // Update counts (dynamic recount to support both standard elements and custom isotopes)
+  const newCounts = {} as Record<ElementSymbol, number>;
   for (const tile of state.tiles.values()) {
+    if (!newCounts[tile.element]) {
+      newCounts[tile.element] = 0;
+    }
     newCounts[tile.element]++;
   }
   state.elementCounts = newCounts;

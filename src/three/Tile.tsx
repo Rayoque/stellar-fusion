@@ -27,6 +27,7 @@ export function Tile({ face, tile }: TileProps) {
   const blockedTime = useGameStore(s => s.blockedTime) || 0;
   const dragOffset3D = useGameStore(s => s.dragOffset3D);
   const activeSlide = useGameStore(s => s.activeSlide);
+  const isAstro = useGameStore(s => s.astrophysicistMode);
 
   const isSelected = face.id === selectedFaceId;
   const isTarget = face.id === dragTargetId;
@@ -140,6 +141,7 @@ export function Tile({ face, tile }: TileProps) {
   const groupRef = React.useRef<THREE.Group>(null);
   const tileContentGroupRef = React.useRef<THREE.Group>(null);
   const textRef = React.useRef<any>(null);
+  const decayTextRef = React.useRef<any>(null);
   const pentagonRef = React.useRef<THREE.Mesh>(null);
   const smoothOpacityRef = React.useRef(0.12);
 
@@ -295,6 +297,34 @@ export function Tile({ face, tile }: TileProps) {
       const qGeodesic = new THREE.Quaternion().setFromUnitVectors(camDir, localNormal);
       const finalQ = qGeodesic.clone().multiply(qCam);
       textRef.current.quaternion.copy(finalQ);
+
+      if (decayTextRef.current) {
+        decayTextRef.current.quaternion.copy(finalQ);
+        
+        // 1. Get world space camera right and up axes
+        const tempRight = new THREE.Vector3(1, 0, 0).applyQuaternion(state.camera.quaternion).normalize();
+        const tempUp = new THREE.Vector3(0, 1, 0).applyQuaternion(state.camera.quaternion).normalize();
+        
+        // 2. Get the unit normal of the face (pointing radially outward)
+        const faceNormal = new THREE.Vector3(face.center.x, face.center.y, face.center.z).normalize();
+        
+        // 3. Project camera vectors onto the face's tangent plane to keep them flat on the tile surface!
+        // v_proj = v - (v . n) * n
+        const projRight = tempRight.clone().sub(faceNormal.clone().multiplyScalar(tempRight.dot(faceNormal))).normalize();
+        const projUp = tempUp.clone().sub(faceNormal.clone().multiplyScalar(tempUp.dot(faceNormal))).normalize();
+        
+        // 4. Calculate shift along these projected screen-up/screen-right surface directions
+        // Lifted higher up (0.16) and slightly closer horizontally (0.11) to clear superscript numbers
+        const shiftX = projRight.x * 0.11 + projUp.x * 0.16;
+        const shiftY = projRight.y * 0.11 + projUp.y * 0.16;
+        const shiftZ = projRight.z * 0.11 + projUp.z * 0.16;
+        
+        decayTextRef.current.position.set(
+          face.center.x * 1.045 + shiftX,
+          face.center.y * 1.045 + shiftY,
+          face.center.z * 1.045 + shiftZ
+        );
+      }
     }
 
     // Shimmering breathing animation for the pentagon confinement field
@@ -347,8 +377,15 @@ export function Tile({ face, tile }: TileProps) {
             <Edges 
               scale={1} 
               threshold={15} 
-              color={isSelected ? "#38bdf8" : "black"} 
+              color={tile && tile.decayTurns !== undefined ? "#10ac84" : (isSelected ? "#38bdf8" : "black")} 
             />
+            {tile && tile.decayTurns !== undefined && (
+              <Edges 
+                scale={1.015} 
+                threshold={15} 
+                color="#2ecc71" 
+              />
+            )}
           </mesh>
         )}
 
@@ -374,7 +411,7 @@ export function Tile({ face, tile }: TileProps) {
         {element && !isMergeTarget && (
           <Text
             ref={textRef}
-            position={[face.center.x * 1.01, face.center.y * 1.01, face.center.z * 1.01]}
+            position={[face.center.x * 1.04, face.center.y * 1.04, face.center.z * 1.04]}
             fontSize={0.25}
             color="#ffffff"
             anchorX="center"
@@ -384,6 +421,23 @@ export function Tile({ face, tile }: TileProps) {
             renderOrder={1}
           >
             {element.symbol}
+          </Text>
+        )}
+
+        {/* Decay countdown badge */}
+        {element && tile && tile.decayTurns !== undefined && !isMergeTarget && (
+          <Text
+            ref={decayTextRef}
+            position={[face.center.x * 1.045, face.center.y * 1.045, face.center.z * 1.045]}
+            fontSize={0.11}
+            color="#2ecc71"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.008}
+            outlineColor="#000000"
+            renderOrder={2}
+          >
+            {tile.decayTurns.toString()}
           </Text>
         )}
       </group>

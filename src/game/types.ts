@@ -1,7 +1,9 @@
 // src/game/types.ts
 // Core domain types for Stellar Fusion — a stellar nucleosynthesis puzzle on a truncated icosahedron.
 
-export type ElementSymbol = 'H' | 'He' | 'C' | 'O' | 'Ne' | 'Mg' | 'Si' | 'Fe';
+export type ElementSymbol = 
+  | 'H' | 'He' | 'C' | 'O' | 'Ne' | 'Mg' | 'Si' | 'Fe'
+  | 'D' | 'He3' | 'He4' | 'Be7' | 'Be8' | 'C12' | 'O16' | 'Ne20' | 'Mg24' | 'Si28' | 'S32' | 'Ar36' | 'Ca40' | 'Ti44' | 'Cr48' | 'Fe52' | 'Ni56' | 'Fe56';
 
 export interface Element {
   symbol: ElementSymbol;
@@ -17,6 +19,7 @@ export interface Tile {
   element: ElementSymbol;
   spawnedAtTurn: number;    // for potential future animations / age
   spawnReason?: 'spawn' | 'merge' | 'slide';
+  decayTurns?: number;      // counts down moves left before decay
 }
 
 export type FaceShape = 'pentagon' | 'hexagon';
@@ -61,6 +64,8 @@ export interface GameState {
   turn: number;
   phase: Phase;
   elementCounts: Record<ElementSymbol, number>;
+  score: number;
+  highScore: number;
   phaseTransitions: {
     main_sequence: number;
     red_giant: number | null;
@@ -82,6 +87,7 @@ export interface GameState {
   isAnimating: boolean;
   endState: EndState | null;
   endlessMode: boolean;
+  astrophysicistMode: boolean;
   isPaused: boolean;
   showRealtimeGraphics: boolean;
   showNucleationTutorial: boolean;
@@ -109,6 +115,7 @@ export interface GameState {
     levelObjectiveMet: boolean;
     levelFailed: boolean;
     endState: EndState | null;
+    score: number;
   }>;
   hasPlayedHeliumLaugh: boolean;
 }

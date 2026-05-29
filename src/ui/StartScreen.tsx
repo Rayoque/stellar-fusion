@@ -1,12 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useGameStore } from '../game/state';
 
 interface StartScreenProps {
   onStart: () => void;
   onOpenCampaign: () => void;
+  onStartAstro: () => void;
 }
 
-export function StartScreen({ onStart, onOpenCampaign }: StartScreenProps) {
-  const [pendingAction, setPendingAction] = useState<'sandbox' | 'campaign' | null>(null);
+export function StartScreen({ onStart, onOpenCampaign, onStartAstro }: StartScreenProps) {
+  const completedLevels = useGameStore(s => s.completedLevels);
+  const isAstroUnlocked = completedLevels.length >= 10;
+  const [pendingAction, setPendingAction] = useState<'sandbox' | 'campaign' | 'astro' | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (key === 'p') {
+        const isFirstTime = localStorage.getItem('stellar_headphones_suggested') !== 'true';
+        if (isFirstTime) {
+          setPendingAction('astro');
+        } else {
+          onStartAstro();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onStartAstro]);
 
   const handleSandboxClick = () => {
     const isFirstTime = localStorage.getItem('stellar_headphones_suggested') !== 'true';
@@ -26,6 +46,15 @@ export function StartScreen({ onStart, onOpenCampaign }: StartScreenProps) {
     }
   };
 
+  const handleAstroClick = () => {
+    const isFirstTime = localStorage.getItem('stellar_headphones_suggested') !== 'true';
+    if (isFirstTime) {
+      setPendingAction('astro');
+    } else {
+      onStartAstro();
+    }
+  };
+
   const handleConfirmAudio = () => {
     localStorage.setItem('stellar_headphones_suggested', 'true');
     const action = pendingAction;
@@ -34,6 +63,8 @@ export function StartScreen({ onStart, onOpenCampaign }: StartScreenProps) {
       onStart();
     } else if (action === 'campaign') {
       onOpenCampaign();
+    } else if (action === 'astro') {
+      onStartAstro();
     }
   };
 
@@ -56,22 +87,42 @@ export function StartScreen({ onStart, onOpenCampaign }: StartScreenProps) {
           Navigate the curved geometry of a thermonuclear star.<br />Synthesize elements and ignite the core.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <button
-            onClick={handleSandboxClick}
-            className="group px-8 py-3.5 bg-white text-black hover:bg-white/95 text-xs font-bold tracking-[3px] rounded-full transition-all duration-300 active:scale-[0.96] flex items-center gap-3 shadow-[0_4px_16px_rgba(255,255,255,0.12)] hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] cursor-pointer"
-          >
-            ENDLESS SANDBOX
-            <span className="group-hover:translate-x-0.5 transition duration-200">→</span>
-          </button>
+        <div className="flex flex-col gap-4 justify-center items-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <button
+              onClick={handleSandboxClick}
+              className="group px-8 py-3.5 bg-white text-black hover:bg-white/95 text-xs font-bold tracking-[3px] rounded-full transition-all duration-300 active:scale-[0.96] flex items-center gap-3 shadow-[0_4px_16px_rgba(255,255,255,0.12)] hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] cursor-pointer"
+            >
+              ENDLESS SANDBOX
+              <span className="group-hover:translate-x-0.5 transition duration-200">→</span>
+            </button>
 
-          <button
-            onClick={handleCampaignClick}
-            className="group px-8 py-3.5 border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs font-bold tracking-[3px] rounded-full transition-all duration-300 active:scale-[0.96] flex items-center gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.3)] cursor-pointer animate-pulse"
-          >
-            PLAY SCENARIOS
-            <span className="text-[10px] select-none">✦</span>
-          </button>
+            <button
+              onClick={handleCampaignClick}
+              className="group px-8 py-3.5 border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs font-bold tracking-[3px] rounded-full transition-all duration-300 active:scale-[0.96] flex items-center gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.3)] cursor-pointer animate-pulse"
+            >
+              PLAY SCENARIOS
+              <span className="text-[10px] select-none">✦</span>
+            </button>
+          </div>
+
+          {/* Astrophysicist Mode Button (Locked/Unlocked) */}
+          {isAstroUnlocked ? (
+            <button
+              onClick={handleAstroClick}
+              className="group px-8 py-3.5 border border-cyan-500/35 bg-cyan-950/20 hover:bg-cyan-900/30 text-cyan-300 text-xs font-bold tracking-[3px] rounded-full transition-all duration-300 active:scale-[0.96] flex items-center gap-3 shadow-[0_4px_16px_rgba(6,182,212,0.15)] hover:shadow-[0_0_24px_rgba(6,182,212,0.3)] cursor-pointer"
+            >
+              ASTROPHYSICIST MODE
+              <span className="text-[10px] select-none animate-spin-slow">☢</span>
+            </button>
+          ) : (
+            <button
+              className="group px-8 py-3.5 border border-white/5 bg-white/3 text-white/20 text-xs font-bold tracking-[3px] rounded-full flex items-center gap-3 cursor-not-allowed opacity-50"
+              title="Locked: Complete all 10 Campaign Scenarios to unlock!"
+            >
+              🔒 ASTROPHYSICIST MODE
+            </button>
+          )}
         </div>
       </div>
 

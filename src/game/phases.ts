@@ -73,6 +73,7 @@ export function currentPhaseRule(state: GameState): PhaseRule {
 }
 
 export function updatePhase(state: GameState): boolean {
+  if (state.astrophysicistMode) return false;
   const currentPhaseIndex = PHASES.findIndex(p => p.phase === state.phase);
   const newPhaseRule = currentPhaseRule(state);
   const newPhaseIndex = PHASES.findIndex(p => p.phase === newPhaseRule.phase);

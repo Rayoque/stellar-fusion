@@ -12,7 +12,7 @@ import { playMerge, playBlocked, playHeliumLaugh, playSuccess } from '../audio/s
 import { LEVELS } from './levels';
 
 interface GameActions {
-  newGame: (mass?: number, levelId?: number) => void;
+  newGame: (mass?: number, levelId?: number, isAstro?: boolean) => void;
   startDrag: (faceId: number) => void;
   endDrag: (faceId: number, dragWorld: { x: number; y: number; z: number }) => void;
   setDragTargetId: (id: number | null) => void;
@@ -30,7 +30,8 @@ interface GameActions {
 type GameStore = GameState & GameActions;
 
 const initialElementCounts = (): Record<ElementSymbol, number> => ({
-  H: 0, He: 0, C: 0, O: 0, Ne: 0, Mg: 0, Si: 0, Fe: 0
+  H: 0, He: 0, C: 0, O: 0, Ne: 0, Mg: 0, Si: 0, Fe: 0,
+  D: 0, He3: 0, He4: 0, Be7: 0, Be8: 0, C12: 0, O16: 0, Ne20: 0, Mg24: 0, Si28: 0, S32: 0, Ar36: 0, Ca40: 0, Ti44: 0, Cr48: 0, Fe52: 0, Ni56: 0, Fe56: 0
 });
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -41,6 +42,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   turn: 0,
   phase: 'main_sequence',
   elementCounts: initialElementCounts(),
+  score: 0,
+  highScore: 0,
   phaseTransitions: {
     main_sequence: 0,
     red_giant: null,
@@ -61,6 +64,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isAnimating: false,
   endState: null,
   endlessMode: false,
+  astrophysicistMode: false,
   isPaused: false,
   showRealtimeGraphics: true,
   showNucleationTutorial: false,
@@ -72,13 +76,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ activeToastElement: null });
   },
 
-  newGame: (mass, levelId) => {
+  newGame: (mass, levelId, isAstro) => {
     const faces = generateTruncatedIcosahedron();
     let starMass = mass ?? (1 + Math.random() * 29); // 1–30 M☉
     const initialTiles = new Map<number, Tile>();
     let currentLevelId: number | null = null;
+    const isAstroMode = isAstro ?? false;
 
-    if (levelId !== undefined) {
+    if (isAstroMode) {
+      // Astrophysicist mode: always start with 5 hydrogens on hexagons
+      const emptyIndices = faces.filter(f => f.shape === 'hexagon').map(f => f.id);
+      for (let i = 0; i < 5 && emptyIndices.length > 0; i++) {
+        const idx = Math.floor(Math.random() * emptyIndices.length);
+        const faceId = emptyIndices[idx];
+        initialTiles.set(faceId, {
+          faceId,
+          element: 'H' as ElementSymbol,
+          spawnedAtTurn: 0,
+        });
+        emptyIndices.splice(idx, 1);
+      }
+    } else if (levelId !== undefined) {
       const level = LEVELS.find(l => l.id === levelId);
       if (level) {
         currentLevelId = levelId;
@@ -106,8 +124,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    const initialCounts = initialElementCounts();
-    for (const t of initialTiles.values()) initialCounts[t.element]++;
+    // Dynamic initial element counting to support standard elements + custom isotopes
+    const initialCounts = {} as Record<ElementSymbol, number>;
+    for (const t of initialTiles.values()) {
+      if (!initialCounts[t.element]) {
+        initialCounts[t.element] = 0;
+      }
+      initialCounts[t.element]++;
+    }
+
+    const lsKey = isAstroMode ? 'stellar_high_score_astro' : 'stellar_high_score';
+    const highScore = parseInt(localStorage.getItem(lsKey) || '0', 10);
 
     set({
       starMass,
@@ -116,6 +143,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       turn: 0,
       phase: 'main_sequence',
       elementCounts: initialCounts,
+      score: 0,
+      highScore,
       phaseTransitions: {
         main_sequence: 0,
         red_giant: null,
@@ -130,6 +159,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       isAnimating: false,
       endState: null,
       endlessMode: false,
+      astrophysicistMode: isAstroMode,
       activeSlide: undefined,
       lastMerge: undefined,
       blockedFaceId: null,
@@ -196,6 +226,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           endState: state.endState,
           hasPlayedHeliumLaugh: state.hasPlayedHeliumLaugh,
           endlessMode: state.endlessMode,
+          score: state.score,
         };
         const nextHistory = [...state.history, snapshot];
         
@@ -270,17 +301,67 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // Increment turn
         state.turn += 1;
 
+        // Astrophysicist Mode: Decay Stage
+        if (state.astrophysicistMode) {
+          for (const tile of state.tiles.values()) {
+            if (tile.decayTurns !== undefined) {
+              // Confinement Shield: Freeze decay countdown if tile sits on a pentagon nucleation site!
+              const face = state.faces[tile.faceId];
+              if (face && face.shape === 'pentagon') {
+                continue; // Skip decrementing, decay timer is shielded/frozen!
+              }
+
+              tile.decayTurns -= 1;
+              if (tile.decayTurns <= 0) {
+                let decayed = false;
+                let nextElement: ElementSymbol = tile.element;
+                if (tile.element === 'Be7') {
+                  nextElement = 'He4';
+                  decayed = true;
+                } else if (tile.element === 'Be8') {
+                  nextElement = 'He4';
+                  decayed = true;
+                } else if (tile.element === 'Ne20') {
+                  nextElement = 'O16';
+                  decayed = true;
+                } else if (tile.element === 'Fe52') {
+                  nextElement = 'Cr48';
+                  decayed = true;
+                } else if (tile.element === 'Ni56') {
+                  nextElement = 'Fe56';
+                  decayed = true;
+                }
+
+                if (decayed) {
+                  tile.element = nextElement;
+                  tile.spawnedAtTurn = state.turn; // mark as transformed on this turn
+                  tile.spawnReason = 'slide';      // trigger animation
+                  tile.decayTurns = undefined;     // stable output
+                }
+              }
+            }
+          }
+        }
+
         // Spawn hydrogen(s)
         spawnHydrogen(state);
 
-        // Recount elementCounts to keep HUD in sync
-        const newCounts: Record<ElementSymbol, number> = {
-          H: 0, He: 0, C: 0, O: 0, Ne: 0, Mg: 0, Si: 0, Fe: 0
-        };
+        // Recount elementCounts dynamically to support standard mode + astrophysicist mode custom isotopes
+        const newCounts = {} as Record<ElementSymbol, number>;
         for (const t of state.tiles.values()) {
+          if (!newCounts[t.element]) {
+            newCounts[t.element] = 0;
+          }
           newCounts[t.element]++;
         }
         state.elementCounts = newCounts;
+
+        // Check high score
+        if (state.score > state.highScore) {
+          state.highScore = state.score;
+          const lsKey = state.astrophysicistMode ? 'stellar_high_score_astro' : 'stellar_high_score';
+          localStorage.setItem(lsKey, state.highScore.toString());
+        }
 
         // Update phase
         updatePhase(state);
@@ -383,6 +464,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
             tiles: new Map(state.tiles),
             showNucleationTutorial: triggerTutorial,
             hasSeenNucleationTutorial: triggerTutorial ? true : state.hasSeenNucleationTutorial,
+            score: state.score,
+            highScore: state.highScore,
           });
           return;
         }
@@ -409,6 +492,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
           lastMerge: state.lastMerge,
           showNucleationTutorial: triggerTutorial,
           hasSeenNucleationTutorial: triggerTutorial ? true : state.hasSeenNucleationTutorial,
+          score: state.score,
+          highScore: state.highScore,
         });
       } else {
         // Play blocked audio cue
@@ -482,7 +567,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // Recount elementCounts to keep HUD and phase in sync immediately!
     const newCounts: Record<ElementSymbol, number> = {
-      H: 0, He: 0, C: 0, O: 0, Ne: 0, Mg: 0, Si: 0, Fe: 0
+      H: 0, He: 0, C: 0, O: 0, Ne: 0, Mg: 0, Si: 0, Fe: 0,
+      D: 0, He3: 0, He4: 0, Be7: 0, Be8: 0, C12: 0, O16: 0, Ne20: 0, Mg24: 0, Si28: 0, S32: 0, Ar36: 0, Ca40: 0, Ti44: 0, Cr48: 0, Fe52: 0, Ni56: 0, Fe56: 0
     };
     for (const t of nextTiles.values()) {
       newCounts[t.element]++;
@@ -520,6 +606,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       endState: snapshot.endState,
       hasPlayedHeliumLaugh: (snapshot as any).hasPlayedHeliumLaugh ?? false,
       endlessMode: (snapshot as any).endlessMode ?? false,
+      score: (snapshot as any).score ?? 0,
       history: nextHistory,
       selectedFaceId: null,
       dragTargetId: null,

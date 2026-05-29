@@ -53,6 +53,10 @@ Core design decisions:
 
 MVP. Playable. Rough edges in geometry adjacency and particle polish. Not yet tuned for difficulty.
 
+## Credits & Inspiration
+
+The advanced unlockable **Astrophysicist Mode** in this game is directly inspired by and modeled after the brilliant nucleosynthesis browser game **[Fe26](https://dimit.me/Fe26/)** by [Dimitri](https://dimit.me/). We highly recommend checking out the original game which paved the way for advanced stellar core fusion puzzle logic!
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

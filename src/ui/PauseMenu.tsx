@@ -143,7 +143,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCodex, onOpenCampaign }:
               }}
               className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-full font-semibold tracking-[1.5px] hover:bg-white/10 active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-xs uppercase cursor-pointer mt-3"
             >
-              STELLAR CODEX
+              {useGameStore.getState().astrophysicistMode ? 'ASTROPHYSICIST CODEX' : 'STELLAR CODEX'}
             </button>
 
             <button
@@ -236,7 +236,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCodex, onOpenCampaign }:
           </div>
 
           <div className="text-[7.5px] text-white/25 tracking-[3px] font-mono uppercase mt-8">
-            STELLAR FUSION ENGINE • V0.9.24
+            STELLAR FUSION ENGINE • V0.10.0
           </div>
         </div>
       </div>

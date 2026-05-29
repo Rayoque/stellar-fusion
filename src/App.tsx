@@ -145,6 +145,12 @@ export default function App() {
     setTimeout(() => playSpawnTick(), 120);
   };
 
+  const handleStartAstro = () => {
+    newGame(undefined, undefined, true);
+    setShowStart(false);
+    setTimeout(() => playSpawnTick(), 120);
+  };
+
   const handlePlayAgain = () => {
     newGame();
     setShowStart(false);
@@ -211,7 +217,9 @@ export default function App() {
           if (currentLevelId !== null) {
             newGame(undefined, currentLevelId);
           } else {
-            newGame();
+            // Respect astrophysicist mode on hotkey reload!
+            const isAstro = useGameStore.getState().astrophysicistMode;
+            newGame(undefined, undefined, isAstro);
           }
           playSpawnTick();
         }
@@ -241,6 +249,7 @@ export default function App() {
         <StartScreen 
           onStart={handleStart} 
           onOpenCampaign={() => setShowCampaign(true)} 
+          onStartAstro={handleStartAstro}
         />
         {showCampaign && (
           <CampaignSelector
