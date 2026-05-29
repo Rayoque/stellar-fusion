@@ -310,10 +310,9 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
                     transform: `translate3d(${translateX}px, 0, 0)`,
                   }}
                 >
-                  <div className="flex items-center gap-2 pointer-events-none">
-                    <span className="text-[10px] text-black/35 font-mono select-none">⟨ Swipe Left</span>
-                    <span className="text-xs tracking-[2px] uppercase select-none">LAUNCH IGNITION</span>
-                  </div>
+                  <span className="text-xs tracking-[2px] uppercase select-none pointer-events-none">
+                    LAUNCH IGNITION
+                  </span>
                 </div>
               </div>
             </div>
