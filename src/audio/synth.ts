@@ -116,8 +116,6 @@ export function startAmbientDrone(): void {
   ambientOsc3 = audioCtx.createOscillator();
   ambientOsc4L = audioCtx.createOscillator();
   ambientOsc4R = audioCtx.createOscillator();
-  const panL = audioCtx.createStereoPanner();
-  const panR = audioCtx.createStereoPanner();
   ambientGain = audioCtx.createGain();
   
   ambientFilter = audioCtx.createBiquadFilter();
@@ -139,14 +137,15 @@ export function startAmbientDrone(): void {
   ambientOsc3.type = 'sine';
   ambientOsc3.frequency.value = 174;
 
-  // Bb3 (232 Hz center) - Pure warm sine, split into a binaural pair.
-  // L 228.5 / R 235.5 => 7 Hz theta beat. Avg = 232 Hz so perceived pitch unchanged.
+  // Bb3 (232 Hz center) - Pure warm sine, split into a detuned pair summed in MONO.
+  // 228.5 + 235.5 Hz interfere to produce a 7 Hz monaural (acoustic) beat in the
+  // theta range. Avg = 232 Hz so perceived pitch is unchanged. Kept mono on purpose:
+  // a stereo split renegotiates the iOS audio session and kills background playback.
+  // Monaural beat also entrains on plain speakers (e.g. car), not just headphones.
   ambientOsc4L.type = 'sine';
   ambientOsc4L.frequency.value = 228.5;
   ambientOsc4R.type = 'sine';
   ambientOsc4R.frequency.value = 235.5;
-  panL.pan.value = -1; // hard left
-  panR.pan.value = 1;  // hard right
 
   // Lowpass filter cutoff set to a warm 450 Hz to keep the sound cozy and filter out any high buzz
   ambientFilter.type = 'lowpass';
@@ -180,13 +179,11 @@ export function startAmbientDrone(): void {
   ambientOsc3.connect(osc3GainNode);
   osc3GainNode.connect(ambientFilter);
 
-  // Binaural pair: each tone panned hard, then summed into shared osc4 gain
-  // (so phase transitions still control level via osc4GainNode). Panner + filter
-  // + master gain all preserve the stereo image through to destination.
-  ambientOsc4L.connect(panL);
-  ambientOsc4R.connect(panR);
-  panL.connect(osc4GainNode);
-  panR.connect(osc4GainNode);
+  // Both detuned tones sum into the shared mono osc4 gain (phase transitions still
+  // control level via osc4GainNode). Mono path = same graph topology as before the
+  // beat, so the iOS background-audio session stays intact.
+  ambientOsc4L.connect(osc4GainNode);
+  ambientOsc4R.connect(osc4GainNode);
   osc4GainNode.connect(ambientFilter);
 
   ambientFilter.connect(ambientGain);
