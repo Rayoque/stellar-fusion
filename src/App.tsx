@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { Scene } from './three/Scene';
 import { useGameStore } from './game/state';
-import { initAudio, startAmbientDrone, playSpawnTick, createSilentWavUrl, updateAmbientDrone } from './audio/synth';
+import { initAudio, startAmbientDrone, playSpawnTick, updateAmbientDrone, resumeAmbientDrone } from './audio/synth';
 import { HUD } from './ui/HUD';
 import { EndScreen } from './ui/EndScreen';
 import { StartScreen } from './ui/StartScreen';
@@ -25,6 +25,9 @@ export default function App() {
   const starMass = useGameStore(s => s.starMass);
   const turn = useGameStore(s => s.turn);
   const elementCounts = useGameStore(s => s.elementCounts);
+  const score = useGameStore(s => s.score);
+  const highScore = useGameStore(s => s.highScore);
+  const astrophysicistMode = useGameStore(s => s.astrophysicistMode);
   const isPaused = useGameStore(s => s.isPaused);
   const setPaused = useGameStore(s => s.setPaused);
 
@@ -67,18 +70,11 @@ export default function App() {
     // Initialize audio on first interaction
     const handleFirstInteraction = () => {
       initAudio();
+      // Starts the pre-baked drone loop on a real <audio> element. Being a file-backed
+      // media element, it elevates the iOS audio session (mute-switch bypass) and
+      // survives screen-lock — no separate silent-WAV element needed anymore.
       startAmbientDrone();
-      
-      // Classic iOS silent-switch ringer bypass hack: playing a brief, programmatically generated 
-      // 1-second silent WAV file Blob URL forces mobile Safari to elevate the page's AVAudioSession 
-      // category from 'Ambient' (muted by silent switch) to 'Playback' (which overrides the silent switch).
-      try {
-        const url = createSilentWavUrl();
-        const silentAudio = new Audio(url);
-        silentAudio.loop = true;
-        silentAudio.play().catch(() => {});
-      } catch (err) {}
-      
+
       const events = ['click', 'keydown', 'touchstart', 'touchend', 'pointerdown', 'pointerup'];
       for (const ev of events) {
         window.removeEventListener(ev, handleFirstInteraction);
@@ -164,25 +160,52 @@ export default function App() {
     updateAmbientDrone(phase, isCoreCollapseActive);
   }, [phase, endState]);
 
+  // Re-assert drone playback when returning to the foreground / after an OS audio
+  // interruption (lock-unlock, Bluetooth handoff, phone call), so it always comes back.
+  useEffect(() => {
+    const onWake = () => {
+      if (document.visibilityState === 'visible') resumeAmbientDrone();
+    };
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('focus', onWake);
+    window.addEventListener('pageshow', onWake);
+    return () => {
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('focus', onWake);
+      window.removeEventListener('pageshow', onWake);
+    };
+  }, []);
+
   const handleStart = () => {
-    newGame();
+    // Resume a saved standard/endless game if one exists; otherwise fresh.
+    if (!useGameStore.getState().loadSavedGame(false)) {
+      newGame();
+    }
     setShowStart(false);
     // Play a subtle spawn tick on start
     setTimeout(() => playSpawnTick(), 120);
   };
 
   const handleStartAstro = () => {
-    newGame(undefined, undefined, true);
+    // Resume a saved Astrophysicist game if one exists; otherwise fresh.
+    if (!useGameStore.getState().loadSavedGame(true)) {
+      newGame(undefined, undefined, true);
+    }
     setShowStart(false);
     setTimeout(() => playSpawnTick(), 120);
   };
 
   const handlePlayAgain = () => {
-    newGame();
+    // EndScreen only shows for open-ended modes; restart in the SAME mode + fresh save.
+    const isAstro = useGameStore.getState().astrophysicistMode;
+    useGameStore.getState().clearSavedGame(isAstro);
+    newGame(undefined, undefined, isAstro);
     setShowStart(false);
   };
 
   const handleMainMenu = () => {
+    // Persist the current open-ended game before wiping the board for the menu.
+    useGameStore.getState().saveCurrentGame();
     setShowStart(true);
     setPaused(false);
     newGame();
@@ -246,8 +269,9 @@ export default function App() {
           if (currentLevelId !== null) {
             newGame(undefined, currentLevelId);
           } else {
-            // Respect astrophysicist mode on hotkey reload!
+            // Respect astrophysicist mode on hotkey reload, and wipe its save.
             const isAstro = useGameStore.getState().astrophysicistMode;
+            useGameStore.getState().clearSavedGame(isAstro);
             newGame(undefined, undefined, isAstro);
           }
           playSpawnTick();
@@ -342,7 +366,11 @@ export default function App() {
           endState={endState}
           starMass={starMass}
           elementCounts={elementCounts}
+          score={score}
+          highScore={highScore}
+          astrophysicistMode={astrophysicistMode}
           onPlayAgain={handlePlayAgain}
+          onMainMenu={handleMainMenu}
         />
       )}
 

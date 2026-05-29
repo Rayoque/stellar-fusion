@@ -8,7 +8,11 @@ interface EndScreenProps {
   endState: EndState;
   starMass: number;
   elementCounts: Record<ElementSymbol, number>;
+  score: number;
+  highScore: number;
+  astrophysicistMode: boolean;
   onPlayAgain: () => void;
+  onMainMenu: () => void;
 }
 
 const END_DESCRIPTIONS: Record<EndState, string> = {
@@ -35,9 +39,10 @@ const CONTINUE_DESCRIPTIONS: Record<EndState, string> = {
   jammed: "Vaporize the 4 lightest nuclei via a violent solar flare to clear space.",
 };
 
-export function EndScreen({ endState, starMass, elementCounts, onPlayAgain }: EndScreenProps) {
+export function EndScreen({ endState, starMass, elementCounts, score, highScore, astrophysicistMode, onPlayAgain, onMainMenu }: EndScreenProps) {
   const totalElements = Object.values(elementCounts).reduce((a, b) => a + b, 0);
   const continueEndless = useGameStore(s => s.continueEndless);
+  const isNewBest = score >= highScore && score > 0;
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
@@ -73,29 +78,56 @@ export function EndScreen({ endState, starMass, elementCounts, onPlayAgain }: En
             </div>
           </div>
 
+          {/* Score summary */}
+          <div className="flex items-stretch gap-3 max-w-[280px] sm:max-w-xs mx-auto mb-5">
+            <div className="flex-1 bg-white/5 border border-white/5 rounded-2xl py-3">
+              <div className="text-[8px] tracking-[2px] text-white/35 uppercase font-mono">Score</div>
+              <div className="text-xl font-bold font-mono tabular-nums text-white/90 mt-0.5">{score.toLocaleString()}</div>
+            </div>
+            <div className="flex-1 bg-white/5 border border-white/5 rounded-2xl py-3">
+              <div className="text-[8px] tracking-[2px] text-white/35 uppercase font-mono">Best</div>
+              <div className={`text-xl font-bold font-mono tabular-nums mt-0.5 ${isNewBest ? 'text-cyan-300' : 'text-white/90'}`}>{highScore.toLocaleString()}</div>
+            </div>
+          </div>
+          {isNewBest && (
+            <div className="text-[9px] text-cyan-400 font-mono tracking-[2px] uppercase mb-5 -mt-2 select-none">★ New Personal Best</div>
+          )}
+
           <div className="text-[9px] text-white/30 mb-6 font-mono tracking-wider">
-            INITIAL MASS: <span className="font-bold text-white/50">{starMass.toFixed(1)} M☉</span> • 
+            INITIAL MASS: <span className="font-bold text-white/50">{starMass.toFixed(1)} M☉</span> •
             TOTAL NUCLEI: <span className="font-bold text-white/50">{totalElements}</span>
           </div>
 
-          {/* Dual Continuation/Reset Buttons Layout */}
+          {/* Buttons. Astrophysicist mode has no "continue" — reaching no-legal-moves
+              is the run's true, full stop, so we offer a fresh run or the menu. */}
           <div className="flex flex-col gap-3 max-w-[280px] sm:max-w-xs mx-auto">
-            <button
-              onClick={continueEndless}
-              className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-full font-bold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase shadow-[0_4px_16px_rgba(6,182,212,0.25)] cursor-pointer"
-              title={CONTINUE_DESCRIPTIONS[endState]}
-            >
-              {CONTINUE_LABELS[endState]}
-            </button>
-            <div className="text-[9px] text-cyan-400/70 font-mono tracking-wider max-w-[280px] leading-normal font-medium mb-2 uppercase text-center select-none">
-              {CONTINUE_DESCRIPTIONS[endState]}
-            </div>
+            {!astrophysicistMode && (
+              <>
+                <button
+                  onClick={continueEndless}
+                  className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-full font-bold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase shadow-[0_4px_16px_rgba(6,182,212,0.25)] cursor-pointer"
+                  title={CONTINUE_DESCRIPTIONS[endState]}
+                >
+                  {CONTINUE_LABELS[endState]}
+                </button>
+                <div className="text-[9px] text-cyan-400/70 font-mono tracking-wider max-w-[280px] leading-normal font-medium mb-2 uppercase text-center select-none">
+                  {CONTINUE_DESCRIPTIONS[endState]}
+                </div>
+              </>
+            )}
 
             <button
               onClick={onPlayAgain}
               className="w-full py-3.5 bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-full font-semibold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase cursor-pointer"
             >
               FUSE ANOTHER STAR
+            </button>
+
+            <button
+              onClick={onMainMenu}
+              className="w-full py-3.5 bg-transparent border border-white/10 text-white/70 hover:bg-white/5 hover:text-white rounded-full font-semibold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase cursor-pointer"
+            >
+              GAME MENU
             </button>
           </div>
         </div>

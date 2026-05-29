@@ -52,8 +52,12 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCodex, onOpenCampaign }:
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
-      <div 
+    <div
+      className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md"
+      onClick={onResume}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
         className="border border-white/10 rounded-[32px] p-8 max-w-sm w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.6)] relative overflow-hidden animate-fade-in-up isolate"
         style={{
           background: 'radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.08), transparent 45%), radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.08), transparent 45%), rgba(15, 15, 19, 0.95)',

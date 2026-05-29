@@ -26,6 +26,9 @@ interface GameActions {
   dismissNucleationTutorial: () => void;
   resetNucleationTutorial: () => void;
   setManuallyZoomed: () => void;
+  saveCurrentGame: () => void;
+  loadSavedGame: (isAstro: boolean) => boolean;
+  clearSavedGame: (isAstro: boolean) => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -50,6 +53,25 @@ const STORAGE_VERSION = '2';
     // localStorage unavailable (e.g. private mode); nothing to migrate
   }
 })();
+
+// --- Open-ended game persistence (Endless/standard + Astrophysicist) ---
+// Campaign levels are NOT persisted. Geometry is deterministic, so a save only
+// needs tiles + scalar state; faces are regenerated on load.
+interface SavedGame {
+  starMass: number;
+  tiles: [number, Tile][];
+  turn: number;
+  phase: Phase;
+  elementCounts: Record<ElementSymbol, number>;
+  score: number;
+  phaseTransitions: GameState['phaseTransitions'];
+  endlessMode: boolean;
+  astrophysicistMode: boolean;
+  hasPlayedHeliumLaugh: boolean;
+  hasSeenFe56Splash: boolean;
+}
+
+const saveKey = (isAstro: boolean) => (isAstro ? 'stellar_save_astro' : 'stellar_save_standard');
 
 export const useGameStore = create<GameStore>((set, get) => ({
   // Initial empty state — populated by newGame()
@@ -507,6 +529,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
             turn: state.turn,
             elementCounts: { ...state.elementCounts },
           });
+          // True end-of-run: clear the saved game so re-entering starts fresh.
+          // Standard collapses/jams here; Astrophysicist only reaches an end via
+          // 'jammed' (no legal moves), which is its intended full-stop reset point.
+          get().clearSavedGame(state.astrophysicistMode);
           return;
         }
 
@@ -535,6 +561,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
           score: state.score,
           highScore: state.highScore,
         });
+        // Persist the in-progress open-ended game after each committed move.
+        get().saveCurrentGame();
       } else {
         // Play blocked audio cue
         playBlocked();
@@ -574,7 +602,106 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   reset: () => {
-    get().newGame();
+    const { astrophysicistMode, currentLevelId } = get();
+    if (currentLevelId !== null) {
+      // Campaign reset behavior unchanged.
+      get().newGame();
+      return;
+    }
+    // Open-ended modes: wipe the saved game and start fresh in the SAME mode.
+    get().clearSavedGame(astrophysicistMode);
+    get().newGame(undefined, undefined, astrophysicistMode);
+  },
+
+  saveCurrentGame: () => {
+    const s = get();
+    // Only persist live, open-ended runs. Skip campaign levels, an empty board,
+    // or a finished run (endState set) — the latter is cleared at end-of-run and
+    // must stay cleared so re-entry starts fresh.
+    if (s.currentLevelId !== null || s.tiles.size === 0 || s.endState !== null) return;
+    const data: SavedGame = {
+      starMass: s.starMass,
+      tiles: Array.from(s.tiles.entries()),
+      turn: s.turn,
+      phase: s.phase,
+      elementCounts: s.elementCounts,
+      score: s.score,
+      phaseTransitions: s.phaseTransitions,
+      endlessMode: s.endlessMode,
+      astrophysicistMode: s.astrophysicistMode,
+      hasPlayedHeliumLaugh: s.hasPlayedHeliumLaugh,
+      hasSeenFe56Splash: s.hasSeenFe56Splash,
+    };
+    try {
+      localStorage.setItem(saveKey(s.astrophysicistMode), JSON.stringify(data));
+    } catch {
+      // localStorage unavailable (private mode / quota) — skip silently.
+    }
+  },
+
+  clearSavedGame: (isAstro) => {
+    try {
+      localStorage.removeItem(saveKey(isAstro));
+    } catch {
+      // ignore
+    }
+  },
+
+  loadSavedGame: (isAstro) => {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(saveKey(isAstro));
+    } catch {
+      return false;
+    }
+    if (!raw) return false;
+
+    let data: SavedGame;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return false;
+    }
+    if (!data || !Array.isArray(data.tiles) || data.tiles.length === 0) return false;
+
+    const faces = generateTruncatedIcosahedron();
+    const tiles = new Map<number, Tile>(data.tiles);
+    const lsKey = isAstro ? 'stellar_high_score_astro' : 'stellar_high_score';
+    const highScore = parseInt(localStorage.getItem(lsKey) || '0', 10);
+
+    set({
+      starMass: data.starMass,
+      faces,
+      tiles,
+      turn: data.turn,
+      phase: data.phase,
+      elementCounts: data.elementCounts,
+      score: data.score,
+      highScore: Math.max(highScore, data.score || 0),
+      phaseTransitions: data.phaseTransitions,
+      currentLevelId: null,
+      levelObjectiveMet: false,
+      levelFailed: false,
+      selectedFaceId: null,
+      dragTargetId: null,
+      isAnimating: false,
+      endState: null,
+      endlessMode: data.endlessMode,
+      astrophysicistMode: data.astrophysicistMode,
+      activeSlide: undefined,
+      lastMerge: undefined,
+      blockedFaceId: null,
+      blockedTime: 0,
+      dragOffset3D: null,
+      isPaused: false,
+      showNucleationTutorial: false,
+      history: [],
+      hasPlayedHeliumLaugh: data.hasPlayedHeliumLaugh,
+      lastMoveFaceId: null,
+      hasSeenFe56Splash: data.hasSeenFe56Splash,
+      showFe56Splash: false,
+    });
+    return true;
   },
   setPaused: (paused) => {
     set({ isPaused: paused });
@@ -627,6 +754,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       elementCounts: newCounts,
       phase: tempState.phase
     });
+    // Continuing past an end state resumes an in-progress run -> persist it again.
+    get().saveCurrentGame();
   },
 
   undo: () => {
