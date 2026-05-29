@@ -102,11 +102,40 @@ export function Controls() {
       keysPressed.current.d = false;
     };
 
+    const handlePointerMove = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') {
+        onInteraction();
+      } else if (e.pointerType === 'mouse') {
+        // Run a highly performant raycast to see if the mouse resides over any part of the sphere.
+        // We only reset the idle auto-rotation if hovering over the buckyball.
+        const dom = gl.domElement;
+        const rect = dom.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+
+        const intersects = raycaster.intersectObjects(scene.children, true);
+        let hitsBall = false;
+        for (const hit of intersects) {
+          if (hit.object.userData?.faceId !== undefined) {
+            hitsBall = true;
+            break;
+          }
+        }
+
+        if (hitsBall) {
+          onInteraction();
+        }
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
     window.addEventListener('pointerdown', onInteraction);
-    window.addEventListener('pointermove', onInteraction);
+    window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('wheel', onInteraction, { passive: true });
 
     return () => {
@@ -114,10 +143,10 @@ export function Controls() {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
       window.removeEventListener('pointerdown', onInteraction);
-      window.removeEventListener('pointermove', onInteraction);
+      window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('wheel', onInteraction);
     };
-  }, []);
+  }, [camera, gl, scene]);
 
   // Proportional Camera Tracking: rotate camera position & up vector smoothly to track the sliding tile's position,
   // transitioning perfectly and gap-free into the post-slide momentum coasting.
@@ -324,12 +353,12 @@ export function Controls() {
       lastInteractionTime.current = performance.now();
     }
 
-    // 2. IDLE AUTO-ROTATION: Slowly orbit camera when user is inactive for > 10s
+    // 2. IDLE AUTO-ROTATION: Slowly orbit camera when user is inactive for > 7s
     const idleTime = performance.now() - lastInteractionTime.current;
-    if (idleTime > 10000) {
+    if (idleTime > 7000) {
       driftVelocity.current = 0; // Clear momentum drift instantly during idle precession
       
-      const idleDuration = (idleTime - 10000) / 1000; // time in idle phase in seconds
+      const idleDuration = (idleTime - 7000) / 1000; // time in idle phase in seconds
       const maxIdleSpeed = 0.04; // rad/sec
       const speed = maxIdleSpeed * Math.min(idleDuration / 5.0, 1.0); // smooth 5-second acceleration ramp
       const step = speed * delta;
