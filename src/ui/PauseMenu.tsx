@@ -7,9 +7,10 @@ interface PauseMenuProps {
   onResume: () => void;
   onMainMenu: () => void;
   onOpenCodex: () => void;
+  onOpenCampaign?: () => void;
 }
 
-export function PauseMenu({ onResume, onMainMenu, onOpenCodex }: PauseMenuProps) {
+export function PauseMenu({ onResume, onMainMenu, onOpenCodex, onOpenCampaign }: PauseMenuProps) {
   const reset = useGameStore(s => s.reset);
   const showRealtimeGraphics = useGameStore(s => s.showRealtimeGraphics);
   const setShowRealtimeGraphics = useGameStore(s => s.setShowRealtimeGraphics);
@@ -121,6 +122,18 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCodex }: PauseMenuProps)
                   </div>
                 </div>
               </div>
+            )}
+
+            {onOpenCampaign && (
+              <button
+                onClick={() => {
+                  onOpenCampaign();
+                  onResume();
+                }}
+                className="w-full py-3 bg-cyan-950/20 border border-cyan-500/10 text-cyan-400 rounded-full font-bold tracking-[1.5px] hover:bg-cyan-950/45 active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-xs uppercase cursor-pointer mt-3"
+              >
+                SELECT SCENARIO
+              </button>
             )}
 
             <button

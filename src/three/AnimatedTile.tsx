@@ -209,9 +209,9 @@ export function AnimatedTile() {
       return true;
     };
 
-    // Calculate progress with a beautiful ease-out cubic curve (perfectly synchronized with the camera!)
+    // Calculate progress with a beautiful ease-out quadratic curve (perfectly synchronized with the camera!)
     const progress = Math.min(elapsed, duration) / duration;
-    const easedProgress = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+    const easedProgress = 1 - (1 - progress) * (1 - progress); // easeOutQuad
     const tEased = easedProgress * duration;
 
     // 1. Calculate Main Blob Position using eased timeline

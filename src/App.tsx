@@ -11,6 +11,7 @@ import { PauseMenu } from './ui/PauseMenu';
 import { CampaignSelector } from './ui/CampaignSelector';
 import { Codex } from './ui/Codex';
 import { CampaignStatusOverlay } from './ui/CampaignStatusOverlay';
+import { CampaignObjectiveOverlay } from './ui/CampaignObjectiveOverlay';
 import { ELEMENTS } from './game/elements';
 
 export default function App() {
@@ -99,6 +100,7 @@ export default function App() {
   }, [activeToastElement, dismissToast]);
 
   const [showStatusOverlay, setShowStatusOverlay] = React.useState(false);
+  const [showObjectiveLevelId, setShowObjectiveLevelId] = React.useState<number | null>(null);
 
   useEffect(() => {
     if (levelObjectiveMet || levelFailed) {
@@ -158,18 +160,21 @@ export default function App() {
     newGame(undefined, levelId);
     setShowCampaign(false);
     setShowStart(false);
+    setShowObjectiveLevelId(levelId);
     setTimeout(() => playSpawnTick(), 120);
   };
 
   const handleRetryLevel = () => {
     if (currentLevelId !== null) {
       newGame(undefined, currentLevelId);
+      setShowObjectiveLevelId(currentLevelId);
     }
   };
 
   const handleNextLevel = () => {
     if (currentLevelId !== null && currentLevelId < 10) {
       newGame(undefined, currentLevelId + 1);
+      setShowObjectiveLevelId(currentLevelId + 1);
     }
   };
 
@@ -241,6 +246,7 @@ export default function App() {
         elementCounts={elementCounts}
         onOpenMenu={() => setPaused(true)}
         onOpenCodex={() => setShowCodex(true)}
+        onOpenObjectives={currentLevelId !== null ? () => setShowObjectiveLevelId(currentLevelId) : undefined}
       />
 
       {/* Standard Sandbox End Screen */}
@@ -259,6 +265,7 @@ export default function App() {
           onResume={() => setPaused(false)}
           onMainMenu={handleMainMenu}
           onOpenCodex={() => setShowCodex(true)}
+          onOpenCampaign={currentLevelId !== null ? () => setShowCampaign(true) : undefined}
         />
       )}
 
@@ -274,6 +281,17 @@ export default function App() {
       {showCodex && (
         <Codex
           onClose={() => { setShowCodex(false); window.scrollTo(0, 0); }}
+        />
+      )}
+
+      {/* Scenario Briefing Objective Pop-up (translucent, lets player see star in background!) */}
+      {showObjectiveLevelId !== null && (
+        <CampaignObjectiveOverlay
+          levelId={showObjectiveLevelId}
+          onStart={() => {
+            setShowObjectiveLevelId(null);
+            playSpawnTick();
+          }}
         />
       )}
 

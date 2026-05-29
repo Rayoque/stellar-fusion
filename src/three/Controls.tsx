@@ -134,9 +134,9 @@ export function Controls() {
       const elapsed = performance.now() - startTime;
 
       if (elapsed < duration) {
-        // Calculate progress with a beautiful, high-fidelity ease-out cubic curve (starts fast, decelerates smoothly throughout)
+        // Calculate progress with a beautiful, high-fidelity ease-out quadratic curve (starts fast, decelerates smoothly throughout)
         const progress = elapsed / duration;
-        const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+        const eased = 1 - (1 - progress) * (1 - progress); // easeOutQuad
 
         const dirStart = camStartPos.current!.clone().normalize();
         const currentDist = camStartPos.current!.length();
