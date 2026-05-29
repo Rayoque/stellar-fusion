@@ -615,10 +615,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   saveCurrentGame: () => {
     const s = get();
-    // Only persist live, open-ended runs. Skip campaign levels, an empty board,
-    // or a finished run (endState set) — the latter is cleared at end-of-run and
-    // must stay cleared so re-entry starts fresh.
-    if (s.currentLevelId !== null || s.tiles.size === 0 || s.endState !== null) return;
+    // Only persist live, open-ended runs. Skip:
+    //  - campaign levels (not persisted)
+    //  - an empty board
+    //  - a finished run (endState set) — cleared at end-of-run, must stay cleared
+    //  - the post-collapse degeneracy phase (endlessMode): the star has already
+    //    collapsed and no hydrogen spawns, so anything past that is moot. High score
+    //    still tracks, but leaving and returning gives a fresh Endless sandbox.
+    if (s.currentLevelId !== null || s.tiles.size === 0 || s.endState !== null || s.endlessMode) return;
     const data: SavedGame = {
       starMass: s.starMass,
       tiles: Array.from(s.tiles.entries()),
@@ -754,8 +758,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       elementCounts: newCounts,
       phase: tempState.phase
     });
-    // Continuing past an end state resumes an in-progress run -> persist it again.
-    get().saveCurrentGame();
+    // Past the collapse (degeneracy phase) we intentionally do NOT persist — drop any
+    // existing save so quitting and returning starts a fresh Endless sandbox.
+    get().clearSavedGame(false);
   },
 
   undo: () => {
