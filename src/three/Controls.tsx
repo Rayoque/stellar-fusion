@@ -533,19 +533,25 @@ export function Controls() {
       const dragVec = new THREE.Vector3(x - projectedCenter.x, y - projectedCenter.y, 0);
       const distFromCenter = dragVec.length();
 
+      // Aspect-correct before deriving a world direction: NDC x/y both span [-1,1], so on a
+      // non-square (e.g. portrait phone) viewport the horizontal axis is over-weighted, which
+      // skews the resolved slide direction (notably making upward drags read sideways).
+      const aspect = rect.width / rect.height;
+      const dragVecCorrected = new THREE.Vector3(dragVec.x * aspect, dragVec.y, 0);
+
       // If they drag their finger back close to the center of the tile (distFromCenter < 0.07),
       // clear the drag target indicator to show that releasing will cancel the swipe.
       if (distFromCenter < 0.07) {
         setDragTargetId(null);
       } else {
-        const dragDir = dragVec.clone().transformDirection(camera.matrixWorld).normalize();
+        const dragDir = dragVecCorrected.clone().transformDirection(camera.matrixWorld).normalize();
         const nextId = resolveSlideTarget(fromFace, { x: dragDir.x, y: dragDir.y, z: dragDir.z }, faces);
         setDragTargetId(nextId);
       }
 
       // Calculate a subtler 3D pull displacement based on the drag vector from the tile's center.
       // We transform it into world space to align with the camera viewport.
-      const pullVec = dragVec.clone().transformDirection(camera.matrixWorld).multiplyScalar(0.4);
+      const pullVec = dragVecCorrected.clone().transformDirection(camera.matrixWorld).multiplyScalar(0.4);
       if (pullVec.length() > 0.10) {
         pullVec.setLength(0.10); // clamped to 0.10 for local cell boundaries
       }
@@ -599,7 +605,12 @@ export function Controls() {
         return;
       }
 
-      const dragDir = dragVec.clone().transformDirection(camera.matrixWorld).normalize();
+      // Aspect-correct so the released direction matches true on-screen pixel direction
+      // (see onPointerMove) — keeps the committed slide consistent with the live preview.
+      const aspect = rect.width / rect.height;
+      const dragDir = new THREE.Vector3(dragVec.x * aspect, dragVec.y, 0)
+        .transformDirection(camera.matrixWorld)
+        .normalize();
       endDrag(startFaceId, { x: dragDir.x, y: dragDir.y, z: dragDir.z });
     };
 
