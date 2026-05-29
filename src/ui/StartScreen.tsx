@@ -16,6 +16,7 @@ export function StartScreen({ onStart, onOpenCampaign, onStartAstro }: StartScre
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
       if (key === 'p') {
+        if (!isAstroUnlocked) return;
         const isFirstTime = localStorage.getItem('stellar_headphones_suggested') !== 'true';
         if (isFirstTime) {
           setPendingAction('astro');
@@ -26,7 +27,7 @@ export function StartScreen({ onStart, onOpenCampaign, onStartAstro }: StartScre
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onStartAstro]);
+  }, [onStartAstro, isAstroUnlocked]);
 
   const handleSandboxClick = () => {
     const isFirstTime = localStorage.getItem('stellar_headphones_suggested') !== 'true';

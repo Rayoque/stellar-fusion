@@ -34,6 +34,22 @@ const initialElementCounts = (): Record<ElementSymbol, number> => ({
   D: 0, He3: 0, He4: 0, Be7: 0, Be8: 0, C12: 0, O16: 0, Ne20: 0, Mg24: 0, Si28: 0, S32: 0, Ar36: 0, Ca40: 0, Ti44: 0, Cr48: 0, Fe52: 0, Ni56: 0, Fe56: 0
 });
 
+// Bumping this clears campaign progress and the Astrophysicist Mode unlock for
+// players carrying an older save, so the mode must be re-earned. High scores and
+// audio settings are intentionally preserved.
+const STORAGE_VERSION = '2';
+(function migrateStorage() {
+  try {
+    if (localStorage.getItem('stellar_storage_version') !== STORAGE_VERSION) {
+      localStorage.removeItem('stellar_completed_levels');
+      localStorage.removeItem('stellar_unlocked_elements');
+      localStorage.setItem('stellar_storage_version', STORAGE_VERSION);
+    }
+  } catch {
+    // localStorage unavailable (e.g. private mode); nothing to migrate
+  }
+})();
+
 export const useGameStore = create<GameStore>((set, get) => ({
   // Initial empty state — populated by newGame()
   starMass: 0,
