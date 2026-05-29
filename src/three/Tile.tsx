@@ -330,9 +330,10 @@ export function Tile({ face, tile }: TileProps) {
     // Shimmering breathing animation for the pentagon confinement field
     if (pentagonRef.current) {
       const elapsed = state.clock.getElapsedTime();
-      const targetBase = (tile && !isSelected) ? 0.0 : 0.12;
+      const restBase = isAstro ? 0.2 : 0.12;
+      const targetBase = (tile && !isSelected) ? 0.0 : restBase;
       smoothOpacityRef.current = THREE.MathUtils.lerp(smoothOpacityRef.current, targetBase, 0.12);
-      
+
       const pulse = Math.sin(elapsed * 2.2) * 0.04 * (smoothOpacityRef.current / 0.12);
       const finalOpacity = Math.max(0, smoothOpacityRef.current + pulse);
       
@@ -355,10 +356,10 @@ export function Tile({ face, tile }: TileProps) {
       {(!element || isSelected) && (
         <mesh geometry={geometry} userData={{ faceId: face.id }}>
           <meshBasicMaterial visible={false} />
-          <Edges 
-            scale={1} 
-            threshold={15} 
-            color="rgba(255, 255, 255, 0.08)" 
+          <Edges
+            scale={1}
+            threshold={15}
+            color={isAstro ? "#38bdf8" : "rgba(255, 255, 255, 0.08)"}
           />
         </mesh>
       )}
@@ -392,17 +393,17 @@ export function Tile({ face, tile }: TileProps) {
         {/* Pentagon indicator (always visible, rendered on top of elements using renderOrder) */}
         {face.shape === 'pentagon' && pentagonGeometry && !isMergeTarget && (
           <mesh ref={pentagonRef} geometry={pentagonGeometry} renderOrder={2}>
-            <meshBasicMaterial 
-              color="#38bdf8" // Confinement field cyan
-              transparent 
-              opacity={0.12} 
+            <meshBasicMaterial
+              color={isAstro ? "#67e8f9" : "#38bdf8"} // Confinement field cyan (brighter in astro to stand out from the neon grid)
+              transparent
+              opacity={0.12}
               side={THREE.DoubleSide}
               depthWrite={false}
             />
-            <Edges 
-              scale={1.0} 
-              threshold={15} 
-              color="#38bdf8" // Glowing cyan outline
+            <Edges
+              scale={1.0}
+              threshold={15}
+              color={isAstro ? "#a5f3fc" : "#38bdf8"} // Glowing cyan outline (hotter in astro for nucleation-site identity)
             />
           </mesh>
         )}

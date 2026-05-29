@@ -6,6 +6,7 @@ import { useGameStore } from '../game/state';
 
 interface CodexProps {
   onClose: () => void;
+  initialElement?: ElementSymbol | null;
 }
 
 const ELEMENT_DESCRIPTIONS: Partial<Record<ElementSymbol, string>> = {
@@ -19,10 +20,10 @@ const ELEMENT_DESCRIPTIONS: Partial<Record<ElementSymbol, string>> = {
   Fe: "Iron. The ultimate nuclear ash. Fusing iron consumes energy rather than releasing it, immediately halting thermal pressure. Gravity wins, triggering a violent core collapse supernova."
 };
 
-export function Codex({ onClose }: CodexProps) {
+export function Codex({ onClose, initialElement }: CodexProps) {
   const unlockedElements = useGameStore(s => s.unlockedElements);
   const isAstro = useGameStore(s => s.astrophysicistMode);
-  const [selectedSym, setSelectedSym] = React.useState<ElementSymbol | null>(null);
+  const [selectedSym, setSelectedSym] = React.useState<ElementSymbol | null>(initialElement ?? null);
 
   const activeIsotopes: ElementSymbol[] = isAstro
     ? ['H', 'D', 'He3', 'He4', 'Be7', 'Be8', 'C12', 'O16', 'Ne20', 'Mg24', 'Si28', 'S32', 'Ar36', 'Ca40', 'Ti44', 'Cr48', 'Fe52', 'Ni56', 'Fe56']

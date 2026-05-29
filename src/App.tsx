@@ -12,7 +12,9 @@ import { CampaignSelector } from './ui/CampaignSelector';
 import { Codex } from './ui/Codex';
 import { CampaignStatusOverlay } from './ui/CampaignStatusOverlay';
 import { CampaignObjectiveOverlay } from './ui/CampaignObjectiveOverlay';
+import { DebugPanel } from './ui/DebugPanel';
 import { ELEMENTS } from './game/elements';
+import type { ElementSymbol } from './game/types';
 
 export default function App() {
   const newGame = useGameStore(s => s.newGame);
@@ -39,6 +41,8 @@ export default function App() {
   const [showStart, setShowStart] = React.useState(true);
   const [showCampaign, setShowCampaign] = React.useState(false);
   const [showCodex, setShowCodex] = React.useState(false);
+  const [codexInitialElement, setCodexInitialElement] = React.useState<ElementSymbol | null>(null);
+  const [debugOpen, setDebugOpen] = React.useState(false);
 
   useEffect(() => {
     // Initialize audio on first interaction
@@ -243,6 +247,21 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showStart, currentLevelId, newGame]);
 
+  // Hidden debug panel toggle: backtick (`), gated by localStorage.stellar_debug === 'true'
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== '`') return;
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)) {
+        return;
+      }
+      if (localStorage.getItem('stellar_debug') !== 'true') return;
+      setDebugOpen(prev => !prev);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   if (showStart) {
     return (
       <>
@@ -255,6 +274,13 @@ export default function App() {
           <CampaignSelector
             onClose={() => { setShowCampaign(false); window.scrollTo(0, 0); }}
             onSelectLevel={handleLaunchLevel}
+          />
+        )}
+        {debugOpen && (
+          <DebugPanel
+            onClose={() => setDebugOpen(false)}
+            onJumpAstro={() => { handleStartAstro(); setDebugOpen(false); }}
+            onJumpLevel={(id) => { handleLaunchLevel(id); setDebugOpen(false); }}
           />
         )}
       </>
@@ -307,7 +333,8 @@ export default function App() {
       {/* Stellar Codex Journal Modal */}
       {showCodex && (
         <Codex
-          onClose={() => { setShowCodex(false); window.scrollTo(0, 0); }}
+          initialElement={codexInitialElement}
+          onClose={() => { setShowCodex(false); setCodexInitialElement(null); window.scrollTo(0, 0); }}
         />
       )}
 
@@ -402,6 +429,7 @@ export default function App() {
           <div 
             className="glass-pill px-6 py-3 rounded-full border border-cyan-500/20 text-cyan-400 font-bold tracking-[3.5px] text-[8.5px] sm:text-[9.5px] shadow-[0_0_24px_rgba(34,211,238,0.15)] flex items-center justify-center text-center gap-2.5 uppercase font-mono pointer-events-auto cursor-pointer select-none animate-fade-in-up"
             onClick={() => {
+              setCodexInitialElement(activeToastElement);
               dismissToast();
               setShowCodex(true);
             }}
@@ -412,6 +440,14 @@ export default function App() {
             <span className="text-xs">✦</span>
           </div>
         </div>
+      )}
+
+      {debugOpen && (
+        <DebugPanel
+          onClose={() => setDebugOpen(false)}
+          onJumpAstro={() => { handleStartAstro(); setDebugOpen(false); }}
+          onJumpLevel={(id) => { handleLaunchLevel(id); setDebugOpen(false); }}
+        />
       )}
     </div>
   );
