@@ -19,7 +19,16 @@ export const PHASES: PhaseRule[] = [
   },
   {
     phase: 'red_giant',
-    triggers: (s) => s.elementCounts.He >= 8,
+    triggers: (s) => {
+      const He = s.elementCounts.He || 0;
+      const C = s.elementCounts.C || 0;
+      const O = s.elementCounts.O || 0;
+      const Ne = s.elementCounts.Ne || 0;
+      const Mg = s.elementCounts.Mg || 0;
+      const Si = s.elementCounts.Si || 0;
+      const Fe = s.elementCounts.Fe || 0;
+      return (He + C + O + Ne + Mg + Si + Fe) >= 8;
+    },
     visualScale: 1.3,
     hSpawnRate: 1,
     unlocksElements: ['H', 'He', 'C', 'O'],
@@ -27,13 +36,18 @@ export const PHASES: PhaseRule[] = [
   {
     phase: 'supergiant',
     triggers: (s) => {
+      const He = s.elementCounts.He || 0;
       const C = s.elementCounts.C || 0;
       const O = s.elementCounts.O || 0;
       const Ne = s.elementCounts.Ne || 0;
       const Mg = s.elementCounts.Mg || 0;
       const Si = s.elementCounts.Si || 0;
       const Fe = s.elementCounts.Fe || 0;
-      return (C + O + Ne + Mg + Si + Fe) >= 4 && C > 0 && s.starMass >= 8;
+      
+      const totalHeliumOrHeavier = He + C + O + Ne + Mg + Si + Fe;
+      const totalCarbonOrHeavier = C + O + Ne + Mg + Si + Fe;
+      
+      return totalHeliumOrHeavier >= 8 && totalCarbonOrHeavier >= 4 && C > 0 && s.starMass >= 8;
     },
     visualScale: 1.6,
     hSpawnRate: 2,
@@ -65,9 +79,11 @@ export function updatePhase(state: GameState): boolean {
   
   // Phase progression is strictly ONE-WAY (forward only). A star can only evolve forward!
   if (newPhaseIndex > currentPhaseIndex) {
-    state.phase = newPhaseRule.phase;
+    // Evolve strictly one phase at a time to prevent skipping intermediate phases (e.g. main_sequence -> supergiant)
+    const nextPhaseRule = PHASES[currentPhaseIndex + 1];
+    state.phase = nextPhaseRule.phase;
     if (state.phaseTransitions) {
-      state.phaseTransitions[newPhaseRule.phase] = state.turn;
+      state.phaseTransitions[nextPhaseRule.phase] = state.turn;
     }
     return true;
   }
