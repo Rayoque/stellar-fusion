@@ -1,8 +1,8 @@
 # Stellar Fusion
 
-A 3D fusion puzzle game played on the surface of a soccer ball. Slide hydrogen into hydrogen, build helium, then carbon, then heavier elements, all the way to iron. Spiritual successor to 2048, with real stellar nucleosynthesis as the rule set.
+A 3D nucleosynthesis puzzle played on the surface of a soccer ball. Slide hydrogen into hydrogen to build helium, then carbon, then heavier elements, all the way to iron. A spiritual successor to 2048, with real stellar physics as the rule set.
 
-![Stellar Fusion gameplay](./signal-2026-05-16-072138_002.jpeg)
+![Stellar Fusion gameplay](./doc/img/hero-gameplay.png)
 
 ## Play it
 
@@ -19,9 +19,19 @@ npm run dev
 
 Open http://localhost:5173.
 
-## How it works
+## Modes
 
-The board is a truncated icosahedron: 12 pentagons and 20 hexagons, the same shape as a soccer ball or a C60 buckminsterfullerene molecule. Tiles live on each face. You drag a tile into a neighbor to attempt a fusion. Every committed drag costs one hydrogen, which is also how new hydrogen spawns. That tension is the 2048 pressure loop, transplanted onto a curved surface.
+Three ways to play, selectable from the start screen:
+
+![Start screen](./doc/img/start-screen.png)
+
+- **Endless Sandbox** — open-ended play. Fuse as far up the chain as the board allows and chase a high score.
+- **Stellar Campaign** — ten curated scenarios, each with a fixed starting layout, a turn limit, and a specific fusion objective. Difficulty ramps from a first helium fusion up to balancing every stable element at once.
+- **Astrophysicist Mode** — an advanced mode that unlocks once the campaign is complete. It swaps the rule set for a full isotope chain. (Inspired by [Fe26](https://dimit.me/Fe26/) — see Credits.)
+
+## How fusion works
+
+The board is a truncated icosahedron: 12 pentagons and 20 hexagons, the same shape as a soccer ball or a C60 buckminsterfullerene molecule. Tiles live on each face. Dragging a tile into a neighbor attempts a fusion. Every committed drag costs one hydrogen, which is also how new hydrogen spawns — that is the 2048 pressure loop, transplanted onto a curved surface.
 
 Fusion rules follow the actual physics, simplified:
 
@@ -32,7 +42,31 @@ Fusion rules follow the actual physics, simplified:
 - Pentagons act as CNO catalytic shortcuts for early progression
 - Iron is immovable. It is the endpoint of fusion. Once you make iron, that face is locked.
 
-End states map to real stellar outcomes based on accumulated mass and phase.
+The star advances through phases (main sequence, red giant, and beyond) as mass and composition change, and the run ends in a real stellar outcome — white dwarf, neutron star, or black hole — depending on the accumulated mass.
+
+## Campaign
+
+Each scenario sets the stellar mass, a turn budget, and an objective, then drops you into a tailored board.
+
+![Stellar Campaign scenario select](./doc/img/campaign.png)
+
+Runs resolve into an end state screen summarizing the final composition and outcome.
+
+![Neutron Star end state](./doc/img/end-state.png)
+
+## Astrophysicist Mode
+
+The unlockable advanced mode runs a detailed isotope chain (deuterium, the helium isotopes, the beryllium bottleneck, and up through the heavier nuclei toward iron-56) rather than the simplified ladder.
+
+![Astrophysicist Mode](./doc/img/astrophysicist-mode.png)
+
+## Codex & menu
+
+A Stellar Codex tracks each element synthesized so far, with a short physics note and the slide rules for every tile. The in-game menu covers resume, how-to-play, the codex, reset, and settings.
+
+![Stellar Codex](./doc/img/codex.png)
+
+![Game menu](./doc/img/pause-menu.png)
 
 ## Stack
 
@@ -40,22 +74,22 @@ React 19, TypeScript, Vite, Three.js via @react-three/fiber and drei, Zustand fo
 
 ## Design notes
 
-The full architecture spec is in [doc/stellar-fusion-architecture.pdf](doc/stellar-fusion-architecture.pdf).
+The original architecture spec is in [doc/stellar-fusion-architecture.pdf](doc/stellar-fusion-architecture.pdf).
 
 Core design decisions:
 
 - Iron's `slideDistance: 0` makes it a permanent dead tile. This is the entire reason iron exists as an endpoint in real stars too.
-- The pentagon CNO shortcut gives the player a way out of the early-game grind, mirroring how massive stars use catalytic carbon-nitrogen-oxygen cycles to burn hydrogen faster.
-- The triple-alpha requirement (three He on a triangular neighborhood) creates a clean regime shift. You go from filling the board with helium to reorganizing it. That shift is the red giant phase.
+- The pentagon CNO shortcut gives a way out of the early-game grind, mirroring how massive stars use catalytic carbon-nitrogen-oxygen cycles to burn hydrogen faster.
+- The triple-alpha requirement (three He on a triangular neighborhood) creates a clean regime shift, from filling the board with helium to reorganizing it. That shift is the red giant phase.
 - One hydrogen per move keeps the board pressured. Without it, the puzzle has no failure state.
 
 ## Status
 
-MVP. Playable. Rough edges in geometry adjacency and particle polish. Not yet tuned for difficulty.
+Playable, with three modes and a ten-level campaign. Active areas of work: geometry adjacency edge cases, particle polish, and difficulty tuning.
 
 ## Credits & Inspiration
 
-The advanced unlockable **Astrophysicist Mode** in this game is directly inspired by and modeled after the brilliant nucleosynthesis browser game **[Fe26](https://dimit.me/Fe26/)** by [Dimitri](https://dimit.me/). We highly recommend checking out the original game which paved the way for advanced stellar core fusion puzzle logic!
+The advanced unlockable **Astrophysicist Mode** is directly inspired by and modeled after the nucleosynthesis browser game **[Fe26](https://dimit.me/Fe26/)** by [Dimitri](https://dimit.me/). The original is well worth a look for anyone interested in stellar core fusion puzzle logic.
 
 ## License
 

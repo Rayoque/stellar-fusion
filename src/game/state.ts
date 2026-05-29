@@ -423,8 +423,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
                   allObjectivesMet = false;
                 }
               } else if (obj.type === 'has_all_elements') {
-                const allUnlocked = Object.values(state.elementCounts).every(c => c > 0);
-                if (!allUnlocked) allObjectivesMet = false;
+                const required: ElementSymbol[] = ['H', 'He', 'C', 'O', 'Ne', 'Mg', 'Si', 'Fe'];
+                const allPresent = required.every(el => (state.elementCounts[el] || 0) > 0);
+                if (!allPresent) allObjectivesMet = false;
               }
             }
 
