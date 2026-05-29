@@ -45,7 +45,13 @@ export function TouchIndicator() {
     const container = containerRef.current;
     if (!container) return;
 
+    let pendingFrame: number | null = null;
+    let latestCoords: Record<number, { x: number; y: number }> = {};
+
     const handlePointerDown = (e: PointerEvent) => {
+      // Bypasses mouse tracking entirely to avoid redundant double-cursors and double CPU overhead
+      if (e.pointerType !== 'touch') return;
+
       const x = e.clientX;
       const y = e.clientY;
       const id = e.pointerId;
@@ -66,7 +72,7 @@ export function TouchIndicator() {
       el.style.boxShadow = `0 0 10px ${colors.primary}, inset 0 0 5px ${colors.primary}`;
       el.style.opacity = '0.9';
       el.style.backdropFilter = 'blur(0.5px)';
-      // Center the element under the physical finger using translate3d
+      el.style.willChange = 'transform'; // hardware acceleration optimization
       el.style.transform = `translate3d(${x - 8}px, ${y - 8}px, 0)`;
 
       container.appendChild(el);
@@ -108,7 +114,7 @@ export function TouchIndicator() {
         rippleGroup.remove();
       }, 400);
 
-      // 4. Programmatically spawn the beautiful drift particles (fewer, smaller, faster)
+      // 4. Programmatically spawn the beautiful drift particles
       const particleCount = 5;
       for (let i = 0; i < particleCount; i++) {
         const angle = Math.random() * Math.PI * 2;
@@ -116,7 +122,7 @@ export function TouchIndicator() {
         const dx = `${(Math.cos(angle) * distance).toFixed(1)}px`;
         const dy = `${(Math.sin(angle) * distance).toFixed(1)}px`;
         const color = colors.particles[Math.floor(Math.random() * colors.particles.length)];
-        const size = 3 + Math.random() * 3; // 3px to 6px (was 5px to 11px)
+        const size = 3 + Math.random() * 3;
 
         const pEl = document.createElement('div');
         pEl.className = 'absolute rounded-full pointer-events-none';
@@ -141,19 +147,32 @@ export function TouchIndicator() {
     };
 
     const handlePointerMove = (e: PointerEvent) => {
-      const x = e.clientX;
-      const y = e.clientY;
-      const id = e.pointerId;
+      if (e.pointerType !== 'touch') return;
 
-      // Instantly track active pointer element's position using high-performance translate3d
-      const el = activeElementsRef.current.get(id);
-      if (el) {
-        el.style.transform = `translate3d(${x - 8}px, ${y - 8}px, 0)`;
+      const id = e.pointerId;
+      latestCoords[id] = { x: e.clientX, y: e.clientY };
+
+      // Decouple coordinate changes and DOM translations using requestAnimationFrame
+      // to guarantee butter-smooth 60Hz/120Hz ProMotion screen tracking with absolutely zero lag.
+      if (pendingFrame === null) {
+        pendingFrame = requestAnimationFrame(() => {
+          pendingFrame = null;
+          for (const [idStr, coords] of Object.entries(latestCoords)) {
+            const pid = Number(idStr);
+            const el = activeElementsRef.current.get(pid);
+            if (el) {
+              el.style.transform = `translate3d(${coords.x - 8}px, ${coords.y - 8}px, 0)`;
+            }
+          }
+        });
       }
     };
 
     const handlePointerUp = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
       const id = e.pointerId;
+      
+      delete latestCoords[id];
       const el = activeElementsRef.current.get(id);
       if (el) {
         el.remove();
@@ -172,6 +191,10 @@ export function TouchIndicator() {
       window.removeEventListener('pointermove', handlePointerMove, { capture: true });
       window.removeEventListener('pointerup', handlePointerUp, { capture: true });
       window.removeEventListener('pointercancel', handlePointerUp, { capture: true });
+
+      if (pendingFrame !== null) {
+        cancelAnimationFrame(pendingFrame);
+      }
 
       // Clean up all active tracking elements from the DOM on unmount
       activeElementsRef.current.forEach(el => el.remove());
