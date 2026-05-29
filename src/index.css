@@ -152,3 +152,30 @@ canvas {
   scrollbar-width: none;  /* Firefox */
 }
 
+/* Mobile Safe Area HUD Overrides to clear dynamic islands, notches, and Safari bottom address bars */
+.hud-top-container {
+  top: calc(1.4rem + env(safe-area-inset-top, 0px));
+}
+
+.hud-bottom-container {
+  bottom: calc(4.8rem + env(safe-area-inset-bottom, 0px));
+}
+
+.hud-toast-container {
+  top: calc(5.2rem + env(safe-area-inset-top, 0px));
+}
+
+@media (min-width: 640px) {
+  .hud-top-container {
+    top: calc(1rem + env(safe-area-inset-top, 0px));
+  }
+
+  .hud-bottom-container {
+    bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hud-toast-container {
+    top: calc(4.8rem + env(safe-area-inset-top, 0px));
+  }
+}
+

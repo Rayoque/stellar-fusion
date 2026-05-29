@@ -226,8 +226,8 @@ export function Controls() {
     const maxSpeed = 2.8; // max orbital rad/s
 
     if (!activeSlide && !isDraggingTile && !isPointerDownOnTile) {
-      if (keysPressed.current.w) targetPitch = -maxSpeed;
-      if (keysPressed.current.s) targetPitch = maxSpeed;
+      if (keysPressed.current.w) targetPitch = maxSpeed;
+      if (keysPressed.current.s) targetPitch = -maxSpeed;
       if (keysPressed.current.a) targetYaw = maxSpeed;
       if (keysPressed.current.d) targetYaw = -maxSpeed;
     }
@@ -308,6 +308,13 @@ export function Controls() {
       }
     }
   });
+
+  // Disable TrackballControls native modifier keys (A = Rotate, S = Zoom, D = Pan) to prevent conflict with WASD
+  useEffect(() => {
+    if (controlsRef.current) {
+      controlsRef.current.keys = [];
+    }
+  }, [isAnimating, isDraggingTile, isPointerDownOnTile]);
 
   useEffect(() => {
     const dom = gl.domElement;
@@ -496,6 +503,7 @@ export function Controls() {
       ref={controlsRef}
       enabled={true}
       noPan={true}
+      keys={['', '', ''] as any} // Disable TrackballControls native modifier keys (A = Rotate, S = Zoom, D = Pan) to prevent conflict with WASD
       rotateSpeed={dynamicRotateSpeed}
       minDistance={2.5}
       maxDistance={12}

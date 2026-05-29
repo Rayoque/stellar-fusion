@@ -75,7 +75,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
   return (
     <div className="absolute inset-0 z-10 pointer-events-none select-none">
       {/* Top Left: Hamburger Menu Button */}
-      <div className="absolute left-4 pointer-events-auto" style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
+      <div className="absolute left-4 pointer-events-auto hud-top-container">
         <button 
           onClick={onOpenMenu}
           className="flex items-center justify-center bg-black/40 backdrop-blur-md w-11 h-11 rounded-full border border-white/10 cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.92] transition-all text-white text-base select-none shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
@@ -87,7 +87,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
       </div>
 
       {/* Top Center: HUD Horizontal Stats Pill & Scenario Objective Banner */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto" style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
+      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto hud-top-container">
         <div 
           onClick={() => setShowModal(true)}
           className="flex items-center justify-between glass-pill px-3 md:px-4 h-11 rounded-full cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all select-none gap-2 md:gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.35)] border border-white/8"
@@ -159,8 +159,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
       </div>
 
       <div 
-        className="absolute left-1/2 -translate-x-1/2 pointer-events-auto" 
-        style={{ bottom: 'calc(0.8rem + env(safe-area-inset-bottom, 0px))' }}
+        className="absolute left-1/2 -translate-x-1/2 pointer-events-auto hud-bottom-container" 
       >
         <div className="flex flex-col items-center gap-2 xs:gap-3.5 pointer-events-none select-none max-w-[94vw] xs:max-w-[88vw] sm:max-w-md md:max-w-xl">
           {/* Dynamic Instructions placed directly above the Elements Tray */}
