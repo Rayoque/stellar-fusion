@@ -625,10 +625,11 @@ export function Controls() {
   return (
     <TrackballControls
       ref={controlsRef}
-      enabled={showControls}
+      enabled={true}
       noPan={true}
       keys={['', '', ''] as any} // Disable TrackballControls native modifier keys (A = Rotate, S = Zoom, D = Pan) to prevent conflict with WASD
-      rotateSpeed={dynamicRotateSpeed}
+      rotateSpeed={showControls ? dynamicRotateSpeed : 0}
+      zoomSpeed={showControls ? 1.0 : 0}
       minDistance={2.5}
       maxDistance={12}
       dynamicDampingFactor={0.15}
