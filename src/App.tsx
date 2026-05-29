@@ -258,7 +258,6 @@ export default function App() {
         <PauseMenu
           onResume={() => setPaused(false)}
           onMainMenu={handleMainMenu}
-          onOpenCampaign={() => setShowCampaign(true)}
           onOpenCodex={() => setShowCodex(true)}
         />
       )}

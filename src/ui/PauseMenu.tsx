@@ -6,16 +6,16 @@ import { isBgSoundEnabled, setBgSoundEnabled, isEffectsSoundEnabled, setEffectsS
 interface PauseMenuProps {
   onResume: () => void;
   onMainMenu: () => void;
-  onOpenCampaign: () => void;
   onOpenCodex: () => void;
 }
 
-export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }: PauseMenuProps) {
+export function PauseMenu({ onResume, onMainMenu, onOpenCodex }: PauseMenuProps) {
   const reset = useGameStore(s => s.reset);
   const showRealtimeGraphics = useGameStore(s => s.showRealtimeGraphics);
   const setShowRealtimeGraphics = useGameStore(s => s.setShowRealtimeGraphics);
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [bgSound, setBgSound] = useState(isBgSoundEnabled());
   const [effectsSound, setEffectsSound] = useState(isEffectsSoundEnabled());
 
@@ -40,6 +40,16 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
     onMainMenu();
   };
 
+  const handleToggleSettings = () => {
+    setShowSettings(!showSettings);
+    if (showGuide) setShowGuide(false);
+  };
+
+  const handleToggleGuide = () => {
+    setShowGuide(!showGuide);
+    if (showSettings) setShowSettings(false);
+  };
+
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
       <div 
@@ -61,14 +71,57 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
             </button>
 
             <button
-              onClick={() => {
-                onOpenCampaign();
-                onResume();
-              }}
-              className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-full font-semibold tracking-[1.5px] hover:bg-white/10 active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-xs uppercase cursor-pointer mt-3"
+              onClick={handleToggleGuide}
+              className={`w-full py-3 border text-white rounded-full font-semibold tracking-[1.5px] active:scale-[0.97] transition-all flex items-center justify-center gap-2 px-6 text-xs uppercase cursor-pointer mt-3 ${
+                showGuide ? 'bg-white/10 border-white/20' : 'bg-white/5 border-white/10 hover:bg-white/10'
+              }`}
             >
-              STELLAR CAMPAIGN
+              HOW TO PLAY
             </button>
+
+            {/* Expanded Visual Guide Panel */}
+            {showGuide && (
+              <div className="bg-[#0b0b0e]/95 border border-white/5 rounded-2xl p-4 text-left space-y-3.5 animate-fade-in-up mt-3 font-sans shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
+                {/* 1. Navigate/Steer */}
+                <div className="flex gap-3">
+                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-xs">
+                    🌐
+                  </div>
+                  <div>
+                    <h4 className="text-[10px] font-bold tracking-wider text-cyan-400 font-mono uppercase">1. NAVIGATE STAR</h4>
+                    <p className="text-[10px] text-white/50 leading-relaxed mt-0.5 font-light">
+                      Drag background to rotate, or press <span className="text-white font-mono bg-white/10 px-1 py-0.5 rounded font-bold">W A S D</span> / Arrow keys on desktop to steer with satisfying physics.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Fuse Elements */}
+                <div className="flex gap-3 border-t border-white/5 pt-3.5">
+                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-xs">
+                    🔥
+                  </div>
+                  <div>
+                    <h4 className="text-[10px] font-bold tracking-wider text-cyan-400 font-mono uppercase">2. FUSE ELEMENTS</h4>
+                    <p className="text-[10px] text-white/50 leading-relaxed mt-0.5 font-light">
+                      Drag / Swipe elements to neighboring tiles to fuse them into heavier elements (<span className="text-cyan-300 font-mono font-medium">H + H ➔ He</span>).
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. Catalyze Pentagons */}
+                <div className="flex gap-3 border-t border-white/5 pt-3.5">
+                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-xs">
+                    ⬠
+                  </div>
+                  <div>
+                    <h4 className="text-[10px] font-bold tracking-wider text-cyan-400 font-mono uppercase">3. NUCLEATION SITE</h4>
+                    <p className="text-[10px] text-white/50 leading-relaxed mt-0.5 font-light">
+                      Land a single <span className="text-white font-semibold">Hydrogen</span> on a pentagonal face to immediately self-fuse it into <span className="text-cyan-300 font-semibold font-mono">Helium</span>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <button
               onClick={() => {
@@ -88,7 +141,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCampaign, onOpenCodex }:
             </button>
 
             <button
-              onClick={() => setShowSettings(!showSettings)}
+              onClick={handleToggleSettings}
               className={`w-full py-3 border text-white rounded-full font-semibold tracking-[1.5px] active:scale-[0.97] transition-all flex items-center justify-center gap-2 px-6 text-xs uppercase cursor-pointer mt-3 ${
                 showSettings ? 'bg-white/10 border-white/20' : 'bg-white/5 border-white/10 hover:bg-white/10'
               }`}
