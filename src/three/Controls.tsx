@@ -41,8 +41,16 @@ export function Controls() {
   const keyPitchVelocity = useRef<number>(0);
   const keyYawVelocity = useRef<number>(0);
 
+  // Idle state auto-rotation tracker
+  const lastInteractionTime = useRef<number>(performance.now());
+
   useEffect(() => {
+    const onInteraction = () => {
+      lastInteractionTime.current = performance.now();
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
+      onInteraction();
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
       const key = e.key.toLowerCase();
       if (key === 'w' || e.key === 'ArrowUp') keysPressed.current.w = true;
@@ -52,6 +60,7 @@ export function Controls() {
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      onInteraction();
       const key = e.key.toLowerCase();
       if (key === 'w' || e.key === 'ArrowUp') keysPressed.current.w = false;
       if (key === 's' || e.key === 'ArrowDown') keysPressed.current.s = false;
@@ -69,11 +78,17 @@ export function Controls() {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
+    window.addEventListener('pointerdown', onInteraction);
+    window.addEventListener('pointermove', onInteraction);
+    window.addEventListener('wheel', onInteraction, { passive: true });
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('pointerdown', onInteraction);
+      window.removeEventListener('pointermove', onInteraction);
+      window.removeEventListener('wheel', onInteraction);
     };
   }, []);
 
@@ -283,7 +298,34 @@ export function Controls() {
       }
     }
 
-    // 2. BACKGROUND MOMENTUM DRIFT PHASE: Coast and decelerate the Buckyball in the slide direction
+    // Reset idle timer instantly during active tile interactions or slide slerps
+    if (activeSlide || isDraggingTile || isPointerDownOnTile) {
+      lastInteractionTime.current = performance.now();
+    }
+
+    // 2. IDLE AUTO-ROTATION: Slowly orbit camera when user is inactive for > 10s
+    const idleTime = performance.now() - lastInteractionTime.current;
+    if (idleTime > 10000) {
+      driftVelocity.current = 0; // Clear momentum drift instantly during idle precession
+      
+      const idleDuration = (idleTime - 10000) / 1000; // time in idle phase in seconds
+      const maxIdleSpeed = 0.04; // rad/sec
+      const speed = maxIdleSpeed * Math.min(idleDuration / 5.0, 1.0); // smooth 5-second acceleration ramp
+      const step = speed * delta;
+
+      // Clean planetary precession axis: slightly tilted (exposes both north and south poles beautifully)
+      const rotationAxis = new THREE.Vector3(0.15, 0.98, 0.05).normalize();
+      const qIdle = new THREE.Quaternion().setFromAxisAngle(rotationAxis, step);
+      camera.position.applyQuaternion(qIdle);
+      camera.up.applyQuaternion(qIdle);
+
+      camera.lookAt(0, 0, 0);
+      if (controlsRef.current) {
+        controlsRef.current.update();
+      }
+    }
+
+    // 3. BACKGROUND MOMENTUM DRIFT PHASE: Coast and decelerate the Buckyball in the slide direction
     if (driftVelocity.current > 0.00005) {
       // Cancel drift instantly if the user interacts with the canvas to guarantee zero lag
       if (isDraggingTile || isPointerDownOnTile) {

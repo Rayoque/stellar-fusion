@@ -95,28 +95,28 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCodex }: PauseMenuProps)
                   </div>
                 </div>
 
-                {/* 2. Fuse Elements */}
+                {/* 2. Fuse Tiles */}
                 <div className="flex gap-3 border-t border-white/5 pt-3.5">
                   <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-xs">
                     🔥
                   </div>
                   <div>
-                    <h4 className="text-[10px] font-bold tracking-wider text-cyan-400 font-mono uppercase">2. FUSE ELEMENTS</h4>
+                    <h4 className="text-[10px] font-bold tracking-wider text-cyan-400 font-mono uppercase">2. FUSE TILES</h4>
                     <p className="text-[10px] text-white/50 leading-relaxed mt-0.5 font-light">
-                      Drag / Swipe elements to neighboring tiles to fuse them into heavier elements (<span className="text-cyan-300 font-mono font-medium">H + H ➔ He</span>).
+                      Drag / Swipe matching tiles into neighboring positions to fuse them together into higher-tier configurations.
                     </p>
                   </div>
                 </div>
 
-                {/* 3. Catalyze Pentagons */}
+                {/* 3. Ignite Star */}
                 <div className="flex gap-3 border-t border-white/5 pt-3.5">
                   <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-xs">
-                    ⬠
+                    ⭐
                   </div>
                   <div>
-                    <h4 className="text-[10px] font-bold tracking-wider text-cyan-400 font-mono uppercase">3. NUCLEATION SITE</h4>
+                    <h4 className="text-[10px] font-bold tracking-wider text-cyan-400 font-mono uppercase">3. STELLAR IGNITION</h4>
                     <p className="text-[10px] text-white/50 leading-relaxed mt-0.5 font-light">
-                      Land a single <span className="text-white font-semibold">Hydrogen</span> on a pentagonal face to immediately self-fuse it into <span className="text-cyan-300 font-semibold font-mono">Helium</span>.
+                      Grow your star through successive fusion cycles to reach its final stage of growth and ignite the core collapse.
                     </p>
                   </div>
                 </div>

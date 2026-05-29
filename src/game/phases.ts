@@ -26,7 +26,15 @@ export const PHASES: PhaseRule[] = [
   },
   {
     phase: 'supergiant',
-    triggers: (s) => s.elementCounts.C >= 4 && s.starMass >= 8,
+    triggers: (s) => {
+      const C = s.elementCounts.C || 0;
+      const O = s.elementCounts.O || 0;
+      const Ne = s.elementCounts.Ne || 0;
+      const Mg = s.elementCounts.Mg || 0;
+      const Si = s.elementCounts.Si || 0;
+      const Fe = s.elementCounts.Fe || 0;
+      return (C + O + Ne + Mg + Si + Fe) >= 4 && C > 0 && s.starMass >= 8;
+    },
     visualScale: 1.6,
     hSpawnRate: 2,
     unlocksElements: ['H', 'He', 'C', 'O', 'Ne', 'Mg', 'Si'],

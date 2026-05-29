@@ -9,7 +9,7 @@ import { Controls } from './Controls';
 export function Scene() {
   return (
     <Canvas
-      camera={{ position: [0, 0, 5.5], fov: 48 }}
+      camera={{ position: [0, 0, 5.5], fov: 48, far: 5000 }}
       style={{ background: '#050508' }}
       gl={{ antialias: true, alpha: false }} // Disable alpha composition since background is solid
       dpr={[1, 1.5]} // Clamp DPR to 1.5 to prevent pixel shading bottleneck on high-DPI/4K screens when zoomed in
