@@ -503,6 +503,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
             hasSeenNucleationTutorial: triggerTutorial ? true : state.hasSeenNucleationTutorial,
             score: state.score,
             highScore: state.highScore,
+            phase: state.phase,
+            turn: state.turn,
+            elementCounts: { ...state.elementCounts },
           });
           return;
         }

@@ -65,6 +65,8 @@ export function Sphere() {
 
   const scale = phaseScale(phase);
 
+  const groupRef = React.useRef<THREE.Group>(null);
+  const isFirstFrame = React.useRef(true);
   const innerRef = React.useRef<THREE.Mesh>(null);
   const middleRef = React.useRef<THREE.Mesh>(null);
   const outerRef = React.useRef<THREE.Mesh>(null);
@@ -96,6 +98,19 @@ export function Sphere() {
 
   useFrame((state, delta) => {
     const elapsed = state.clock.getElapsedTime();
+
+    // Snappy, frame-rate independent smooth phase transition scaling LERP
+    if (groupRef.current) {
+      if (isFirstFrame.current) {
+        groupRef.current.scale.set(scale, scale, scale);
+        isFirstFrame.current = false;
+      } else {
+        const currentScale = groupRef.current.scale.x;
+        const targetScale = scale;
+        const lerpedScale = THREE.MathUtils.lerp(currentScale, targetScale, 1 - Math.exp(-6 * delta));
+        groupRef.current.scale.set(lerpedScale, lerpedScale, lerpedScale);
+      }
+    }
 
     // Volumetric counter-rotating layers to create a deep, boiling gas/convection effect
     if (innerRef.current) {
@@ -169,7 +184,7 @@ export function Sphere() {
   });
 
   return (
-    <group scale={[scale, scale, scale]}>
+    <group ref={groupRef}>
       {/* Layer 1: Solid Inner Foundation Core (Opaque emissive material for vector plasma core) */}
       <mesh ref={innerRef}>
         <sphereGeometry args={[0.88, 48, 48]} />

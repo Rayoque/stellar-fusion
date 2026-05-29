@@ -78,6 +78,15 @@ export function updatePhase(state: GameState): boolean {
   const newPhaseRule = currentPhaseRule(state);
   const newPhaseIndex = PHASES.findIndex(p => p.phase === newPhaseRule.phase);
   
+  // Instant Core Collapse: If Iron is synthesized, bypass intermediate steps and collapse immediately!
+  if (newPhaseRule.phase === 'collapse' && state.phase !== 'collapse') {
+    state.phase = 'collapse';
+    if (state.phaseTransitions) {
+      state.phaseTransitions['collapse'] = state.turn;
+    }
+    return true;
+  }
+
   // Phase progression is strictly ONE-WAY (forward only). A star can only evolve forward!
   if (newPhaseIndex > currentPhaseIndex) {
     // Evolve strictly one phase at a time to prevent skipping intermediate phases (e.g. main_sequence -> supergiant)
