@@ -116,6 +116,7 @@ export function startAmbientDrone(): void {
   ambientOsc3 = audioCtx.createOscillator();
   ambientOsc4L = audioCtx.createOscillator();
   ambientOsc4R = audioCtx.createOscillator();
+  const osc4BeatGain = audioCtx.createGain();
   ambientGain = audioCtx.createGain();
   
   ambientFilter = audioCtx.createBiquadFilter();
@@ -137,15 +138,18 @@ export function startAmbientDrone(): void {
   ambientOsc3.type = 'sine';
   ambientOsc3.frequency.value = 174;
 
-  // Bb3 (232 Hz center) - Pure warm sine, split into a detuned pair summed in MONO.
-  // 228.5 + 235.5 Hz interfere to produce a 7 Hz monaural (acoustic) beat in the
-  // theta range. Avg = 232 Hz so perceived pitch is unchanged. Kept mono on purpose:
-  // a stereo split renegotiates the iOS audio session and kills background playback.
-  // Monaural beat also entrains on plain speakers (e.g. car), not just headphones.
+  // Bb3 (232 Hz) - Pure warm sine carrier, plus a quieter 239 Hz companion summed in
+  // MONO. The 7 Hz difference makes a monaural (acoustic) beat in the theta range.
+  // Unequal amplitudes keep partial modulation: the carrier never drops to silence,
+  // so it's a gentle pulse, not a full-depth throb. Kept mono on purpose: a stereo
+  // split renegotiates the iOS audio session and kills background playback. Monaural
+  // beat also entrains on plain speakers (e.g. car), not just headphones.
   ambientOsc4L.type = 'sine';
-  ambientOsc4L.frequency.value = 228.5;
+  ambientOsc4L.frequency.value = 232;
   ambientOsc4R.type = 'sine';
-  ambientOsc4R.frequency.value = 235.5;
+  ambientOsc4R.frequency.value = 239;
+  // Companion tone at ~35% of carrier => modulation swings ~1.35x..0.65x, not 2x..0.
+  osc4BeatGain.gain.value = 0.35;
 
   // Lowpass filter cutoff set to a warm 450 Hz to keep the sound cozy and filter out any high buzz
   ambientFilter.type = 'lowpass';
@@ -179,11 +183,12 @@ export function startAmbientDrone(): void {
   ambientOsc3.connect(osc3GainNode);
   osc3GainNode.connect(ambientFilter);
 
-  // Both detuned tones sum into the shared mono osc4 gain (phase transitions still
-  // control level via osc4GainNode). Mono path = same graph topology as before the
-  // beat, so the iOS background-audio session stays intact.
+  // Carrier full level, companion attenuated through osc4BeatGain, both summed into
+  // the shared mono osc4 gain (phase transitions still control level via osc4GainNode).
+  // Mono path = same graph topology as before the beat, so iOS background audio stays intact.
   ambientOsc4L.connect(osc4GainNode);
-  ambientOsc4R.connect(osc4GainNode);
+  ambientOsc4R.connect(osc4BeatGain);
+  osc4BeatGain.connect(osc4GainNode);
   osc4GainNode.connect(ambientFilter);
 
   ambientFilter.connect(ambientGain);
