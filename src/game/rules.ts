@@ -225,25 +225,35 @@ export const SCORE_VALUES: Record<ElementSymbol, number> = {
   Si: 28,    // mass 28
   Fe: 56,    // mass 56
 
-  // Astro Mode (Half-mass scoring rules from Fe26)
-  D: 1.0,    // mass 2 / 2
-  He3: 1.5,  // mass 3 / 2
-  He4: 2.0,  // mass 4 / 2
-  Be7: 3.0,  // mass 7 / 2 (aligned to user's 3-point report)
-  Be8: 4.0,  // mass 8 / 2
-  C12: 6.0,  // mass 12 / 2
-  O16: 8.0,  // mass 16 / 2
-  Ne20: 10.0, // mass 20 / 2
-  Mg24: 12.0, // mass 24 / 2
-  Si28: 14.0, // mass 28 / 2
-  S32: 16.0,  // mass 32 / 2
-  Ar36: 18.0,  // mass 36 / 2
-  Ca40: 20.0,  // mass 40 / 2
-  Ti44: 22.0,  // mass 44 / 2
-  Cr48: 24.0,  // mass 48 / 2
-  Fe52: 26.0,  // mass 52 / 2
-  Ni56: 28.0,  // mass 56 / 2
-  Fe56: 28.0   // mass 56 / 2
+  // Astrophysicist Mode — exact fusion point values from Fe26 (dimit.me/Fe26)
+  D: 1,
+  He3: 1.5,
+  He4: 2,
+  Be7: 3,
+  Be8: 4,
+  C12: 6,
+  O16: 8,
+  Ne20: 10,
+  Mg24: 12,
+  Si28: 14,
+  S32: 16,
+  Ar36: 18,
+  Ca40: 20,
+  Ti44: 22,
+  Cr48: 24,
+  Fe52: 26,
+  Ni56: 28,
+  Fe56: 56   // winning element, worth full mass
+};
+
+// Astrophysicist Mode — score change when an isotope decays (Fe26).
+// Most decays forfeit the points the isotope earned; Ni56 -> Fe56 is rewarded.
+export const DECAY_POINTS: Partial<Record<ElementSymbol, number>> = {
+  Be7: -3,
+  Be8: -4,
+  Ne20: -10,
+  Fe52: -26,
+  Ni56: 56,
 };
 
 export function getDecayTurns(element: ElementSymbol): number | undefined {

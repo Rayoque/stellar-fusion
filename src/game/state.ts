@@ -6,7 +6,7 @@ import { ELEMENTS } from './elements';
 import { currentPhaseRule, updatePhase } from './phases';
 import { spawnHydrogen } from './spawn';
 import { checkEndState } from './endgame';
-import { detectMerge, applyMerge } from './rules';
+import { detectMerge, applyMerge, DECAY_POINTS } from './rules';
 import { executeSlide } from '../geometry/slide';
 import { playMerge, playBlocked, playHeliumLaugh, playSuccess } from '../audio/synth';
 import { LEVELS } from './levels';
@@ -333,6 +333,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 }
 
                 if (decayed) {
+                  state.score = (state.score || 0) + (DECAY_POINTS[tile.element] ?? 0);
                   tile.element = nextElement;
                   tile.spawnedAtTurn = state.turn; // mark as transformed on this turn
                   tile.spawnReason = 'slide';      // trigger animation
