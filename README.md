@@ -85,7 +85,15 @@ Core design decisions:
 
 ## Status
 
-Playable, with three modes and a ten-level campaign. Active areas of work: geometry adjacency edge cases, particle polish, and difficulty tuning.
+Playable and in active development, with three modes and a ten-level campaign. Active areas of work: geometry adjacency edge cases, particle polish, and difficulty tuning.
+
+## Future plans
+
+- A more challenging, heavily curated Puzzle Mode campaign, inspired by world-class puzzle design.
+- Haptic feedback, with a no-ads release on the Apple App Store.
+- Broader compatibility across devices.
+
+Feedback is very much appreciated — open an issue or reach out.
 
 ## Credits & Inspiration
 
