@@ -1,11 +1,19 @@
 // src/game/spawn.ts
-import type { GameState } from './types';
+import type { GameState, ElementSymbol } from './types';
 import { currentPhaseRule } from './phases';
+
+// Hydrogen "rain" may land on pentagons too, but much less often than hexagons.
+// This is a per-slot weight: a pentagon is ~30% as likely to be picked as a hexagon.
+const PENTAGON_SPAWN_WEIGHT = 0.3;
 
 /**
  * Spawn hydrogen(s) after every committed move.
  * Rewards efficient play: even non-merging drags cost a new H.
  * In collapse phase, no new fuel (hSpawnRate = 0).
+ *
+ * Hydrogen can rain onto pentagons (nucleation sites) too, but at a lower chance.
+ * When it does, it immediately becomes helium (the same self-fusion the player gets
+ * by dragging H onto a pentagon) — but silently, since this isn't a player action.
  */
 export function spawnHydrogen(state: GameState): void {
   const phaseRule = currentPhaseRule(state);
@@ -13,8 +21,14 @@ export function spawnHydrogen(state: GameState): void {
 
   if (rate <= 0) return;
 
-  const emptyFaces = state.faces.filter(f => f.shape === 'hexagon' && !state.tiles.has(f.id));
+  // Both hexagons and pentagons are valid landing slots now (pentagons weighted lower).
+  const emptyFaces = state.faces.filter(
+    f => (f.shape === 'hexagon' || f.shape === 'pentagon') && !state.tiles.has(f.id)
+  );
   if (emptyFaces.length === 0) return;
+
+  // H self-fuses to helium on a pentagon; the output isotope is mode-dependent.
+  const heliumOnPentagon: ElementSymbol = state.astrophysicistMode ? 'He4' : 'He';
 
   const lastFaceId = state.lastMoveFaceId;
   const lastFace = lastFaceId !== null && lastFaceId !== undefined ? state.faces[lastFaceId] : null;
@@ -22,44 +36,44 @@ export function spawnHydrogen(state: GameState): void {
   for (let i = 0; i < rate; i++) {
     if (emptyFaces.length === 0) break;
 
-    let target;
-    // When the board is getting full (empty hexagons <= 10), make hydrogen tend to spawn 
-    // further away from the user's last landing position to avoid blocking them.
-    if (emptyFaces.length <= 10 && lastFace) {
-      const facesWithDist = emptyFaces.map(f => {
+    // When the board is getting full (empty slots <= 10), bias spawns away from the
+    // user's last landing position so they don't get boxed in.
+    const useDistanceBias = emptyFaces.length <= 10 && !!lastFace;
+
+    // Weighted pick: shape weight (pentagons lower) times optional distance bias.
+    const weights = emptyFaces.map(f => {
+      const shapeWeight = f.shape === 'pentagon' ? PENTAGON_SPAWN_WEIGHT : 1;
+      if (useDistanceBias && lastFace) {
         const dx = f.center.x - lastFace.center.x;
         const dy = f.center.y - lastFace.center.y;
         const dz = f.center.z - lastFace.center.z;
-        const distSq = dx * dx + dy * dy + dz * dz;
-        return { face: f, weight: distSq }; // weight proportional to squared distance (opposite side has highest weight)
-      });
-
-      const totalWeight = facesWithDist.reduce((sum, item) => sum + item.weight, 0);
-      let rand = Math.random() * totalWeight;
-      target = emptyFaces[0];
-      for (const item of facesWithDist) {
-        rand -= item.weight;
-        if (rand <= 0) {
-          target = item.face;
-          break;
-        }
+        return shapeWeight * (dx * dx + dy * dy + dz * dz); // farther = more likely
       }
-    } else {
-      // Standard purely random uniform fallback when board is not full
-      const idx = Math.floor(Math.random() * emptyFaces.length);
-      target = emptyFaces[idx];
+      return shapeWeight;
+    });
+
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+    let rand = Math.random() * totalWeight;
+    let targetIdx = 0;
+    for (let k = 0; k < emptyFaces.length; k++) {
+      rand -= weights[k];
+      if (rand <= 0) {
+        targetIdx = k;
+        break;
+      }
     }
+
+    const target = emptyFaces[targetIdx];
+    const isPentagon = target.shape === 'pentagon';
 
     state.tiles.set(target.id, {
       faceId: target.id,
-      element: 'H',
+      // On a pentagon the hydrogen instantly self-fuses to helium (silent — not a player move).
+      element: isPentagon ? heliumOnPentagon : 'H',
       spawnedAtTurn: state.turn,
       spawnReason: 'spawn',
     });
 
-    const indexToRemove = emptyFaces.findIndex(f => f.id === target.id);
-    if (indexToRemove !== -1) {
-      emptyFaces.splice(indexToRemove, 1);
-    }
+    emptyFaces.splice(targetIdx, 1);
   }
 }
