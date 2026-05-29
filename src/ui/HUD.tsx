@@ -5,6 +5,7 @@ import { ELEMENTS } from '../game/elements';
 import { useGameStore } from '../game/state';
 import { getStarAgeInfo } from '../game/phases';
 import { LEVELS } from '../game/levels';
+import { playSpawnTick } from '../audio/synth';
 
 interface HUDProps {
   phase: Phase;
@@ -360,6 +361,20 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
             >
               Objective: {level.objectives[0].type === 'has_element' ? `Synthesize ${level.objectives[0].element}` : level.title}
             </div>
+          )}
+
+          {/* In-game quick reset (open-ended modes only): subtle, clearly tappable,
+              lets the player start a fresh star without opening the pause menu. */}
+          {currentLevelId === null && (
+            <button
+              onClick={() => { state.reset(); playSpawnTick(); }}
+              className="mt-1 flex-shrink-0 pointer-events-auto flex items-center gap-1 glass-pill px-2.5 py-1 rounded-full text-[7.5px] font-mono tracking-[2.5px] uppercase text-white/40 hover:text-white/80 border border-white/8 hover:bg-white/5 active:scale-[0.95] transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.25)] animate-fade-in-up"
+              style={{ borderColor: `${currentThemeColor}20` }}
+              title="Reignite — reset and start a fresh star"
+            >
+              <span className="text-[9px] leading-none translate-y-[-0.5px]">↻</span>
+              Reignite
+            </button>
           )}
         </div>
 
