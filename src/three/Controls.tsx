@@ -622,10 +622,10 @@ export function Controls() {
   const referenceWidth = 400; // width at which default speed (1.0) felt good
   const dynamicRotateSpeed = (size.width / referenceWidth) * 1.0;
 
-  return showControls ? (
+  return (
     <TrackballControls
       ref={controlsRef}
-      enabled={true}
+      enabled={showControls}
       noPan={true}
       keys={['', '', ''] as any} // Disable TrackballControls native modifier keys (A = Rotate, S = Zoom, D = Pan) to prevent conflict with WASD
       rotateSpeed={dynamicRotateSpeed}
@@ -634,5 +634,5 @@ export function Controls() {
       dynamicDampingFactor={0.15}
       makeDefault
     />
-  ) : null;
+  );
 }
