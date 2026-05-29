@@ -336,9 +336,9 @@ export function playSuccess(): void {
   initAudio();
   const now = audioCtx.currentTime;
 
-  // Glistening Eb Major cosmic arpeggio chime (Eb4 -> G4 -> Bb4 -> Eb5)
-  const notes = [311.13, 392.00, 466.16, 622.25];
-  const delays = [0, 0.08, 0.16, 0.24];
+  // Extremely subtle, warm, deep cosmic resonance chord (Eb3 -> G3 -> Bb3 -> Eb4)
+  const notes = [155.56, 196.00, 233.08, 311.13];
+  const delays = [0, 0.05, 0.10, 0.15];
 
   notes.forEach((freq, i) => {
     const time = now + delays[i];
@@ -350,18 +350,18 @@ export function playSuccess(): void {
     osc.frequency.setValueAtTime(freq, time);
 
     gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(0.12, time + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.8);
+    gain.gain.linearRampToValueAtTime(0.038, time + 0.15); // Very soft, gentle attack
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 1.4); // Slow, smooth wash-out decay
 
     filter.type = 'lowpass';
-    filter.frequency.value = 1500;
+    filter.frequency.value = 1000; // Warm, dark filter cutoff
 
     osc.connect(filter);
     filter.connect(gain);
     gain.connect(audioCtx!.destination);
 
     osc.start(time);
-    osc.stop(time + 0.9);
+    osc.stop(time + 1.6);
   });
 }
 

@@ -163,7 +163,7 @@ export function Sphere() {
 
       if (burstRef.current.material) {
         const mat = burstRef.current.material as THREE.MeshBasicMaterial;
-        mat.opacity = 0.55 * (1.0 - easeOut); // fades from 0.55 to 0.0
+        mat.opacity = 0.18 * (1.0 - easeOut); // fades from 0.18 to 0.0
       }
     }
   });
@@ -229,7 +229,7 @@ export function Sphere() {
           <meshBasicMaterial 
             color={auraColor}
             transparent={true}
-            opacity={0.55}
+            opacity={0.18}
             blending={THREE.AdditiveBlending}
             side={THREE.DoubleSide}
             depthWrite={false}

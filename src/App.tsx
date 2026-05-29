@@ -157,6 +157,7 @@ export default function App() {
   };
 
   const handleLaunchLevel = (levelId: number) => {
+    setShowStatusOverlay(false); // Instantly hide stale overlay
     newGame(undefined, levelId);
     setShowCampaign(false);
     setShowStart(false);
@@ -171,6 +172,7 @@ export default function App() {
 
   const handleRetryLevel = () => {
     if (currentLevelId !== null) {
+      setShowStatusOverlay(false); // Instantly hide stale overlay
       newGame(undefined, currentLevelId);
       const completed = useGameStore.getState().completedLevels;
       if (!completed.includes(currentLevelId)) {
@@ -183,6 +185,7 @@ export default function App() {
 
   const handleNextLevel = () => {
     if (currentLevelId !== null && currentLevelId < 10) {
+      setShowStatusOverlay(false); // Instantly hide stale overlay
       newGame(undefined, currentLevelId + 1);
       const completed = useGameStore.getState().completedLevels;
       if (!completed.includes(currentLevelId + 1)) {
@@ -318,6 +321,7 @@ export default function App() {
           onNextLevel={currentLevelId < 10 ? handleNextLevel : undefined}
           onRetry={handleRetryLevel}
           onBackToCampaign={() => {
+            setShowStatusOverlay(false); // Instantly hide stale overlay
             newGame();
             setShowStart(true);
             setShowCampaign(true);
