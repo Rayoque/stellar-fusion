@@ -30,10 +30,53 @@ const PHASE_LABELS: Record<Phase, string> = {
   collapse: 'COLLAPSE',
 };
 
+function hexToRgb(hex: string) {
+  const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+  const fullHex = hex.replace(shorthandRegex, (_, r, g, b) => r + r + g + g + b + b);
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(fullHex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : { r: 255, g: 255, b: 255 };
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+function interpolateColor(color1: string, color2: string, factor: number): string {
+  const c1 = hexToRgb(color1);
+  const c2 = hexToRgb(color2);
+  const r = Math.round(c1.r + factor * (c2.r - c1.r));
+  const g = Math.round(c1.g + factor * (c2.g - c1.g));
+  const b = Math.round(c1.b + factor * (c2.b - c1.b));
+  return rgbToHex(r, g, b);
+}
+
+function getMainSequenceColor(mass: number): string {
+  if (mass <= 1.5) {
+    const t = (mass - 1.0) / 0.5;
+    return interpolateColor('#f97316', '#fbbf24', Math.min(Math.max(t, 0), 1));
+  } else if (mass <= 3.0) {
+    const t = (mass - 1.5) / 1.5;
+    return interpolateColor('#fbbf24', '#fef08a', Math.min(Math.max(t, 0), 1));
+  } else if (mass <= 8.0) {
+    const t = (mass - 3.0) / 5.0;
+    return interpolateColor('#fef08a', '#e0f2fe', Math.min(Math.max(t, 0), 1));
+  } else if (mass <= 16.0) {
+    const t = (mass - 8.0) / 8.0;
+    return interpolateColor('#e0f2fe', '#38bdf8', Math.min(Math.max(t, 0), 1));
+  } else {
+    const t = (mass - 16.0) / 14.0;
+    return interpolateColor('#38bdf8', '#1d4ed8', Math.min(Math.max(t, 0), 1));
+  }
+}
+
 const PHASE_COLORS: Record<Phase, string> = {
-  main_sequence: '#38bdf8', // Cyan
-  red_giant: '#f97316',     // Orange
-  supergiant: '#fbbf24',    // Amber/Gold
+  main_sequence: '#38bdf8', // Default fallback, dynamic override used in render
+  red_giant: '#ff1a1a',     // Deep vibrant Scarlet Red
+  supergiant: '#f43f5e',    // Hot electric Crimson-Magenta
   collapse: '#a855f7',      // Purple
 };
 
@@ -70,7 +113,9 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
   const ageSG_end = tMS * scale * 0.999;
   const ageCollapse = ageSG_end;
 
-  const currentThemeColor = PHASE_COLORS[phase] || '#38bdf8';
+  const currentThemeColor = phase === 'main_sequence'
+    ? getMainSequenceColor(starMass)
+    : (PHASE_COLORS[phase] || '#38bdf8');
 
   return (
     <div className="absolute inset-0 z-10 pointer-events-none select-none">

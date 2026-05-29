@@ -9,14 +9,14 @@ const PHASE_COLORS = {
     particles: ['#38bdf8', '#0ea5e9', '#ffffff', '#7dd3fc']
   },
   red_giant: {
-    primary: '#f97316', // Orange
-    glow: 'rgba(249, 115, 22, 0.25)',
-    particles: ['#f97316', '#ef4444', '#ffffff', '#fdba74']
+    primary: '#ff1a1a', // Deep Scarlet Red
+    glow: 'rgba(255, 26, 26, 0.25)',
+    particles: ['#ff1a1a', '#dc2626', '#ffffff', '#fca5a5']
   },
   supergiant: {
-    primary: '#fbbf24', // Amber/Gold
-    glow: 'rgba(251, 191, 36, 0.25)',
-    particles: ['#fbbf24', '#f59e0b', '#ffffff', '#fef08a', '#38bdf8']
+    primary: '#f43f5e', // Hot Crimson-Magenta
+    glow: 'rgba(244, 63, 94, 0.25)',
+    particles: ['#f43f5e', '#d946ef', '#ffffff', '#fbcfe8', '#38bdf8']
   },
   collapse: {
     primary: '#a855f7', // Purple/Magenta
