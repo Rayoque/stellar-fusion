@@ -98,11 +98,7 @@ export function playBlocked(): void {
 let ambientOsc1: OscillatorNode | null = null;
 let ambientOsc2: OscillatorNode | null = null;
 let ambientOsc3: OscillatorNode | null = null;
-// osc4 (Bb3, 232 Hz) is split into a binaural pair: L 228.5 Hz / R 235.5 Hz.
-// Average pitch stays 232 Hz, the 7 Hz difference creates a theta-range binaural
-// beat perceived on headphones (brain-generated, no acoustic interference).
-let ambientOsc4L: OscillatorNode | null = null;
-let ambientOsc4R: OscillatorNode | null = null;
+let ambientOsc4: OscillatorNode | null = null;
 let ambientGain: GainNode | null = null;
 let ambientFilter: BiquadFilterNode | null = null;
 let osc3GainNode: GainNode | null = null;
@@ -114,9 +110,7 @@ export function startAmbientDrone(): void {
   ambientOsc1 = audioCtx.createOscillator();
   ambientOsc2 = audioCtx.createOscillator();
   ambientOsc3 = audioCtx.createOscillator();
-  ambientOsc4L = audioCtx.createOscillator();
-  ambientOsc4R = audioCtx.createOscillator();
-  const osc4BeatGain = audioCtx.createGain();
+  ambientOsc4 = audioCtx.createOscillator();
   ambientGain = audioCtx.createGain();
   
   ambientFilter = audioCtx.createBiquadFilter();
@@ -138,18 +132,9 @@ export function startAmbientDrone(): void {
   ambientOsc3.type = 'sine';
   ambientOsc3.frequency.value = 174;
 
-  // Bb3 (232 Hz) - Pure warm sine carrier, plus a quieter 239 Hz companion summed in
-  // MONO. The 7 Hz difference makes a monaural (acoustic) beat in the theta range.
-  // Unequal amplitudes keep partial modulation: the carrier never drops to silence,
-  // so it's a gentle pulse, not a full-depth throb. Kept mono on purpose: a stereo
-  // split renegotiates the iOS audio session and kills background playback. Monaural
-  // beat also entrains on plain speakers (e.g. car), not just headphones.
-  ambientOsc4L.type = 'sine';
-  ambientOsc4L.frequency.value = 232;
-  ambientOsc4R.type = 'sine';
-  ambientOsc4R.frequency.value = 239;
-  // Companion tone at ~35% of carrier => modulation swings ~1.35x..0.65x, not 2x..0.
-  osc4BeatGain.gain.value = 0.35;
+  // Bb3 (232 Hz) - Pure warm sine wave (audible on small phone/laptop speakers, smooth and soothing)
+  ambientOsc4.type = 'sine';
+  ambientOsc4.frequency.value = 232;
 
   // Lowpass filter cutoff set to a warm 450 Hz to keep the sound cozy and filter out any high buzz
   ambientFilter.type = 'lowpass';
@@ -172,9 +157,7 @@ export function startAmbientDrone(): void {
   lfoGain.connect(ambientOsc1.frequency);
   lfoGain.connect(ambientOsc2.frequency);
   lfoGain.connect(ambientOsc3.frequency);
-  // Same absolute LFO offset on both binaural tones keeps the difference locked at 7 Hz.
-  lfoGain.connect(ambientOsc4L.frequency);
-  lfoGain.connect(ambientOsc4R.frequency);
+  lfoGain.connect(ambientOsc4.frequency);
 
   // Connect oscillators to their gain nodes, then to filter, then to master destination
   ambientOsc1.connect(ambientFilter);
@@ -183,12 +166,7 @@ export function startAmbientDrone(): void {
   ambientOsc3.connect(osc3GainNode);
   osc3GainNode.connect(ambientFilter);
 
-  // Carrier full level, companion attenuated through osc4BeatGain, both summed into
-  // the shared mono osc4 gain (phase transitions still control level via osc4GainNode).
-  // Mono path = same graph topology as before the beat, so iOS background audio stays intact.
-  ambientOsc4L.connect(osc4GainNode);
-  ambientOsc4R.connect(osc4BeatGain);
-  osc4BeatGain.connect(osc4GainNode);
+  ambientOsc4.connect(osc4GainNode);
   osc4GainNode.connect(ambientFilter);
 
   ambientFilter.connect(ambientGain);
@@ -198,8 +176,7 @@ export function startAmbientDrone(): void {
   ambientOsc1.start();
   ambientOsc2.start();
   ambientOsc3.start();
-  ambientOsc4L.start();
-  ambientOsc4R.start();
+  ambientOsc4.start();
   lfo.start();
 }
 
@@ -207,9 +184,8 @@ export function stopAmbientDrone(): void {
   if (ambientOsc1) ambientOsc1.stop();
   if (ambientOsc2) ambientOsc2.stop();
   if (ambientOsc3) ambientOsc3.stop();
-  if (ambientOsc4L) ambientOsc4L.stop();
-  if (ambientOsc4R) ambientOsc4R.stop();
-  ambientOsc1 = ambientOsc2 = ambientOsc3 = ambientOsc4L = ambientOsc4R = ambientGain = ambientFilter = osc3GainNode = osc4GainNode = null;
+  if (ambientOsc4) ambientOsc4.stop();
+  ambientOsc1 = ambientOsc2 = ambientOsc3 = ambientOsc4 = ambientGain = ambientFilter = osc3GainNode = osc4GainNode = null;
 }
 
 export function updateAmbientDrone(phase: string, hasCollapsed: boolean): void {
