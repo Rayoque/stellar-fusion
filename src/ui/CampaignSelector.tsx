@@ -19,6 +19,108 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
     setActiveHintIdx(null);
   }, [selectedLevelId]);
 
+  // Swipe states
+  const [translateX, setTranslateX] = React.useState(0);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const dragStart = React.useRef<number>(0);
+  const currentTranslateX = React.useRef<number>(0);
+  const maxReveal = 140; // width of the reset button
+
+  // Long press / click-and-hold states
+  const [holdProgress, setHoldProgress] = React.useState(0);
+  const holdTimer = React.useRef<any>(null);
+  const progressInterval = React.useRef<any>(null);
+
+  // Snap back swipe when level selection changes
+  React.useEffect(() => {
+    setTranslateX(0);
+  }, [selectedLevelId]);
+
+  // Clean up timers on unmount
+  React.useEffect(() => {
+    return () => {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+      if (progressInterval.current) clearInterval(progressInterval.current);
+    };
+  }, []);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    setIsDragging(true);
+    dragStart.current = e.clientX;
+    currentTranslateX.current = translateX;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    const diff = e.clientX - dragStart.current;
+    let target = currentTranslateX.current + diff;
+    // Clamp between -maxReveal and 0
+    target = Math.max(Math.min(target, 0), -maxReveal);
+    setTranslateX(target);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+
+    const diff = e.clientX - dragStart.current;
+    
+    // If movement is tiny, trigger regular launch tap/click
+    if (Math.abs(diff) < 5) {
+      onSelectLevel(selectedLevel.id);
+      return;
+    }
+
+    // Snap threshold
+    if (translateX < -60) {
+      setTranslateX(-maxReveal);
+    } else {
+      setTranslateX(0);
+    }
+  };
+
+  const startResetHold = () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    if (progressInterval.current) clearInterval(progressInterval.current);
+
+    setHoldProgress(0);
+    const startTime = Date.now();
+
+    progressInterval.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const pct = Math.min((elapsed / 1000) * 100, 100);
+      setHoldProgress(pct);
+    }, 20);
+
+    holdTimer.current = setTimeout(() => {
+      clearInterval(progressInterval.current);
+      clearTimeout(holdTimer.current);
+      progressInterval.current = null;
+      holdTimer.current = null;
+
+      // Reset campaign checkmarks
+      localStorage.setItem('stellar_completed_levels', '[]');
+      useGameStore.setState({ completedLevels: [] });
+
+      setHoldProgress(0);
+      setTranslateX(0);
+    }, 1000);
+  };
+
+  const cancelResetHold = () => {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+    if (progressInterval.current) {
+      clearInterval(progressInterval.current);
+      progressInterval.current = null;
+    }
+    setHoldProgress(0);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex justify-center items-center p-4 animate-fade-in-up select-none pointer-events-auto">
       {/* Modal Container */}
@@ -174,14 +276,46 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
               </div>
             </div>
 
-            {/* Docked Launch Button at bottom (not scrollable) */}
-            <div className="flex-shrink-0 border-t border-white/5 mt-4 pt-4">
-              <button
-                onClick={() => onSelectLevel(selectedLevel.id)}
-                className="w-full py-3.5 bg-white hover:bg-white/95 text-black rounded-full font-bold tracking-[2px] transition-all active:scale-[0.98] text-xs uppercase shadow-[0_4px_16px_rgba(255,255,255,0.12)] cursor-pointer"
-              >
-                LAUNCH IGNITION
-              </button>
+            {/* Swipeable Ignition + Reset Campaign Dock */}
+            <div className="flex-shrink-0 border-t border-white/5 mt-4 pt-4 relative">
+              <div className="relative w-full h-[52px] rounded-full overflow-hidden bg-black/45 border border-white/5 select-none">
+                {/* Background Red Reset Campaign Button */}
+                <button
+                  onPointerDown={startResetHold}
+                  onPointerUp={cancelResetHold}
+                  onPointerLeave={cancelResetHold}
+                  className="absolute right-0 top-0 bottom-0 w-[140px] bg-red-700 hover:bg-red-600 text-white font-bold text-[10px] tracking-[1.5px] uppercase rounded-full flex flex-col items-center justify-center cursor-pointer select-none transition-all z-0 overflow-hidden pr-3"
+                  style={{
+                    boxShadow: 'inset 0 0 12px rgba(239, 68, 68, 0.4)'
+                  }}
+                  title="Click and hold for 1 second to completely reset all campaign checkmarks"
+                >
+                  <span className="relative z-10 leading-none">Hold 1s</span>
+                  <span className="relative z-10 text-[7px] text-white/70 tracking-[1px] mt-1 leading-none">To Reset Map</span>
+                  
+                  {/* Dynamic hold-progress filling bar */}
+                  <div 
+                    className="absolute left-0 top-0 bottom-0 bg-red-500/40 pointer-events-none transition-all"
+                    style={{ width: `${holdProgress}%` }}
+                  />
+                </button>
+
+                {/* Foreground White Launch Ignition Button (Swipeable) */}
+                <div
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  className="absolute inset-0 bg-white hover:bg-white/95 text-black rounded-full font-bold flex items-center justify-center cursor-grab active:cursor-grabbing select-none transition-transform duration-100 ease-out z-10 shadow-[0_4px_16px_rgba(255,255,255,0.12)]"
+                  style={{
+                    transform: `translate3d(${translateX}px, 0, 0)`,
+                  }}
+                >
+                  <div className="flex items-center gap-2 pointer-events-none">
+                    <span className="text-[10px] text-black/35 font-mono select-none">⟨ Swipe Left</span>
+                    <span className="text-xs tracking-[2px] uppercase select-none">LAUNCH IGNITION</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           

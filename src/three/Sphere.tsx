@@ -60,6 +60,7 @@ export function Sphere() {
   const tiles = useGameStore(s => s.tiles);
   const phase = useGameStore(s => s.phase);
   const starMass = useGameStore(s => s.starMass);
+  const levelObjectiveMet = useGameStore(s => s.levelObjectiveMet);
   const showRealtimeGraphics = useGameStore(s => s.showRealtimeGraphics);
 
   const scale = phaseScale(phase);
@@ -67,6 +68,16 @@ export function Sphere() {
   const innerRef = React.useRef<THREE.Mesh>(null);
   const middleRef = React.useRef<THREE.Mesh>(null);
   const outerRef = React.useRef<THREE.Mesh>(null);
+  const burstRef = React.useRef<THREE.Mesh>(null);
+  const burstStartTime = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    if (levelObjectiveMet) {
+      burstStartTime.current = performance.now();
+    } else {
+      burstStartTime.current = null;
+    }
+  }, [levelObjectiveMet]);
 
   // Dynamic astrophysics colors to ensure Red Giant & Supergiant are completely distinct from all Main Sequence colors:
   // - MS: Mass-dependent dynamic color (Orange -> Yellow -> White -> Blue)
@@ -138,6 +149,23 @@ export function Sphere() {
         }
       }
     }
+
+    // Additive level completion shockwave burst effect
+    if (burstRef.current && burstStartTime.current !== null) {
+      const elapsedMs = performance.now() - burstStartTime.current;
+      const duration = 1400; // 1.4 seconds matching the App.tsx overlay delay
+      const progress = Math.min(elapsedMs / duration, 1.0);
+
+      // Smooth cubic easing out
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const s = 1.0 + easeOut * 1.5; // grows from 1.0x to 2.5x
+      burstRef.current.scale.set(s, s, s);
+
+      if (burstRef.current.material) {
+        const mat = burstRef.current.material as THREE.MeshBasicMaterial;
+        mat.opacity = 0.55 * (1.0 - easeOut); // fades from 0.55 to 0.0
+      }
+    }
   });
 
   return (
@@ -193,6 +221,21 @@ export function Sphere() {
           depthWrite={false}
         />
       </mesh>
+
+      {/* Subtle scenario success cosmic burst shockwave */}
+      {levelObjectiveMet && (
+        <mesh ref={burstRef}>
+          <sphereGeometry args={[0.925, 48, 48]} />
+          <meshBasicMaterial 
+            color={auraColor}
+            transparent={true}
+            opacity={0.55}
+            blending={THREE.AdditiveBlending}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
 
       {faces.map((face) => (
         <Tile

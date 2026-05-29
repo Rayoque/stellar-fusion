@@ -8,7 +8,7 @@ import { spawnHydrogen } from './spawn';
 import { checkEndState } from './endgame';
 import { detectMerge, applyMerge } from './rules';
 import { executeSlide } from '../geometry/slide';
-import { playMerge, playBlocked, playHeliumLaugh } from '../audio/synth';
+import { playMerge, playBlocked, playHeliumLaugh, playSuccess } from '../audio/synth';
 import { LEVELS } from './levels';
 
 interface GameActions {
@@ -353,6 +353,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 const nextCompleted = [...currentCompleted, level.id];
                 localStorage.setItem('stellar_completed_levels', JSON.stringify(nextCompleted));
                 set({ completedLevels: nextCompleted });
+              }
+              if (!state.levelObjectiveMet) {
+                playSuccess();
               }
             } else if (state.turn >= level.maxTurns) {
               levelFailed = true;

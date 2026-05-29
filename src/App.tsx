@@ -160,21 +160,36 @@ export default function App() {
     newGame(undefined, levelId);
     setShowCampaign(false);
     setShowStart(false);
-    setShowObjectiveLevelId(levelId);
+    const completed = useGameStore.getState().completedLevels;
+    if (!completed.includes(levelId)) {
+      setShowObjectiveLevelId(levelId);
+    } else {
+      setShowObjectiveLevelId(null);
+    }
     setTimeout(() => playSpawnTick(), 120);
   };
 
   const handleRetryLevel = () => {
     if (currentLevelId !== null) {
       newGame(undefined, currentLevelId);
-      setShowObjectiveLevelId(currentLevelId);
+      const completed = useGameStore.getState().completedLevels;
+      if (!completed.includes(currentLevelId)) {
+        setShowObjectiveLevelId(currentLevelId);
+      } else {
+        setShowObjectiveLevelId(null);
+      }
     }
   };
 
   const handleNextLevel = () => {
     if (currentLevelId !== null && currentLevelId < 10) {
       newGame(undefined, currentLevelId + 1);
-      setShowObjectiveLevelId(currentLevelId + 1);
+      const completed = useGameStore.getState().completedLevels;
+      if (!completed.includes(currentLevelId + 1)) {
+        setShowObjectiveLevelId(currentLevelId + 1);
+      } else {
+        setShowObjectiveLevelId(null);
+      }
     }
   };
 

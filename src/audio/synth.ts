@@ -331,3 +331,38 @@ export function playHeliumLaugh(): void {
   });
 }
 
+export function playSuccess(): void {
+  if (!effectsSoundEnabled || !audioCtx) return;
+  initAudio();
+  const now = audioCtx.currentTime;
+
+  // Glistening Eb Major cosmic arpeggio chime (Eb4 -> G4 -> Bb4 -> Eb5)
+  const notes = [311.13, 392.00, 466.16, 622.25];
+  const delays = [0, 0.08, 0.16, 0.24];
+
+  notes.forEach((freq, i) => {
+    const time = now + delays[i];
+    const osc = audioCtx!.createOscillator();
+    const gain = audioCtx!.createGain();
+    const filter = audioCtx!.createBiquadFilter();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, time);
+
+    gain.gain.setValueAtTime(0, time);
+    gain.gain.linearRampToValueAtTime(0.12, time + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.8);
+
+    filter.type = 'lowpass';
+    filter.frequency.value = 1500;
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx!.destination);
+
+    osc.start(time);
+    osc.stop(time + 0.9);
+  });
+}
+
+
