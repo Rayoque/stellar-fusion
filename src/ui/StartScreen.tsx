@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useGameStore } from '../game/state';
 import { Background } from '../three/Background';
+import { APP_VERSION } from '../version';
 
 interface StartScreenProps {
   onStart: () => void;
@@ -134,6 +135,11 @@ export function StartScreen({ onStart, onOpenCampaign, onStartAstro }: StartScre
             </button>
           )}
         </div>
+      </div>
+
+      {/* Version tag pinned to the bottom of the splash */}
+      <div className="absolute left-1/2 -translate-x-1/2 z-10 text-[8px] sm:text-[9px] text-white/25 tracking-[3px] font-mono uppercase select-none pointer-events-none bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
+        V{APP_VERSION}
       </div>
 
       {/* Headphones Suggestion Popup Overlay */}

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../game/state';
 import { isBgSoundEnabled, setBgSoundEnabled, isEffectsSoundEnabled, setEffectsSoundEnabled } from '../audio/synth';
+import { APP_VERSION } from '../version';
 
 interface PauseMenuProps {
   onResume: () => void;
@@ -240,7 +241,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCodex, onOpenCampaign }:
           </div>
 
           <div className="text-[7.5px] text-white/25 tracking-[3px] font-mono uppercase mt-8">
-            STELLAR FUSION ENGINE • V0.11.4
+            STELLAR FUSION ENGINE • V{APP_VERSION}
           </div>
         </div>
       </div>
