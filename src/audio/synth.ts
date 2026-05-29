@@ -104,6 +104,28 @@ let ambientFilter: BiquadFilterNode | null = null;
 let osc3GainNode: GainNode | null = null;
 let osc4GainNode: GainNode | null = null;
 
+// iOS suspends raw WebAudio on screen-lock; only real media elements keep playing.
+// So the drone is routed into a MediaStreamDestination and played through an <audio>
+// element, which rides the page's audio session and survives lock.
+let bgStreamDest: MediaStreamAudioDestinationNode | null = null;
+let bgAudioEl: HTMLAudioElement | null = null;
+
+function setupBgMediaSession(): void {
+  if (!('mediaSession' in navigator)) return;
+  const ms = navigator.mediaSession;
+  ms.metadata = new MediaMetadata({
+    title: 'Ambient Drone',
+    artist: 'Stellar Fusion',
+  });
+  // Lock-screen / control-center transport maps to the bg-sound toggle.
+  try {
+    ms.setActionHandler('play', () => setBgSoundEnabled(true));
+    ms.setActionHandler('pause', () => setBgSoundEnabled(false));
+    ms.setActionHandler('stop', () => setBgSoundEnabled(false));
+  } catch {}
+  ms.playbackState = 'playing';
+}
+
 export function startAmbientDrone(): void {
   if (!bgSoundEnabled || !audioCtx || ambientOsc1) return;
 
@@ -170,7 +192,22 @@ export function startAmbientDrone(): void {
   osc4GainNode.connect(ambientFilter);
 
   ambientFilter.connect(ambientGain);
-  ambientGain.connect(audioCtx.destination);
+
+  // Route the drone through a MediaStream + <audio> element instead of straight to
+  // audioCtx.destination, so iOS keeps it alive when the screen locks. (Effects sounds
+  // still go direct to destination; they only matter while the app is in the foreground.)
+  bgStreamDest = audioCtx.createMediaStreamDestination();
+  ambientGain.connect(bgStreamDest);
+
+  if (!bgAudioEl) {
+    bgAudioEl = new Audio();
+    bgAudioEl.setAttribute('playsinline', '');
+    bgAudioEl.loop = true; // stream is continuous, but loop guards against any stall
+  }
+  bgAudioEl.srcObject = bgStreamDest.stream;
+  // Must be called from a user gesture (startAmbientDrone is only invoked from one).
+  bgAudioEl.play().catch(() => {});
+  setupBgMediaSession();
 
   // Start all oscillators
   ambientOsc1.start();
@@ -186,6 +223,14 @@ export function stopAmbientDrone(): void {
   if (ambientOsc3) ambientOsc3.stop();
   if (ambientOsc4) ambientOsc4.stop();
   ambientOsc1 = ambientOsc2 = ambientOsc3 = ambientOsc4 = ambientGain = ambientFilter = osc3GainNode = osc4GainNode = null;
+
+  // Tear down the background media element / stream.
+  if (bgAudioEl) {
+    bgAudioEl.pause();
+    bgAudioEl.srcObject = null;
+  }
+  bgStreamDest = null;
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 }
 
 export function updateAmbientDrone(phase: string, hasCollapsed: boolean): void {
