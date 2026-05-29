@@ -95,273 +95,185 @@ export function playBlocked(): void {
   osc.stop(now + 0.25);
 }
 
-// --- Ambient drone: pre-baked seamless loops played via <audio> elements ---
-//
-// iOS suspends raw WebAudio on screen-lock; only real media elements keep playing,
-// and live WebAudio routed through a MediaStream crackled after session interrupts.
-// So we render the drone to seamless 20s WAV loops up-front (OfflineAudioContext)
-// and play them through <audio loop> elements. A static file can't glitch, and the
-// media element survives lock. Phase changes crossfade between two pooled elements.
-//
-// Seamless loop: all carriers (58/87/174/232/69.3 Hz) complete an integer number of
-// cycles in 20s and the 0.05 Hz LFO completes exactly one cycle (its pitch offset
-// integrates to zero), so the waveform returns to its start at t=20s. We render with
-// a 4s warm-up that is sliced off, so the lowpass is at steady state at the loop seam.
+let ambientOsc1: OscillatorNode | null = null;
+let ambientOsc2: OscillatorNode | null = null;
+let ambientOsc3: OscillatorNode | null = null;
+let ambientOsc4: OscillatorNode | null = null;
+let ambientGain: GainNode | null = null;
+let ambientFilter: BiquadFilterNode | null = null;
+let osc3GainNode: GainNode | null = null;
+let osc4GainNode: GainNode | null = null;
 
-type Voicing = 'main_sequence' | 'red_giant' | 'supergiant' | 'collapsed';
-interface VoicingParams { osc2: number; osc3Gain: number; osc4Gain: number; cutoff: number; master: number; }
+export function startAmbientDrone(): void {
+  if (!bgSoundEnabled || !audioCtx) return;
+  // Always try to resume — iOS suspends the context on lock/interrupt, and without
+  // this the drone gets stuck silent even though the oscillators still exist.
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  if (ambientOsc1) return; // graph already built and running
 
-// Mirrors the per-phase targets the old live updateAmbientDrone used to ramp to.
-const VOICINGS: Record<Voicing, VoicingParams> = {
-  main_sequence: { osc2: 87,   osc3Gain: 0.12,   osc4Gain: 0.06,   cutoff: 450, master: 0.045 },
-  red_giant:     { osc2: 87,   osc3Gain: 0.192,  osc4Gain: 0.096,  cutoff: 630, master: 0.069 },
-  supergiant:    { osc2: 87,   osc3Gain: 0.288,  osc4Gain: 0.168,  cutoff: 870, master: 0.099 },
-  collapsed:     { osc2: 69.3, osc3Gain: 0.0001, osc4Gain: 0.0001, cutoff: 250, master: 0.022 },
-};
+  ambientOsc1 = audioCtx.createOscillator();
+  ambientOsc2 = audioCtx.createOscillator();
+  ambientOsc3 = audioCtx.createOscillator();
+  ambientOsc4 = audioCtx.createOscillator();
+  ambientGain = audioCtx.createGain();
+  
+  ambientFilter = audioCtx.createBiquadFilter();
+  const lfo = audioCtx.createOscillator();
+  const lfoGain = audioCtx.createGain();
+  
+  osc3GainNode = audioCtx.createGain();
+  osc4GainNode = audioCtx.createGain();
 
-const LOOP_SECONDS = 20;
-const WARMUP_SECONDS = 4;
-const RENDER_SR = 44100;
+  // Bb1 (58 Hz) - Deep sub-bass base
+  ambientOsc1.type = 'sine';
+  ambientOsc1.frequency.value = 58;
 
-const loopUrls: Partial<Record<Voicing, string>> = {};
-let renderStarted = false;
+  // F2 (87 Hz) - Deep perfect fifth
+  ambientOsc2.type = 'sine';
+  ambientOsc2.frequency.value = 87;
 
-const bgEls: [HTMLAudioElement | null, HTMLAudioElement | null] = [null, null];
-let activeIdx = 0;
-let currentVoicing: Voicing = 'main_sequence';
-let pendingVoicing: Voicing | null = null;
-let bgStarted = false;
+  // F3 (174 Hz) - Warm mid-low harmonic helper (original drone note)
+  ambientOsc3.type = 'sine';
+  ambientOsc3.frequency.value = 174;
 
-function encodeLoopToWavUrl(buffer: AudioBuffer, startSample: number, length: number): string {
-  const data = buffer.getChannelData(0);
-  const sr = buffer.sampleRate;
-  const dataSize = length * 2; // 16-bit mono
-  const ab = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(ab);
-  view.setUint32(0, 0x52494646, false);  // "RIFF"
-  view.setUint32(4, 36 + dataSize, true);
-  view.setUint32(8, 0x57415645, false);  // "WAVE"
-  view.setUint32(12, 0x666d7420, false); // "fmt "
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);           // PCM
-  view.setUint16(22, 1, true);           // mono
-  view.setUint32(24, sr, true);
-  view.setUint32(28, sr * 2, true);      // byte rate
-  view.setUint16(32, 2, true);           // block align
-  view.setUint16(34, 16, true);          // bits/sample
-  view.setUint32(36, 0x64617461, false); // "data"
-  view.setUint32(40, dataSize, true);
-  let off = 44;
-  for (let i = 0; i < length; i++) {
-    const s = Math.max(-1, Math.min(1, data[startSample + i]));
-    view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-    off += 2;
-  }
-  return URL.createObjectURL(new Blob([ab], { type: 'audio/wav' }));
-}
+  // Bb3 (232 Hz) - Pure warm sine wave (audible on small phone/laptop speakers, smooth and soothing)
+  ambientOsc4.type = 'sine';
+  ambientOsc4.frequency.value = 232;
 
-async function renderVoicing(p: VoicingParams): Promise<string> {
-  const total = LOOP_SECONDS + WARMUP_SECONDS;
-  const ctx = new OfflineAudioContext(1, RENDER_SR * total, RENDER_SR);
+  // Lowpass filter cutoff set to a warm 450 Hz to keep the sound cozy and filter out any high buzz
+  ambientFilter.type = 'lowpass';
+  ambientFilter.frequency.value = 450;
 
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.value = p.cutoff;
-  const master = ctx.createGain();
-  master.gain.value = p.master;
-  filter.connect(master);
-  master.connect(ctx.destination);
-
-  const lfo = ctx.createOscillator();
+  // LFO to slowly modulate pitch for an organic, shifting interstellar drone
   lfo.type = 'sine';
   lfo.frequency.value = 0.05;
-  const lfoGain = ctx.createGain();
   lfoGain.gain.value = 2.0;
+
+  // Ambient master gain
+  ambientGain.gain.value = 0.045;
+
+  // Individual gains for delicate balance
+  osc3GainNode.gain.value = 0.12; 
+  osc4GainNode.gain.value = 0.06; // Soft, warm presence to be heard on built-in speakers
+
+  // Connect LFO for gentle pitch modulation across all oscillators
   lfo.connect(lfoGain);
+  lfoGain.connect(ambientOsc1.frequency);
+  lfoGain.connect(ambientOsc2.frequency);
+  lfoGain.connect(ambientOsc3.frequency);
+  lfoGain.connect(ambientOsc4.frequency);
 
-  const addOsc = (freq: number, gainVal: number) => {
-    const o = ctx.createOscillator();
-    o.type = 'sine';
-    o.frequency.value = freq;
-    lfoGain.connect(o.frequency); // gentle organic pitch drift
-    if (gainVal === 1) {
-      o.connect(filter);
-    } else {
-      const g = ctx.createGain();
-      g.gain.value = gainVal;
-      o.connect(g);
-      g.connect(filter);
-    }
-    o.start(0);
-  };
-  addOsc(58, 1);        // Bb1 sub-bass
-  addOsc(p.osc2, 1);    // F2 fifth (or minor third when collapsed)
-  addOsc(174, p.osc3Gain); // F3 warm harmonic
-  addOsc(232, p.osc4Gain); // Bb3 presence
-  lfo.start(0);
+  // Connect oscillators to their gain nodes, then to filter, then to master destination
+  ambientOsc1.connect(ambientFilter);
+  ambientOsc2.connect(ambientFilter);
+  
+  ambientOsc3.connect(osc3GainNode);
+  osc3GainNode.connect(ambientFilter);
 
-  const rendered = await ctx.startRendering();
-  // Slice off the warm-up so the lowpass is in steady state at the loop seam.
-  return encodeLoopToWavUrl(rendered, WARMUP_SECONDS * RENDER_SR, LOOP_SECONDS * RENDER_SR);
+  ambientOsc4.connect(osc4GainNode);
+  osc4GainNode.connect(ambientFilter);
+
+  ambientFilter.connect(ambientGain);
+  ambientGain.connect(audioCtx.destination);
+
+  // Start all oscillators
+  ambientOsc1.start();
+  ambientOsc2.start();
+  ambientOsc3.start();
+  ambientOsc4.start();
+  lfo.start();
 }
 
-let silentPrimerUrl: string | null = null;
-function getSilentPrimerUrl(): string {
-  if (!silentPrimerUrl) silentPrimerUrl = createSilentWavUrl();
-  return silentPrimerUrl;
-}
-
-function ensureLoopsRendered(): void {
-  if (renderStarted || typeof OfflineAudioContext === 'undefined') return;
-  renderStarted = true;
-  (Object.keys(VOICINGS) as Voicing[]).forEach(name => {
-    renderVoicing(VOICINGS[name])
-      .then(url => {
-        loopUrls[name] = url;
-        // If the active element is currently playing the silent primer (or a stale
-        // loop) while waiting for THIS voicing, swap in the real loop now. The element
-        // was already unlocked by the in-gesture primer play, so this play() is allowed.
-        if (bgSoundEnabled && bgStarted && pendingVoicing === name) {
-          pendingVoicing = null;
-          const cur = bgEls[activeIdx]!;
-          cur.src = url;
-          cur.currentTime = 0;
-          cur.volume = 1;
-          cur.play().catch(() => {});
-        }
-      })
-      .catch(() => {});
-  });
-}
-
-function makeBgEl(): HTMLAudioElement {
-  const el = new Audio();
-  el.loop = true;
-  el.preload = 'auto';
-  el.setAttribute('playsinline', '');
-  el.volume = 0;
-  return el;
-}
-
-function ensureEls(): void {
-  if (!bgEls[0]) bgEls[0] = makeBgEl();
-  if (!bgEls[1]) bgEls[1] = makeBgEl();
-}
-
-// Volume ramp via rAF. Phase transitions only happen in the foreground (gameplay),
-// where rAF runs, so this is sufficient; background just holds the current loop.
-function fadeEl(el: HTMLAudioElement, target: number, ms: number, onDone?: () => void): void {
-  const anyEl = el as unknown as { _fadeRAF?: number };
-  if (anyEl._fadeRAF) cancelAnimationFrame(anyEl._fadeRAF);
-  const startT = performance.now();
-  const from = el.volume;
-  const step = (t: number) => {
-    const k = ms <= 0 ? 1 : Math.min(1, (t - startT) / ms);
-    el.volume = Math.max(0, Math.min(1, from + (target - from) * k));
-    if (k < 1) {
-      anyEl._fadeRAF = requestAnimationFrame(step);
-    } else {
-      anyEl._fadeRAF = 0;
-      onDone?.();
-    }
-  };
-  anyEl._fadeRAF = requestAnimationFrame(step);
-}
-
-// Crossfade the active element to `name`'s loop. Used for phase transitions, which
-// only occur during foreground gameplay (well after the loops have finished baking).
-function crossfadeVoicing(name: Voicing): void {
-  ensureEls();
-  if (name === currentVoicing) return;
-  const url = loopUrls[name];
-  if (!url) {
-    // Extremely rare (transition before bake done): fall back to an active swap.
-    pendingVoicing = name;
-    currentVoicing = name;
-    return;
-  }
-  currentVoicing = name;
-  const cur = bgEls[activeIdx]!;
-  const nextIdx = 1 - activeIdx;
-  const nxt = bgEls[nextIdx]!;
-  nxt.src = url;
-  nxt.currentTime = 0;
-  nxt.volume = 0;
-  nxt.play().catch(() => {});
-  fadeEl(nxt, 1, 2000);
-  fadeEl(cur, 0, 2000, () => cur.pause());
-  activeIdx = nextIdx;
-}
-
-function setupBgMediaSession(): void {
-  if (!('mediaSession' in navigator)) return;
-  const ms = navigator.mediaSession;
-  ms.metadata = new MediaMetadata({ title: 'Ambient Drone', artist: 'Stellar Fusion' });
-  // Lock-screen / control-center transport maps to the bg-sound toggle.
-  try {
-    ms.setActionHandler('play', () => setBgSoundEnabled(true));
-    ms.setActionHandler('pause', () => setBgSoundEnabled(false));
-    ms.setActionHandler('stop', () => setBgSoundEnabled(false));
-  } catch { /* unsupported action */ }
-  ms.playbackState = 'playing';
-}
-
-// Must be invoked from a user gesture the first time (it is — see App.tsx).
-export function startAmbientDrone(): void {
-  if (!bgSoundEnabled) return;
-  ensureLoopsRendered();
-  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-  ensureEls();
-  setupBgMediaSession();
-  bgStarted = true;
-
-  const cur = bgEls[activeIdx]!;
-  const url = loopUrls[currentVoicing];
-  if (url) {
-    if (cur.src !== url) { cur.src = url; cur.currentTime = 0; }
-    pendingVoicing = null;
-  } else {
-    // Loop not baked yet — prime with a short silent loop to UNLOCK the element
-    // inside this user gesture; ensureLoopsRendered() swaps in the real loop on bake.
-    cur.src = getSilentPrimerUrl();
-    pendingVoicing = currentVoicing;
-  }
-  cur.volume = 1;
-  cur.play().catch(() => {});
+// Re-assert drone playback when the page returns to the foreground or after the OS
+// interrupted the audio session (screen lock/unlock, Bluetooth handoff, phone call).
+// Plays in foreground / app-switch; iOS stops it on screen-lock (accepted), but this
+// guarantees it comes back instead of getting stuck off.
+export function resumeAmbientDrone(): void {
+  if (!bgSoundEnabled || !audioCtx) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  // If the graph was torn down (e.g. toggled off), rebuild it.
+  if (!ambientOsc1) startAmbientDrone();
 }
 
 export function stopAmbientDrone(): void {
-  bgStarted = false;
-  bgEls[0]?.pause();
-  bgEls[1]?.pause();
-  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
-}
-
-// Re-assert playback after the tab/app returns to the foreground or the OS
-// interrupted the audio session (lock/unlock, Bluetooth handoff, phone call).
-export function resumeAmbientDrone(): void {
-  if (!bgSoundEnabled) return;
-  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-  if (!bgStarted) { startAmbientDrone(); return; }
-  const el = bgEls[activeIdx];
-  if (el && el.src && el.paused) el.play().catch(() => {});
-  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+  if (ambientOsc1) ambientOsc1.stop();
+  if (ambientOsc2) ambientOsc2.stop();
+  if (ambientOsc3) ambientOsc3.stop();
+  if (ambientOsc4) ambientOsc4.stop();
+  ambientOsc1 = ambientOsc2 = ambientOsc3 = ambientOsc4 = ambientGain = ambientFilter = osc3GainNode = osc4GainNode = null;
 }
 
 export function updateAmbientDrone(phase: string, hasCollapsed: boolean): void {
-  if (!bgSoundEnabled) return;
-  let name: Voicing;
-  if (hasCollapsed) name = 'collapsed';
-  else if (phase === 'red_giant') name = 'red_giant';
-  else if (phase === 'supergiant' || phase === 'collapse') name = 'supergiant';
-  else name = 'main_sequence';
+  if (!bgSoundEnabled || !audioCtx || !ambientGain || !ambientOsc2 || !ambientFilter || !osc3GainNode || !osc4GainNode) return;
 
-  if (!bgStarted) {
-    // Not playing yet — record so the right loop is used once it starts.
-    currentVoicing = name;
-    return;
+  const now = audioCtx.currentTime;
+  const transitionTime = 2.0; // 2 seconds smooth crossfade glide
+
+  if (hasCollapsed) {
+    // SOMBER CORE COLLAPSE: Lessened, cold sub-bass void (minor chord)
+    ambientGain.gain.setValueAtTime(ambientGain.gain.value, now);
+    ambientGain.gain.exponentialRampToValueAtTime(0.022, now + transitionTime);
+
+    // Glide Bb2/F2 perfect fifth (87Hz) to minor third (69.3Hz) for dark, haunting somber tone
+    ambientOsc2.frequency.setValueAtTime(ambientOsc2.frequency.value, now);
+    ambientOsc2.frequency.exponentialRampToValueAtTime(69.3, now + transitionTime);
+
+    // Mute higher warm harmonics
+    osc3GainNode.gain.setValueAtTime(osc3GainNode.gain.value, now);
+    osc3GainNode.gain.exponentialRampToValueAtTime(0.0001, now + transitionTime);
+
+    osc4GainNode.gain.setValueAtTime(osc4GainNode.gain.value, now);
+    osc4GainNode.gain.exponentialRampToValueAtTime(0.0001, now + transitionTime);
+
+    // Dark filter
+    ambientFilter.frequency.setValueAtTime(ambientFilter.frequency.value, now);
+    ambientFilter.frequency.exponentialRampToValueAtTime(250, now + transitionTime);
+  } else {
+    // Restore perfect fifth (87Hz) if transitioning back
+    ambientOsc2.frequency.setValueAtTime(ambientOsc2.frequency.value, now);
+    ambientOsc2.frequency.exponentialRampToValueAtTime(87, now + transitionTime);
+
+    if (phase === 'main_sequence') {
+      // BASE MAIN SEQUENCE
+      ambientGain.gain.setValueAtTime(ambientGain.gain.value, now);
+      ambientGain.gain.exponentialRampToValueAtTime(0.045, now + transitionTime);
+
+      osc3GainNode.gain.setValueAtTime(osc3GainNode.gain.value, now);
+      osc3GainNode.gain.exponentialRampToValueAtTime(0.12, now + transitionTime);
+
+      osc4GainNode.gain.setValueAtTime(osc4GainNode.gain.value, now);
+      osc4GainNode.gain.exponentialRampToValueAtTime(0.06, now + transitionTime);
+
+      ambientFilter.frequency.setValueAtTime(ambientFilter.frequency.value, now);
+      ambientFilter.frequency.exponentialRampToValueAtTime(450, now + transitionTime);
+    } else if (phase === 'red_giant') {
+      // INTENSE RED GIANT (20% more intense relatively: base 0.045 + (0.020 * 1.2))
+      ambientGain.gain.setValueAtTime(ambientGain.gain.value, now);
+      ambientGain.gain.exponentialRampToValueAtTime(0.069, now + transitionTime);
+
+      osc3GainNode.gain.setValueAtTime(osc3GainNode.gain.value, now);
+      osc3GainNode.gain.exponentialRampToValueAtTime(0.192, now + transitionTime);
+
+      osc4GainNode.gain.setValueAtTime(osc4GainNode.gain.value, now);
+      osc4GainNode.gain.exponentialRampToValueAtTime(0.096, now + transitionTime);
+
+      ambientFilter.frequency.setValueAtTime(ambientFilter.frequency.value, now);
+      ambientFilter.frequency.exponentialRampToValueAtTime(630, now + transitionTime);
+    } else if (phase === 'supergiant' || phase === 'collapse') {
+      // MASSIVE SUPERGIANT / CHAOTIC COLLAPSE (20% more intense relatively: base 0.045 + (0.045 * 1.2))
+      ambientGain.gain.setValueAtTime(ambientGain.gain.value, now);
+      ambientGain.gain.exponentialRampToValueAtTime(0.099, now + transitionTime);
+
+      osc3GainNode.gain.setValueAtTime(osc3GainNode.gain.value, now);
+      osc3GainNode.gain.exponentialRampToValueAtTime(0.288, now + transitionTime);
+
+      osc4GainNode.gain.setValueAtTime(osc4GainNode.gain.value, now);
+      osc4GainNode.gain.exponentialRampToValueAtTime(0.168, now + transitionTime);
+
+      ambientFilter.frequency.setValueAtTime(ambientFilter.frequency.value, now);
+      ambientFilter.frequency.exponentialRampToValueAtTime(870, now + transitionTime);
+    }
   }
-  crossfadeVoicing(name);
 }
 
 /**

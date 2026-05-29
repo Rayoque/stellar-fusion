@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { Scene } from './three/Scene';
 import { useGameStore } from './game/state';
-import { initAudio, startAmbientDrone, playSpawnTick, updateAmbientDrone, resumeAmbientDrone } from './audio/synth';
+import { initAudio, startAmbientDrone, playSpawnTick, updateAmbientDrone, resumeAmbientDrone, createSilentWavUrl } from './audio/synth';
 import { HUD } from './ui/HUD';
 import { EndScreen } from './ui/EndScreen';
 import { StartScreen } from './ui/StartScreen';
@@ -70,10 +70,17 @@ export default function App() {
     // Initialize audio on first interaction
     const handleFirstInteraction = () => {
       initAudio();
-      // Starts the pre-baked drone loop on a real <audio> element. Being a file-backed
-      // media element, it elevates the iOS audio session (mute-switch bypass) and
-      // survives screen-lock — no separate silent-WAV element needed anymore.
       startAmbientDrone();
+
+      // Classic iOS silent-switch ringer bypass hack: playing a brief, programmatically generated
+      // 1-second silent WAV file Blob URL forces mobile Safari to elevate the page's AVAudioSession
+      // category from 'Ambient' (muted by silent switch) to 'Playback' (which overrides the silent switch).
+      try {
+        const url = createSilentWavUrl();
+        const silentAudio = new Audio(url);
+        silentAudio.loop = true;
+        silentAudio.play().catch(() => {});
+      } catch (err) {}
 
       const events = ['click', 'keydown', 'touchstart', 'touchend', 'pointerdown', 'pointerup'];
       for (const ev of events) {
