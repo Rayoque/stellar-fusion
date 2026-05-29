@@ -105,6 +105,9 @@ export default function App() {
 
   const [showStatusOverlay, setShowStatusOverlay] = React.useState(false);
   const [showObjectiveLevelId, setShowObjectiveLevelId] = React.useState<number | null>(null);
+  // Tracks whether the objective overlay is the game-start briefing (plays a tick on dismiss)
+  // vs a mid-game reopen from the HUD (silent on dismiss).
+  const [objectiveIsBriefing, setObjectiveIsBriefing] = React.useState(false);
 
   useEffect(() => {
     if (levelObjectiveMet || levelFailed) {
@@ -173,6 +176,7 @@ export default function App() {
     setShowStart(false);
     const completed = useGameStore.getState().completedLevels;
     if (!completed.includes(levelId)) {
+      setObjectiveIsBriefing(true);
       setShowObjectiveLevelId(levelId);
     } else {
       setShowObjectiveLevelId(null);
@@ -186,6 +190,7 @@ export default function App() {
       newGame(undefined, currentLevelId);
       const completed = useGameStore.getState().completedLevels;
       if (!completed.includes(currentLevelId)) {
+        setObjectiveIsBriefing(true);
         setShowObjectiveLevelId(currentLevelId);
       } else {
         setShowObjectiveLevelId(null);
@@ -199,6 +204,7 @@ export default function App() {
       newGame(undefined, currentLevelId + 1);
       const completed = useGameStore.getState().completedLevels;
       if (!completed.includes(currentLevelId + 1)) {
+        setObjectiveIsBriefing(true);
         setShowObjectiveLevelId(currentLevelId + 1);
       } else {
         setShowObjectiveLevelId(null);
@@ -299,7 +305,7 @@ export default function App() {
         elementCounts={elementCounts}
         onOpenMenu={() => setPaused(true)}
         onOpenCodex={() => setShowCodex(true)}
-        onOpenObjectives={currentLevelId !== null ? () => setShowObjectiveLevelId(currentLevelId) : undefined}
+        onOpenObjectives={currentLevelId !== null ? () => { setObjectiveIsBriefing(false); setShowObjectiveLevelId(currentLevelId); } : undefined}
       />
 
       {/* Standard Sandbox End Screen */}
@@ -343,8 +349,10 @@ export default function App() {
         <CampaignObjectiveOverlay
           levelId={showObjectiveLevelId}
           onStart={() => {
+            const wasBriefing = objectiveIsBriefing;
             setShowObjectiveLevelId(null);
-            playSpawnTick();
+            setObjectiveIsBriefing(false);
+            if (wasBriefing) playSpawnTick();
           }}
         />
       )}

@@ -23,9 +23,9 @@ export interface Level {
 export const LEVELS: Level[] = [
   {
     id: 1,
-    title: "Deuterium Fusion",
+    title: "First Light",
     author: "Protostar Core",
-    description: "Embark on a simple path. To ignite your star, you must establish basic nucleosynthesis. The convective layer has scattered four Hydrogen cores across opposite hemispheres. Maneuver and slerp them along the curved hexagonal corridors to align them and spark your very first Helium fusion!",
+    description: "To ignite your star, you must establish basic nucleosynthesis. The convective layer has scattered four Hydrogen cores across opposite hemispheres. Maneuver and slide them along the curved hexagonal corridors to align them and spark your very first Helium fusion!",
     starMass: 1.5,
     maxTurns: 6,
     initialTiles: [
@@ -83,7 +83,7 @@ export const LEVELS: Level[] = [
         type: 'has_element', 
         element: 'C', 
         count: 1,
-        hint: "Slide the blocking Hydrogen tiles away to open up sliding avenues. Then, slerp the three Helium tiles so they form a tight triangle (each sharing borders with the other two) to fuse them into Carbon."
+        hint: "Slide the blocking Hydrogen tiles away to open up sliding avenues. Then, slide the three Helium tiles so they form a tight triangle (each sharing borders with the other two) to fuse them into Carbon."
       }
     ]
   },
@@ -91,7 +91,7 @@ export const LEVELS: Level[] = [
     id: 4,
     title: "Convective Capture",
     author: "Oxygen Synthesis",
-    description: "Your red giant is expanding, and convective currents are pulling elements apart. Carbon has a short slide range (3 steps) and sits isolated. You have Helium tiles trapped in distant, opposite orbits, blocked by reactive Hydrogen. Guide the Helium safely around the blockers to capture the Carbon core!",
+    description: "Convective currents are pulling elements apart. Carbon has a short slide range (3 steps) and sits isolated. You have Helium tiles trapped in distant, opposite orbits, blocked by reactive Hydrogen. Guide the Helium safely around the blockers to capture the Carbon core!",
     starMass: 8.0,
     maxTurns: 7,
     initialTiles: [
@@ -114,7 +114,7 @@ export const LEVELS: Level[] = [
     id: 5,
     title: "The Neon Shell",
     author: "Neon Burning",
-    description: "Extreme temperatures are building in the convective shell. Your heavy Oxygen core is locked in a tight corner of the sphere, surrounded by highly reactive Hydrogen walls. You must strategically maneuver the Hydrogen out of the way to clear a safe corridor, then slerp your trapped Helium in to synthesize Neon!",
+    description: "Extreme temperatures are building in the convective shell. Your heavy Oxygen core is locked in a tight corner of the sphere, surrounded by highly reactive Hydrogen walls. You must strategically maneuver the Hydrogen out of the way to clear a safe corridor, then slide your trapped Helium in to synthesize Neon!",
     starMass: 12.0,
     maxTurns: 10,
     initialTiles: [
@@ -161,7 +161,7 @@ export const LEVELS: Level[] = [
     id: 7,
     title: "Silicon Synthesis",
     author: "Silicon Ash",
-    description: "Your star is rapidly aging. Heavy Magnesium is extremely inert, moving only 1 step per swipe. The Helium is trapped on the extreme opposite side of the star behind winding, curved hexagonal ridges. Settle on a flawless, winding solution to slide the Helium all the way home!",
+    description: "Your star is rapidly aging. Heavy Magnesium is extremely inert, moving only 1 step per swipe. The Helium is trapped on the extreme opposite side of the star behind winding, curved hexagonal ridges. Thread the Helium along the winding corridors to reach the Magnesium!",
     starMass: 18.0,
     maxTurns: 10,
     initialTiles: [
@@ -209,7 +209,7 @@ export const LEVELS: Level[] = [
     id: 9,
     title: "Iron Core Collapse",
     author: "Supernova Threshold",
-    description: "Iron fusion consumes energy, sealing the fate of the star. You have two heavy Silicon cores (slide range 1) on the board. But there is NO Helium! You only start with lightweight Hydrogen gases. You must first fuse the Hydrogen gases into a Helium, then navigate that Helium into the Silicon to ignite the supernova!",
+    description: "Iron fusion consumes energy, sealing the fate of the star. You have two heavy Silicon cores (slide range 1) on the board. But there is NO Helium! You only start with lightweight Hydrogen. You must first fuse the Hydrogen into a Helium, then navigate that Helium into the Silicon to ignite the supernova!",
     starMass: 29.5,
     maxTurns: 8,
     initialTiles: [
@@ -248,7 +248,7 @@ export const LEVELS: Level[] = [
     objectives: [
       { 
         type: 'has_all_elements',
-        hint: "Have exactly one (or more) of each of the 8 stable elements on the board at the same time: H, He, C, O, Ne, Mg, Si, Fe. Carefully manage the space so that you don't merge everything away or jam the board!"
+        hint: "Have at least one of each of the 8 stable elements on the board at the same time: H, He, C, O, Ne, Mg, Si, Fe. Carefully manage the space so that you don't merge everything away or jam the board!"
       }
     ]
   }

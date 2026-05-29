@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Canvas } from '@react-three/fiber';
 import { useGameStore } from '../game/state';
+import { Background } from '../three/Background';
 
 interface StartScreenProps {
   onStart: () => void;
@@ -71,6 +73,13 @@ export function StartScreen({ onStart, onOpenCampaign, onStartAstro }: StartScre
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#050508] text-white overflow-hidden select-none">
+      {/* Slowly rotating starfield behind everything */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <Canvas camera={{ position: [0, 0, 5.5], fov: 48, far: 5000 }} gl={{ alpha: true }} dpr={[1, 1.5]}>
+          <Background />
+        </Canvas>
+      </div>
+
       {/* Immersive Breathing Stellar Body Background Glow */}
       <div className="absolute top-1/2 left-1/2 w-[320px] h-[320px] sm:w-[480px] sm:h-[480px] rounded-full bg-gradient-to-tr from-cyan-500/20 to-purple-600/10 blur-[80px] sm:blur-[120px] animate-stellar-pulse pointer-events-none z-0" />
       

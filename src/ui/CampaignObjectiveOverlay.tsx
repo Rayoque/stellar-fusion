@@ -13,9 +13,13 @@ export function CampaignObjectiveOverlay({ levelId, onStart }: CampaignObjective
   if (!level) return null;
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/35 backdrop-blur-sm select-none pointer-events-auto animate-fade-in">
+    <div
+      className="absolute inset-0 z-50 flex items-center justify-center bg-black/35 backdrop-blur-sm select-none pointer-events-auto animate-fade-in"
+      onClick={onStart}
+    >
       {/* Modal Container */}
-      <div 
+      <div
+        onClick={(e) => e.stopPropagation()}
         className="border border-cyan-500/20 rounded-[32px] p-8 sm:p-10 max-w-md w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.65)] relative overflow-hidden animate-fade-in-up isolate"
         style={{ 
           background: 'radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.08), transparent 50%), radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.08), transparent 50%), rgba(15, 15, 19, 0.94)',
