@@ -54,6 +54,8 @@ export const ASTRO_MERGE_RULES: MergeRule[] = [
   { inputs: ['O16', 'He4'], output: 'Ne20', pattern: 'pair' },
   // Ne20 + He4 -> Mg24
   { inputs: ['Ne20', 'He4'], output: 'Mg24', pattern: 'pair' },
+  // Mg24 + He4 -> Si28
+  { inputs: ['Mg24', 'He4'], output: 'Si28', pattern: 'pair' },
   // Si28 + He4 -> S32
   { inputs: ['Si28', 'He4'], output: 'S32', pattern: 'pair' },
   // S32 + He4 -> Ar36

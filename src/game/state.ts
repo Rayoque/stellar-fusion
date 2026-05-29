@@ -25,6 +25,7 @@ interface GameActions {
   undo: () => void;
   dismissNucleationTutorial: () => void;
   resetNucleationTutorial: () => void;
+  setManuallyZoomed: () => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -87,6 +88,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   hasSeenNucleationTutorial: localStorage.getItem('stellar_seen_nucleation') === 'true',
   history: [],
   hasPlayedHeliumLaugh: false,
+  hasManuallyZoomed: localStorage.getItem('stellar_has_manually_zoomed') === 'true',
+  isOrbitingFromHUD: false,
+  isSphereTooBig: false,
+  lastMoveFaceId: null,
+  hasSeenFe56Splash: false,
+  showFe56Splash: false,
 
   dismissToast: () => {
     set({ activeToastElement: null });
@@ -185,6 +192,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       showNucleationTutorial: false,
       history: [],
       hasPlayedHeliumLaugh: false,
+      lastMoveFaceId: null,
+      hasSeenFe56Splash: false,
+      showFe56Splash: false,
     });
   },
 
@@ -312,6 +322,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
           applyMerge(mergeRule, mergeLandedId, state, isMerge ? landedId : undefined);
           playMerge(parentElement, mergeRule.output);
           // Eslint-clean, snappy instant merges just like 2048: no artificial lag or delays!
+
+          // Trigger Astrophysicist Mode Iron-56 Splash screen upon successful synthesis
+          if (state.astrophysicistMode && mergeRule.output === 'Fe56' && !state.hasSeenFe56Splash) {
+            state.levelObjectiveMet = true;
+            state.showFe56Splash = true;
+            state.hasSeenFe56Splash = true;
+            playSuccess();
+          }
         }
 
         // Increment turn
@@ -360,7 +378,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
           }
         }
 
-        // Spawn hydrogen(s)
+        // Record last move face ID and spawn hydrogen(s)
+        state.lastMoveFaceId = landedId;
         spawnHydrogen(state);
 
         // Recount elementCounts dynamically to support standard mode + astrophysicist mode custom isotopes
@@ -640,5 +659,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   resetNucleationTutorial: () => {
     localStorage.removeItem('stellar_seen_nucleation');
     set({ hasSeenNucleationTutorial: false, showNucleationTutorial: false });
+  },
+  setManuallyZoomed: () => {
+    localStorage.setItem('stellar_has_manually_zoomed', 'true');
+    set({ hasManuallyZoomed: true });
   },
 }));

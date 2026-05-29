@@ -118,4 +118,10 @@ export interface GameState {
     score: number;
   }>;
   hasPlayedHeliumLaugh: boolean;
+  hasManuallyZoomed: boolean;
+  isOrbitingFromHUD: boolean;
+  isSphereTooBig: boolean;
+  lastMoveFaceId: number | null;
+  hasSeenFe56Splash: boolean;
+  showFe56Splash: boolean;
 }

@@ -162,7 +162,7 @@ canvas {
 }
 
 .hud-toast-container {
-  top: calc(5.2rem + env(safe-area-inset-top, 0px));
+  top: calc(7.8rem + env(safe-area-inset-top, 0px));
 }
 
 @media (min-width: 640px) {
@@ -175,7 +175,7 @@ canvas {
   }
 
   .hud-toast-container {
-    top: calc(4.8rem + env(safe-area-inset-top, 0px));
+    top: calc(7.2rem + env(safe-area-inset-top, 0px));
   }
 }
 

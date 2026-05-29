@@ -96,6 +96,8 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
 
   const trayRef = React.useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = React.useState(false);
+  const dragStartRef = React.useRef<{ x: number; y: number } | null>(null);
+  const hasDispatchedDownRef = React.useRef(false);
 
   React.useEffect(() => {
     const tray = trayRef.current;
@@ -214,32 +216,32 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
       Fe56: '4.0B K',
     };
 
-    const densityMap: Partial<Record<ElementSymbol, string>> = {
-      H: '150 g/cm³',
-      D: '200 g/cm³',
-      He3: '1.0k g/cm³',
-      He4: '2.0k g/cm³',
-      Be7: '5.0k g/cm³',
-      Be8: '10k g/cm³',
-      C12: '200k g/cm³',
-      O16: '2.0M g/cm³',
-      Ne20: '4.0M g/cm³',
-      Mg24: '6.0M g/cm³',
-      Si28: '10M g/cm³',
-      S32: '15M g/cm³',
-      Ar36: '20M g/cm³',
-      Ca40: '30M g/cm³',
-      Ti44: '40M g/cm³',
-      Cr48: '50M g/cm³',
-      Fe52: '70M g/cm³',
-      Ni56: '90M g/cm³',
-      Fe56: '100M g/cm³',
-    };
+    let stage = 'HYDROGEN BURNING';
+    let stageShort = 'HYDROGEN';
+    
+    if (['H', 'D', 'He3', 'He4'].includes(heaviest)) {
+      stage = 'HYDROGEN BURNING';
+      stageShort = 'HYDROGEN';
+    } else if (['Be7', 'Be8', 'C12', 'O16'].includes(heaviest)) {
+      stage = 'HELIUM BURNING';
+      stageShort = 'HELIUM';
+    } else if (['Ne20', 'Mg24'].includes(heaviest)) {
+      stage = 'CARBON & NEON';
+      stageShort = 'CARBON';
+    } else if (heaviest === 'Fe56') {
+      stage = 'STABLE CORE';
+      stageShort = 'STABLE';
+    } else {
+      // Si28, S32, Ar36, Ca40, Ti44, Cr48, Fe52, Ni56
+      stage = 'SILICON BURNING';
+      stageShort = 'SILICON';
+    }
 
     return {
       heaviest,
       temp: tempMap[heaviest] || '15M K',
-      density: densityMap[heaviest] || '150 g/cm³',
+      stage,
+      stageShort,
     };
   };
 
@@ -251,153 +253,142 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
 
   return (
     <div className="absolute inset-0 z-10 pointer-events-none select-none">
-      {/* Top Left: Hamburger Menu Button */}
-      <div className="absolute left-4 pointer-events-auto hud-top-container">
-        <button 
-          onClick={onOpenMenu}
-          className="flex items-center justify-center bg-black/40 backdrop-blur-md w-11 h-11 rounded-full border border-white/10 cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.92] transition-all text-white text-base select-none shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
-          style={{ borderColor: `${currentThemeColor}25` }}
-          title="Open Pause Menu"
-        >
-          ☰
-        </button>
-      </div>
-
-      {/* Top Right: Score & Best Score Pill */}
-      {currentLevelId === null && (
-        <div className="absolute right-4 pointer-events-auto hud-top-container flex items-center gap-2">
-          <div 
-            className="flex flex-col items-center justify-center bg-black/40 backdrop-blur-md px-3.5 h-11 rounded-2xl border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)] font-mono"
-            style={{ borderColor: `${currentThemeColor}20` }}
+      {/* Top HUD Header Bar: Unified flex row that dynamically spaces components without overlapping */}
+      <div className="absolute top-0 left-0 right-0 px-4 pointer-events-none select-none hud-top-container flex items-center justify-between gap-2.5">
+        {/* Left Section: Menu Button */}
+        <div className="pointer-events-auto flex-shrink-0">
+          <button 
+            onClick={onOpenMenu}
+            className="flex items-center justify-center bg-black/40 backdrop-blur-md w-11 h-11 rounded-full border border-white/10 cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.92] transition-all text-white text-base select-none shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
+            style={{ borderColor: `${currentThemeColor}25` }}
+            title="Open Pause Menu"
           >
-            <div className="text-[6.5px] tracking-[1px] text-white/40 leading-none">SCORE</div>
-            <div className="text-[12px] font-bold text-white leading-tight mt-0.5 tabular-nums">
-              {state.score % 1 === 0 ? state.score.toString() : state.score.toFixed(1)}
-            </div>
-          </div>
-
-          <div 
-            className="flex flex-col items-center justify-center bg-black/40 backdrop-blur-md px-3.5 h-11 rounded-2xl border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)] font-mono"
-            style={{ borderColor: `${currentThemeColor}20` }}
-          >
-            <div className="text-[6.5px] tracking-[1px] text-white/40 leading-none">BEST</div>
-            <div className="text-[12px] font-bold text-cyan-400 leading-tight mt-0.5 tabular-nums">
-              {state.highScore % 1 === 0 ? state.highScore.toString() : state.highScore.toFixed(1)}
-            </div>
-          </div>
+            ☰
+          </button>
         </div>
-      )}
 
-      {/* Top Center: HUD Horizontal Stats Pill & Scenario Objective Banner */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-auto hud-top-container">
-        <div 
-          onClick={() => setShowModal(true)}
-          className="flex items-center justify-between glass-pill px-3 md:px-4 h-11 rounded-full cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all select-none gap-2 md:gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.35)] border border-white/8"
-          style={{ 
-            borderColor: `${currentThemeColor}30`, 
-            boxShadow: `0 0 16px ${currentThemeColor}08, inset 0 0 10px ${currentThemeColor}05` 
-          }}
-          title="Open Stellar Evolution Guide"
-        >
-          {/* Desktop Layout (md:flex hidden with fluid gaps/text on medium-to-large viewports) */}
-          <div className="hidden md:flex items-center gap-2.5 lg:gap-4">
-            {state.astrophysicistMode ? (
-              <>
-                <div className="flex items-center gap-1.5 lg:gap-2.5">
-                  <span className="text-sm lg:text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>☢</span>
-                  <div>
-                    <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">ERA</div>
-                    <div className="font-semibold tracking-wide text-[9px] lg:text-[10px] leading-tight mt-0.5 whitespace-nowrap">Fe26 ASTRO</div>
+        {/* Center Section: Core Stats Pill & Campaign objective secondary banner */}
+        <div className="flex-grow flex flex-col items-center justify-center min-w-0 max-w-full mx-2 pointer-events-auto">
+          {/* Main horizontal stats pill */}
+          <div 
+            onClick={() => setShowModal(true)}
+            className="flex items-center justify-between glass-pill px-3 md:px-4 h-11 rounded-full cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all select-none gap-2 md:gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.35)] border border-white/8 min-w-0 max-w-full"
+            style={{ 
+              borderColor: `${currentThemeColor}30`, 
+              boxShadow: `0 0 16px ${currentThemeColor}08, inset 0 0 10px ${currentThemeColor}05` 
+            }}
+            title="Open Stellar Evolution Guide"
+          >
+            {/* Desktop Layout (md:flex hidden with fluid gaps/text on medium-to-large viewports) */}
+            <div className="hidden md:flex items-center gap-2.5 lg:gap-4">
+              {state.astrophysicistMode ? (
+                <>
+                  <div className="flex items-center gap-1.5 lg:gap-2.5">
+                    <span className="text-sm lg:text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>☢</span>
+                    <div>
+                      <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">CORE STAGE</div>
+                      <div className="font-semibold tracking-wide text-[9px] lg:text-[10px] leading-tight mt-0.5 whitespace-nowrap">{astroStats.stage}</div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="h-5 w-px bg-white/15" />
+                  <div className="h-5 w-px bg-white/15" />
 
-                <div>
-                  <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">DENSITY</div>
-                  <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums text-white/90 whitespace-nowrap">{astroStats.density}</div>
-                </div>
-
-                <div className="h-5 w-px bg-white/15" />
-
-                <div>
-                  <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">CORE TEMP</div>
-                  <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums font-bold whitespace-nowrap" style={{ color: currentThemeColor }}>{astroStats.temp}</div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-1.5 lg:gap-2.5">
-                  <span className="text-sm lg:text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
                   <div>
-                    <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">PHASE</div>
-                    <div className="font-semibold tracking-wide text-[9px] lg:text-[10px] leading-tight mt-0.5 whitespace-nowrap">{PHASE_LABELS[phase]}</div>
+                    <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">CORE TEMP</div>
+                    <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums font-bold whitespace-nowrap" style={{ color: currentThemeColor }}>{astroStats.temp}</div>
                   </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5 lg:gap-2.5">
+                    <span className="text-sm lg:text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
+                    <div>
+                      <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">PHASE</div>
+                      <div className="font-semibold tracking-wide text-[9px] lg:text-[10px] leading-tight mt-0.5 whitespace-nowrap">{PHASE_LABELS[phase]}</div>
+                    </div>
+                  </div>
+
+                  <div className="h-5 w-px bg-white/15" />
+
+                  <div>
+                    <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">STAR AGE</div>
+                    <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums font-bold whitespace-nowrap" style={{ color: currentThemeColor }}>{ageInfo.formatted}</div>
+                  </div>
+                </>
+              )}
+
+              <div className="h-5 w-px bg-white/15" />
+
+              <div>
+                <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">TURN</div>
+                <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums text-white/90 whitespace-nowrap">
+                  {turn}{maxTurns !== null ? ` / ${maxTurns}` : ''}
                 </div>
+              </div>
+            </div>
 
-                <div className="h-5 w-px bg-white/15" />
+            {/* Mobile/Compact Layout (flex md:hidden) */}
+            <div className="flex md:hidden items-center gap-1.5 text-[8.5px] font-mono tracking-wider font-semibold uppercase text-white/80 whitespace-nowrap">
+              {state.astrophysicistMode ? (
+                <>
+                  <span className="text-[10px] leading-none flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>☢</span>
+                  <span className="font-bold tracking-widest text-white">{astroStats.stageShort}</span>
+                  <span className="opacity-25">•</span>
+                  <span className="font-bold" style={{ color: currentThemeColor }}>{astroStats.temp}</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-[10px] leading-none flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
+                  <span className="font-bold tracking-widest" style={{ color: currentThemeColor }}>
+                    {phase === 'main_sequence' ? 'MAIN' : phase === 'red_giant' ? 'GIANT' : phase === 'supergiant' ? 'SUPER' : 'COLLAPSE'}
+                  </span>
+                  <span className="opacity-25">•</span>
+                  <span className="font-bold" style={{ color: currentThemeColor }}>{compactAge}</span>
+                </>
+              )}
+              <span className="opacity-25">•</span>
+              <span className="text-white">T{turn}{maxTurns !== null ? `/${maxTurns}` : ''}</span>
+            </div>
+          </div>
 
-                <div>
-                  <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">MASS</div>
-                  <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums text-white/90 whitespace-nowrap">{starMass.toFixed(1)} <span className="text-[7.5px] lg:text-[8px] text-white/50 align-super">M☉</span></div>
-                </div>
+          {/* Campaign Objective Floating Secondary Banner */}
+          {level && onOpenObjectives && (
+            <div 
+              onClick={onOpenObjectives}
+              className="glass-pill px-3 py-1 rounded-full text-[7.5px] font-mono tracking-widest text-cyan-300 font-bold uppercase whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.3)] border border-cyan-500/15 hover:bg-white/10 active:scale-[0.96] transition-all cursor-pointer pointer-events-auto mt-1 flex-shrink-0 animate-fade-in-up"
+              title="Click to view detailed scientific scenario objective description"
+            >
+              Objective: {level.objectives[0].type === 'has_element' ? `Synthesize ${level.objectives[0].element}` : level.title}
+            </div>
+          )}
+        </div>
 
-                <div className="h-5 w-px bg-white/15" />
+        {/* Right Section: Score and Best pill (Sandbox mode only) */}
+        {currentLevelId === null ? (
+          <div className="pointer-events-auto flex-shrink-0 flex items-center gap-1.5 xs:gap-2">
+            <div 
+              className="flex flex-col items-center justify-center bg-black/40 backdrop-blur-md px-2.5 xs:px-3 h-11 rounded-2xl border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)] font-mono"
+              style={{ borderColor: `${currentThemeColor}20` }}
+            >
+              <div className="text-[6.5px] tracking-[1px] text-white/40 leading-none">SCORE</div>
+              <div className="text-[11px] xs:text-[12px] font-bold text-white leading-tight mt-0.5 tabular-nums">
+                {state.score % 1 === 0 ? state.score.toString() : state.score.toFixed(1)}
+              </div>
+            </div>
 
-                <div>
-                  <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">STAR AGE</div>
-                  <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums font-bold whitespace-nowrap" style={{ color: currentThemeColor }}>{ageInfo.formatted}</div>
-                </div>
-              </>
-            )}
-
-            <div className="h-5 w-px bg-white/15" />
-
-            <div>
-              <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">TURN</div>
-              <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums text-white/90 whitespace-nowrap">
-                {turn}{maxTurns !== null ? ` / ${maxTurns}` : ''}
+            <div 
+              className="flex flex-col items-center justify-center bg-black/40 backdrop-blur-md px-2.5 xs:px-3 h-11 rounded-2xl border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)] font-mono"
+              style={{ borderColor: `${currentThemeColor}20` }}
+            >
+              <div className="text-[6.5px] tracking-[1px] text-white/40 leading-none">BEST</div>
+              <div className="text-[11px] xs:text-[12px] font-bold text-cyan-400 leading-tight mt-0.5 tabular-nums">
+                {state.highScore % 1 === 0 ? state.highScore.toString() : state.highScore.toFixed(1)}
               </div>
             </div>
           </div>
-
-          {/* Mobile/Compact Layout (flex md:hidden) */}
-          <div className="flex md:hidden items-center gap-1.5 text-[8.5px] font-mono tracking-wider font-semibold uppercase text-white/80 whitespace-nowrap">
-            {state.astrophysicistMode ? (
-              <>
-                <span className="text-[10px] leading-none flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>☢</span>
-                <span className="font-bold tracking-widest" style={{ color: currentThemeColor }}>FE26</span>
-                <span className="opacity-25">•</span>
-                <span className="text-white">{astroStats.density}</span>
-                <span className="opacity-25">•</span>
-                <span className="font-bold" style={{ color: currentThemeColor }}>{astroStats.temp}</span>
-              </>
-            ) : (
-              <>
-                <span className="text-[10px] leading-none flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
-                <span className="font-bold tracking-widest" style={{ color: currentThemeColor }}>
-                  {phase === 'main_sequence' ? 'MAIN' : phase === 'red_giant' ? 'GIANT' : phase === 'supergiant' ? 'SUPER' : 'COLLAPSE'}
-                </span>
-                <span className="opacity-25">•</span>
-                <span className="text-white">{starMass.toFixed(1)} M☉</span>
-                <span className="opacity-25">•</span>
-                <span className="font-bold" style={{ color: currentThemeColor }}>{compactAge}</span>
-              </>
-            )}
-            <span className="opacity-25">•</span>
-            <span className="text-white">T{turn}{maxTurns !== null ? `/${maxTurns}` : ''}</span>
-          </div>
-        </div>
-
-        {/* Campaign Objective Floating Secondary Banner */}
-        {level && onOpenObjectives && (
-          <div 
-            onClick={onOpenObjectives}
-            className="glass-pill px-3 py-1 rounded-full text-[7.5px] font-mono tracking-widest text-cyan-300 font-bold uppercase whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.3)] border border-cyan-500/15 hover:bg-white/10 active:scale-[0.96] transition-all cursor-pointer pointer-events-auto animate-fade-in-up"
-            title="Click to view detailed scientific scenario objective description"
-          >
-            Objective: {level.objectives[0].type === 'has_element' ? `Synthesize ${level.objectives[0].element}` : level.title}
-          </div>
+        ) : (
+          /* Empty placeholder to balance the flex layout in level modes, keeping the main pill centered! */
+          <div className="w-11 h-11 flex-shrink-0 md:block hidden" />
         )}
       </div>
 
@@ -410,12 +401,124 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
             {state.astrophysicistMode ? 'FUSE NUCLEI ALL THE WAY TO IRON-56' : 'DRAG TILES TO FUSE • BUILD YOUR STAR'}
           </div>
 
-          {/* Elements Tray Wrapper Container */}
+          {/* Elements Tray Wrapper Container with Smart Touch Orbiting handlers */}
           <div 
             className="glass-panel rounded-[20px] xs:rounded-[22px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center overflow-hidden w-full max-w-full pointer-events-auto border border-white/8"
             style={{ 
               borderColor: `${currentThemeColor}15`,
               boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px ${currentThemeColor}05`
+            }}
+            onPointerDown={(e) => {
+              if ((e.target as HTMLElement).closest('button')) {
+                return;
+              }
+              try {
+                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              } catch (err) {}
+
+              dragStartRef.current = { x: e.clientX, y: e.clientY };
+              hasDispatchedDownRef.current = false;
+              (window as any).isOrbitingFromHUD = true;
+            }}
+            onPointerMove={(e) => {
+              if (!dragStartRef.current) return;
+
+              const dx = e.clientX - dragStartRef.current.x;
+              const dy = e.clientY - dragStartRef.current.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+
+              let shouldOrbit = false;
+              if (state.astrophysicistMode) {
+                if (!hasDispatchedDownRef.current && dist > 8) {
+                  if (Math.abs(dy) > Math.abs(dx) * 0.8) {
+                    shouldOrbit = true;
+                  } else {
+                    dragStartRef.current = null;
+                    (window as any).isOrbitingFromHUD = false;
+                    return;
+                  }
+                } else if (hasDispatchedDownRef.current) {
+                  shouldOrbit = true;
+                }
+              } else {
+                if (dist > 3 || hasDispatchedDownRef.current) {
+                  shouldOrbit = true;
+                }
+              }
+
+              if (shouldOrbit) {
+                const canvas = document.querySelector('canvas');
+                if (canvas) {
+                  if (!hasDispatchedDownRef.current) {
+                    hasDispatchedDownRef.current = true;
+                    const downEvent = new PointerEvent('pointerdown', {
+                      bubbles: true,
+                      cancelable: true,
+                      clientX: dragStartRef.current.x,
+                      clientY: dragStartRef.current.y,
+                      pointerId: e.pointerId,
+                      pointerType: e.pointerType,
+                    });
+                    canvas.dispatchEvent(downEvent);
+                  }
+
+                  const moveEvent = new PointerEvent('pointermove', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                    pointerId: e.pointerId,
+                    pointerType: e.pointerType,
+                  });
+                  canvas.dispatchEvent(moveEvent);
+                }
+              }
+            }}
+            onPointerUp={(e) => {
+              try {
+                (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+              } catch (err) {}
+
+              if (hasDispatchedDownRef.current) {
+                const canvas = document.querySelector('canvas');
+                if (canvas) {
+                  const upEvent = new PointerEvent('pointerup', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                    pointerId: e.pointerId,
+                    pointerType: e.pointerType,
+                  });
+                  canvas.dispatchEvent(upEvent);
+                }
+              }
+              dragStartRef.current = null;
+              hasDispatchedDownRef.current = false;
+              (window as any).isOrbitingFromHUD = false;
+            }}
+            onPointerCancel={(e) => {
+              try {
+                (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+              } catch (err) {}
+
+              if (hasDispatchedDownRef.current) {
+                const canvas = document.querySelector('canvas');
+                if (canvas) {
+                  const cancelEvent = new PointerEvent('pointercancel', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                    pointerId: e.pointerId,
+                    pointerType: e.pointerType,
+                  });
+                  canvas.dispatchEvent(cancelEvent);
+                }
+              }
+              dragStartRef.current = null;
+              hasDispatchedDownRef.current = false;
+              (window as any).isOrbitingFromHUD = false;
             }}
           >
             {/* Scrollable Elements List */}

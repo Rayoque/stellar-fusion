@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Soft background radial star-glow -->
+  <circle cx="32" cy="32" r="28" fill="url(#bg-glow)" opacity="0.35" />
+  
+  <!-- Outer geometry grid (stylized pentagonal/hexagonal nodes representing the board topology) -->
+  <polygon points="32,5 58,24 48,55 16,55 6,24" stroke="url(#grid-grad)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
+  <polygon points="32,12 51,26 44,48 20,48 13,26" stroke="url(#grid-grad-inner)" stroke-width="1.5" stroke-linejoin="round" opacity="0.6" />
+
+
+  <!-- Central fusing core (star/nucleus) -->
+  <circle cx="32" cy="32" r="8" fill="url(#fusion-grad)" />
+  <circle cx="32" cy="32" r="8" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.5" />
+
+  <defs>
+    <!-- Background glow gradient -->
+    <radialGradient id="bg-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.6" />
+      <stop offset="50%" stop-color="#7c3aed" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#050508" stop-opacity="0" />
+    </radialGradient>
+    
+    <!-- Outer grid gradient: matches the fusion journey from Hydrogen to Iron (Cyan -> Purple -> Red) -->
+    <linearGradient id="grid-grad" x1="6" y1="5" x2="58" y2="55">
+      <stop offset="0%" stop-color="#22d3ee" />
+      <stop offset="50%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#f43f5e" />
+    </linearGradient>
+
+    <!-- Inner grid gradient -->
+    <linearGradient id="grid-grad-inner" x1="13" y1="12" x2="51" y2="48">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#701a75" />
+    </linearGradient>
+
+    <!-- Central fusion core gradient (pure fusion white-blue) -->
+    <radialGradient id="fusion-grad" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="35%" stop-color="#cffafe" />
+      <stop offset="70%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#083344" />
+    </radialGradient>
+  </defs>
+</svg>

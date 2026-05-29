@@ -5,6 +5,33 @@ import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../game/state';
 import { resolveSlideTarget } from '../geometry/slide';
+import { SCORE_VALUES } from '../game/rules';
+
+function getElementMass(element: string): number {
+  const standardMasses: Record<string, number> = {
+    H: 1,
+    He: 4,
+    C: 12,
+    O: 16,
+    Ne: 20,
+    Mg: 24,
+    Si: 28,
+    Fe: 56,
+  };
+  
+  if (standardMasses[element] !== undefined) {
+    return standardMasses[element];
+  }
+  
+  const match = element.match(/\d+$/);
+  if (match) {
+    return parseInt(match[0], 10);
+  }
+  
+  if (element === 'D') return 2;
+  
+  return 1;
+}
 
 export function Controls() {
   const controlsRef = useRef<any>(null);
@@ -115,19 +142,16 @@ export function Controls() {
         camStartPos.current = camera.position.clone();
         camStartUp.current = camera.up.clone();
 
-        // Calculate drift axis and initial velocity right now at the start of the slide!
+        // Calculate drift axis (inverted so sphere rotates WITH the slide weight) and initial velocity
         const vStart = new THREE.Vector3(startFace.center.x, startFace.center.y, startFace.center.z).normalize();
         const vEnd = new THREE.Vector3(endFace.center.x, endFace.center.y, endFace.center.z).normalize();
         driftAxis.current.crossVectors(vStart, vEnd).normalize();
 
-        const ELEMENT_MASSES: Record<string, number> = {
-          H: 1, He: 4, C: 12, O: 16, Ne: 20, Mg: 24, Si: 28, Fe: 56
-        };
-        const mass = ELEMENT_MASSES[activeSlide.element] || 1;
+        const mass = getElementMass(activeSlide.element);
         const slideLength = path.length - 1;
         
         // Premium dynamic momentum: proportional to BOTH element mass AND slide length/velocity
-        const initialVel = mass * 0.0020 * slideLength;
+        const initialVel = mass * 0.0004 * slideLength;
         driftVelocity.current = Math.min(initialVel, 0.12); // clamp at 0.12 rad/frame for visual stability
       }
 
@@ -204,10 +228,7 @@ export function Controls() {
 
       if (elapsed >= duration) {
         const tSpring = elapsed - duration;
-        const ELEMENT_MASSES: Record<string, number> = {
-          H: 1, He: 4, C: 12, O: 16, Ne: 20, Mg: 24, Si: 28, Fe: 56
-        };
-        const mass = ELEMENT_MASSES[activeSlide.element] || 1;
+        const mass = getElementMass(activeSlide.element);
 
         // Fusion nuclear energy release snappy high-frequency crack shake
         if (activeSlide.isMerge) {
@@ -349,6 +370,29 @@ export function Controls() {
         controlsRef.current.update();
       }
     }
+
+    // 4. Pinch/scroll manual zoom threshold detection & filling ratio calculation
+    const hasManuallyZoomed = useGameStore.getState().hasManuallyZoomed;
+    const setManuallyZoomed = useGameStore.getState().setManuallyZoomed;
+    const phase = useGameStore.getState().phase;
+    const isSphereTooBig = useGameStore.getState().isSphereTooBig;
+    
+    const dist = camera.position.length();
+
+    if (!hasManuallyZoomed) {
+      if (Math.abs(dist - 5.5) > 0.4) {
+        setManuallyZoomed();
+      }
+    }
+
+    // Dynamic filling ratio (Sphere Scale / Camera Distance)
+    const sphereScale = phase === 'red_giant' ? 1.3 : phase === 'supergiant' ? 1.6 : phase === 'collapse' ? 0.45 : 1.0;
+    const ratio = sphereScale / dist;
+    const tooBig = ratio >= 0.23;
+
+    if (tooBig !== isSphereTooBig) {
+      useGameStore.setState({ isSphereTooBig: tooBig });
+    }
   });
 
   // Disable TrackballControls native modifier keys (A = Rotate, S = Zoom, D = Pan) to prevent conflict with WASD
@@ -366,6 +410,15 @@ export function Controls() {
       driftVelocity.current = 0;
 
       if (isAnimating) return;
+
+      // BYPASS tile grabbing if we are orbiting programmatically from the HUD elements tray
+      if ((window as any).isOrbitingFromHUD === true) {
+        dragStartFaceId.current = null;
+        dragStartPos.current = null;
+        setIsDraggingTile(false);
+        setIsPointerDownOnTile(false);
+        return;
+      }
 
       const rect = dom.getBoundingClientRect();
       const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;

@@ -1,0 +1,17 @@
+{
+  "short_name": "StellarFusion",
+  "name": "Stellar Fusion",
+  "description": "A 3D nucleosynthesis puzzle on the surface of a sphere.",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ],
+  "start_url": ".",
+  "background_color": "#050508",
+  "theme_color": "#050508",
+  "display": "standalone",
+  "orientation": "any"
+}

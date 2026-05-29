@@ -15,6 +15,8 @@ import { CampaignObjectiveOverlay } from './ui/CampaignObjectiveOverlay';
 import { DebugPanel } from './ui/DebugPanel';
 import { ELEMENTS } from './game/elements';
 import type { ElementSymbol } from './game/types';
+import { ZoomTooltip } from './ui/ZoomTooltip';
+import { AstroFe56Overlay } from './ui/AstroFe56Overlay';
 
 export default function App() {
   const newGame = useGameStore(s => s.newGame);
@@ -36,6 +38,23 @@ export default function App() {
   // Nucleation Tutorial state bindings
   const showNucleationTutorial = useGameStore(s => s.showNucleationTutorial);
   const dismissNucleationTutorial = useGameStore(s => s.dismissNucleationTutorial);
+  
+  const hasManuallyZoomed = useGameStore(s => s.hasManuallyZoomed);
+  const isSphereTooBig = useGameStore(s => s.isSphereTooBig);
+  const showFe56Splash = useGameStore(s => s.showFe56Splash);
+
+  const [showAstroOverlay, setShowAstroOverlay] = React.useState(false);
+
+  useEffect(() => {
+    if (showFe56Splash) {
+      const timer = setTimeout(() => {
+        setShowAstroOverlay(true);
+      }, 1400);
+      return () => clearTimeout(timer);
+    } else {
+      setShowAstroOverlay(false);
+    }
+  }, [showFe56Splash]);
 
   // UI state variables
   const [showStart, setShowStart] = React.useState(true);
@@ -265,7 +284,16 @@ export default function App() {
       setDebugOpen(prev => !prev);
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    // Expose direct React state triggers to window for immediate console feedback
+    (window as any)._openDebugPanel = () => setDebugOpen(true);
+    (window as any)._closeDebugPanel = () => setDebugOpen(false);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      delete (window as any)._openDebugPanel;
+      delete (window as any)._closeDebugPanel;
+    };
   }, []);
 
   if (showStart) {
@@ -373,6 +401,18 @@ export default function App() {
         />
       )}
 
+      {/* Astrophysicist Mode Iron-56 Synthesis Congratulations Overlay */}
+      {showAstroOverlay && (
+        <AstroFe56Overlay
+          onContinue={() => {
+            useGameStore.setState({ 
+              showFe56Splash: false,
+              levelObjectiveMet: false
+            });
+          }}
+        />
+      )}
+
       {/* Nucleation / Pentagon Self-Fusion Catalyst Tutorial Modal (Intuitively freezes active play once after action completes) */}
       {delayedShowNucleation && (
         <div className="fixed inset-0 z-[100] bg-black/35 flex justify-center items-center p-4 animate-fade-in-up">
@@ -429,8 +469,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Subtle discovery dynamic toast notification */}
-      {activeToastElement && (
+      {/* Subtle discovery dynamic toast notification gated to avoid overlaps */}
+      {activeToastElement && !showStart && !isPaused && !showCampaign && !showCodex && !delayedShowNucleation && showObjectiveLevelId === null && !showStatusOverlay && (
         <div 
           className="fixed left-1/2 -translate-x-1/2 z-50 pointer-events-none flex justify-center w-full max-w-[90vw] sm:max-w-none hud-toast-container"
         >
@@ -448,6 +488,11 @@ export default function App() {
             <span className="text-xs">✦</span>
           </div>
         </div>
+      )}
+
+      {/* Subtle, gated backgroundless Pinch-to-Zoom Tooltip */}
+      {isSphereTooBig && !hasManuallyZoomed && !showStart && !isPaused && !showCampaign && !showCodex && !delayedShowNucleation && showObjectiveLevelId === null && (
+        <ZoomTooltip />
       )}
 
       {debugOpen && (
