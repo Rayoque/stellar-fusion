@@ -165,6 +165,12 @@ canvas {
   top: calc(7.8rem + env(safe-area-inset-top, 0px));
 }
 
+/* Reignite quick-reset floats just under the top info bar (absolute, so it never
+   displaces the centered bar). */
+.hud-reignite-container {
+  top: calc(4.6rem + env(safe-area-inset-top, 0px));
+}
+
 @media (min-width: 640px) {
   .hud-top-container {
     top: calc(1rem + env(safe-area-inset-top, 0px));
@@ -176,6 +182,10 @@ canvas {
 
   .hud-toast-container {
     top: calc(7.2rem + env(safe-area-inset-top, 0px));
+  }
+
+  .hud-reignite-container {
+    top: calc(4.2rem + env(safe-area-inset-top, 0px));
   }
 }
 

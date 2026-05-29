@@ -254,10 +254,11 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
 
   return (
     <div className="absolute inset-0 z-10 pointer-events-none select-none">
-      {/* Top HUD Header Bar: Unified flex row that dynamically spaces components without overlapping */}
-      <div className="absolute top-0 left-0 right-0 px-4 pointer-events-none select-none hud-top-container flex items-center justify-between gap-2.5">
+      {/* Top HUD Header Bar: 1fr/auto/1fr grid keeps the center info bar screen-centered
+          regardless of the left/right widths, only shrinking it if it can't fit. */}
+      <div className="absolute top-0 left-0 right-0 px-4 pointer-events-none select-none hud-top-container grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
         {/* Left Section: Menu Button */}
-        <div className="pointer-events-auto flex-shrink-0">
+        <div className="pointer-events-auto flex-shrink-0 justify-self-start">
           <button 
             onClick={onOpenMenu}
             className="flex items-center justify-center bg-black/40 backdrop-blur-md w-11 h-11 rounded-full border border-white/10 cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.92] transition-all text-white text-base select-none shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
@@ -269,7 +270,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
         </div>
 
         {/* Center Section: Core Stats Pill & Campaign objective secondary banner */}
-        <div className="flex-grow flex flex-col items-center justify-center min-w-0 max-w-full mx-2 pointer-events-auto">
+        <div className="justify-self-center flex flex-col items-center justify-center min-w-0 max-w-full pointer-events-auto">
           {/* Main horizontal stats pill */}
           <div 
             onClick={() => setShowModal(true)}
@@ -362,25 +363,11 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
               Objective: {level.objectives[0].type === 'has_element' ? `Synthesize ${level.objectives[0].element}` : level.title}
             </div>
           )}
-
-          {/* In-game quick reset (open-ended modes only): subtle, clearly tappable,
-              lets the player start a fresh star without opening the pause menu. */}
-          {currentLevelId === null && (
-            <button
-              onClick={() => { state.reset(); playSpawnTick(); }}
-              className="mt-1 flex-shrink-0 pointer-events-auto flex items-center gap-1 glass-pill px-2.5 py-1 rounded-full text-[7.5px] font-mono tracking-[2.5px] uppercase text-white/40 hover:text-white/80 border border-white/8 hover:bg-white/5 active:scale-[0.95] transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.25)] animate-fade-in-up"
-              style={{ borderColor: `${currentThemeColor}20` }}
-              title="Reignite — reset and start a fresh star"
-            >
-              <span className="text-[9px] leading-none translate-y-[-0.5px]">↻</span>
-              Reignite
-            </button>
-          )}
         </div>
 
         {/* Right Section: Score and Best pill (Sandbox mode only) */}
         {currentLevelId === null ? (
-          <div className="pointer-events-auto flex-shrink-0 flex items-center gap-1.5 xs:gap-2">
+          <div className="pointer-events-auto flex-shrink-0 flex items-center gap-1.5 xs:gap-2 justify-self-end">
             <div 
               className="flex flex-col items-center justify-center bg-black/40 backdrop-blur-md px-2.5 xs:px-3 h-11 rounded-2xl border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)] font-mono"
               style={{ borderColor: `${currentThemeColor}20` }}
@@ -402,13 +389,29 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
             </div>
           </div>
         ) : (
-          /* Empty placeholder to balance the flex layout in level modes, keeping the main pill centered! */
-          <div className="w-11 h-11 flex-shrink-0 md:block hidden" />
+          /* Empty placeholder to balance the layout in level modes, keeping the main pill centered! */
+          <div className="w-11 h-11 flex-shrink-0 md:block hidden justify-self-end" />
         )}
       </div>
 
-      <div 
-        className="absolute left-1/2 -translate-x-1/2 pointer-events-auto hud-bottom-container" 
+      {/* In-game Reignite quick-reset — only in the collapse stage, floated under the
+          top bar (absolute, so it never displaces the centered info bar). */}
+      {currentLevelId === null && phase === 'collapse' && (
+        <div className="absolute left-1/2 -translate-x-1/2 hud-reignite-container pointer-events-none flex justify-center">
+          <button
+            onClick={() => { state.reset(); playSpawnTick(); }}
+            className="pointer-events-auto flex items-center gap-1 glass-pill px-2.5 py-1 rounded-full text-[7.5px] font-mono tracking-[2.5px] uppercase text-white/40 hover:text-white/80 border border-white/8 hover:bg-white/5 active:scale-[0.95] transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.25)] animate-fade-in-up"
+            style={{ borderColor: `${currentThemeColor}20` }}
+            title="Reignite — reset and start a fresh star"
+          >
+            <span className="text-[9px] leading-none translate-y-[-0.5px]">↻</span>
+            Reignite
+          </button>
+        </div>
+      )}
+
+      <div
+        className="absolute left-1/2 -translate-x-1/2 pointer-events-auto hud-bottom-container"
       >
         <div className="flex flex-col items-center gap-2 xs:gap-3.5 pointer-events-none select-none max-w-[94vw] xs:max-w-[88vw] sm:max-w-md md:max-w-xl">
           {/* Dynamic Instructions placed directly above the Elements Tray */}
