@@ -29,6 +29,9 @@ interface GameActions {
   saveCurrentGame: () => void;
   loadSavedGame: (isAstro: boolean) => boolean;
   clearSavedGame: (isAstro: boolean) => void;
+  setAutoPlay: (on: boolean) => void;
+  setAutoPlaySpeed: (speed: number) => void;
+  setAutoRotateTarget: (faceId: number | null) => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -125,6 +128,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   lastMoveFaceId: null,
   hasSeenFe56Splash: false,
   showFe56Splash: false,
+  autoPlay: false,
+  autoPlaySpeed: 1,
+  autoRotateTargetFaceId: null,
 
   dismissToast: () => {
     set({ activeToastElement: null });
@@ -226,6 +232,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastMoveFaceId: null,
       hasSeenFe56Splash: false,
       showFe56Splash: false,
+      autoPlay: false,
+      autoRotateTargetFaceId: null,
     });
   },
 
@@ -809,5 +817,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setManuallyZoomed: () => {
     localStorage.setItem('stellar_last_zoom_time', Date.now().toString());
     set({ hasManuallyZoomed: true });
+  },
+  setAutoPlay: (on) => {
+    set({ autoPlay: on, autoRotateTargetFaceId: null });
+  },
+  setAutoPlaySpeed: (speed) => {
+    set({ autoPlaySpeed: speed });
+  },
+  setAutoRotateTarget: (faceId) => {
+    set({ autoRotateTargetFaceId: faceId });
   },
 }));

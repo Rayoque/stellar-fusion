@@ -16,6 +16,10 @@ export function DebugPanel({ onClose, onJumpAstro, onJumpLevel }: DebugPanelProp
   const showRealtimeGraphics = useGameStore(s => s.showRealtimeGraphics);
   const setShowRealtimeGraphics = useGameStore(s => s.setShowRealtimeGraphics);
   const completedLevels = useGameStore(s => s.completedLevels);
+  const autoPlay = useGameStore(s => s.autoPlay);
+  const setAutoPlay = useGameStore(s => s.setAutoPlay);
+  const autoPlaySpeed = useGameStore(s => s.autoPlaySpeed);
+  const setAutoPlaySpeed = useGameStore(s => s.setAutoPlaySpeed);
 
   const unlockAll = () => {
     const allLevels = LEVELS.map(l => l.id);
@@ -47,6 +51,36 @@ export function DebugPanel({ onClose, onJumpAstro, onJumpLevel }: DebugPanelProp
       <div className="flex items-center justify-between mb-2">
         <span className="font-bold tracking-[2px] text-amber-400 uppercase text-[9px]">Debug Mode</span>
         <button onClick={onClose} className="text-amber-400/70 hover:text-amber-200 px-1 cursor-pointer" title="Close (`)">✕</button>
+      </div>
+
+      <div className="text-[8px] tracking-[2px] text-amber-500/60 uppercase mb-1.5">Auto-Player</div>
+      <div className="flex flex-col gap-1 mb-3">
+        <button
+          onClick={() => setAutoPlay(!autoPlay)}
+          className={`w-full text-left px-2.5 py-1.5 rounded border transition-colors cursor-pointer ${
+            autoPlay
+              ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/40 text-emerald-200'
+              : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/20 text-amber-200'
+          }`}
+        >
+          {autoPlay ? '⏸  Pause auto-player' : '▶  Play auto-player'}
+        </button>
+        <div className="flex items-center gap-2 px-0.5">
+          <span className="text-[8px] text-amber-500/60 uppercase tracking-[1px] whitespace-nowrap">Speed</span>
+          <input
+            type="range"
+            min={0.5}
+            max={4}
+            step={0.1}
+            value={autoPlaySpeed}
+            onChange={(e) => setAutoPlaySpeed(parseFloat(e.target.value))}
+            className="flex-1 h-1 accent-amber-400 cursor-pointer"
+          />
+          <span className="text-[9px] text-amber-200 tabular-nums w-8 text-right">{autoPlaySpeed.toFixed(1)}×</span>
+        </div>
+        <div className="text-[8px] text-amber-500/50 leading-tight px-0.5">
+          Watches itself fuse. You can still drag tiles while it runs.
+        </div>
       </div>
 
       <div className="text-[8px] tracking-[2px] text-amber-500/60 uppercase mb-1.5">Dev Actions</div>

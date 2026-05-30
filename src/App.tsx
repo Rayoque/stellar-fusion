@@ -13,6 +13,7 @@ import { Codex } from './ui/Codex';
 import { CampaignStatusOverlay } from './ui/CampaignStatusOverlay';
 import { CampaignObjectiveOverlay } from './ui/CampaignObjectiveOverlay';
 import { DebugPanel } from './ui/DebugPanel';
+import { AutoPlayerDriver } from './game/AutoPlayerDriver';
 import { ELEMENTS } from './game/elements';
 import type { ElementSymbol } from './game/types';
 import { AstroFe56Overlay } from './ui/AstroFe56Overlay';
@@ -353,12 +354,31 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
 
+    // Mobile has no backtick key, so a hidden gesture opens the dev menu on touch:
+    // 5 quick taps in the top-right corner (over the score readout). This also sets
+    // the debug flag, so it's the one-time unlock on a phone.
+    let taps: number[] = [];
+    const handleSecretTap = (e: PointerEvent) => {
+      const inCorner = e.clientX > window.innerWidth - 90 && e.clientY < 90;
+      if (!inCorner) return;
+      const now = Date.now();
+      taps = taps.filter(t => now - t < 1500);
+      taps.push(now);
+      if (taps.length >= 5) {
+        taps = [];
+        localStorage.setItem('stellar_debug', 'true');
+        setDebugOpen(true);
+      }
+    };
+    window.addEventListener('pointerdown', handleSecretTap, { capture: true });
+
     // Expose direct React state triggers to window for immediate console feedback
     (window as any)._openDebugPanel = () => setDebugOpen(true);
     (window as any)._closeDebugPanel = () => setDebugOpen(false);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('pointerdown', handleSecretTap, { capture: true } as any);
       delete (window as any)._openDebugPanel;
       delete (window as any)._closeDebugPanel;
     };
@@ -393,6 +413,7 @@ export default function App() {
     <div className="relative w-full h-screen h-[100dvh] overflow-hidden bg-[#050508] text-white font-sans select-none antialiased">
       <Scene />
       <TouchIndicator />
+      <AutoPlayerDriver />
 
       <HUD
         phase={phase}

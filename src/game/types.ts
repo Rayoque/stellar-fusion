@@ -124,4 +124,12 @@ export interface GameState {
   lastMoveFaceId: number | null;
   hasSeenFe56Splash: boolean;
   showFe56Splash: boolean;
+  // Dev-only auto-player: when true, a driver makes moves on its own using the
+  // same startDrag/endDrag path a human uses. Toggled from the debug panel.
+  autoPlay: boolean;
+  // Auto-player pace multiplier (0.5×–4×); scales the dwell + idle between moves.
+  autoPlaySpeed: number;
+  // When set, Controls smoothly orbits the camera to bring this face to the front,
+  // so the auto-player can fetch a piece that's currently on the back.
+  autoRotateTargetFaceId: number | null;
 }

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../game/state';
 import { resolveSlideTarget } from '../geometry/slide';
 import { SCORE_VALUES } from '../game/rules';
+import { setCameraPos } from './cameraState';
 
 function getElementMass(element: string): number {
   const standardMasses: Record<string, number> = {
@@ -151,6 +152,29 @@ export function Controls() {
   // Proportional Camera Tracking: rotate camera position & up vector smoothly to track the sliding tile's position,
   // transitioning perfectly and gap-free into the post-slide momentum coasting.
   useFrame((state, delta) => {
+    // Publish camera position so the dev auto-player can tell which faces face us.
+    setCameraPos(camera.position.x, camera.position.y, camera.position.z);
+
+    // Dev auto-player: smoothly orbit the camera to bring a requested face to the
+    // front, so it can fetch a piece that's currently on the back of the sphere.
+    const rotTargetId = useGameStore.getState().autoRotateTargetFaceId;
+    if (rotTargetId !== null && !activeSlide) {
+      const tf = faces[rotTargetId];
+      if (tf) {
+        const dist = camera.position.length();
+        const cur = camera.position.clone().normalize();
+        const tgt = new THREE.Vector3(tf.center.x, tf.center.y, tf.center.z).normalize();
+        const q = new THREE.Quaternion().setFromUnitVectors(cur, tgt);
+        const rotSpeed = useGameStore.getState().autoPlaySpeed;
+        const step = new THREE.Quaternion().slerpQuaternions(new THREE.Quaternion(), q, Math.min(1, delta * 3 * rotSpeed));
+        camera.position.applyQuaternion(step).setLength(dist);
+        camera.up.applyQuaternion(step);
+        camera.lookAt(0, 0, 0);
+        if (controlsRef.current) controlsRef.current.update();
+        setCameraPos(camera.position.x, camera.position.y, camera.position.z);
+      }
+    }
+
     if (!activeSlide) {
       camStartPos.current = null;
       camStartUp.current = null;
