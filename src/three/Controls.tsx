@@ -181,7 +181,14 @@ export function Controls() {
         
         // Premium dynamic momentum: proportional to BOTH element mass AND slide length/velocity
         const initialVel = mass * 0.0004 * slideLength;
-        driftVelocity.current = Math.min(initialVel, 0.12); // clamp at 0.12 rad/frame for visual stability
+
+        // Scale down post-slide momentum drift if the destination face is already centered
+        const dirStart = camStartPos.current.clone().normalize();
+        const endToCameraStartAngle = dirStart.angleTo(vEnd);
+        const maxCenteringAngle = 0.8; // ~45 degrees threshold
+        const centeringWeight = Math.max(0, 1 - endToCameraStartAngle / maxCenteringAngle);
+
+        driftVelocity.current = Math.min(initialVel, 0.12) * (1 - centeringWeight); // clamp at 0.12 rad/frame for visual stability
       }
 
       const elapsed = performance.now() - startTime;
@@ -195,6 +202,7 @@ export function Controls() {
         const currentDist = camStartPos.current!.length();
 
         const vStart = new THREE.Vector3(startFace.center.x, startFace.center.y, startFace.center.z).normalize();
+        const vEnd = new THREE.Vector3(endFace.center.x, endFace.center.y, endFace.center.z).normalize();
 
         // Calculate segment-by-segment geodesic center direction
         const N = path.length - 1;
@@ -219,15 +227,32 @@ export function Controls() {
         // 2. Relative offset direction (keeps the shape exactly at its grabbed screen coordinates)
         const dirRelative = dirStart.clone().applyQuaternion(qTileProgress);
 
-        // 4. Blend by 40% drift factor to achieve the "slurping" center-line drift over time
+        // 3. Standard offset camera tracking with a 40% drift factor
         const driftFactor = 0.40;
-        const blendedDir = new THREE.Vector3().lerpVectors(
+        const dirStandard = new THREE.Vector3().lerpVectors(
           dirRelative, 
           dirTileCurrent, 
           eased * driftFactor
         ).normalize();
 
-        // 5. Calculate up vector based on the blended direction's rotation
+        // 4. Centered path camera tracking slerping directly from dirStart to the destination vEnd
+        const qCentered = new THREE.Quaternion().setFromUnitVectors(dirStart, vEnd);
+        const qCenteredProgress = new THREE.Quaternion().slerpQuaternions(new THREE.Quaternion(), qCentered, eased);
+        const dirCentered = dirStart.clone().applyQuaternion(qCenteredProgress).normalize();
+
+        // 5. Interpolate standard offset tracking and centered tracking based on destination centering weight.
+        // This ensures if the target shape is already at the center of the screen, the camera stays centered on it.
+        const endToCameraStartAngle = dirStart.angleTo(vEnd);
+        const maxCenteringAngle = 0.8; // ~45 degrees threshold
+        const centeringWeight = Math.max(0, 1 - endToCameraStartAngle / maxCenteringAngle);
+
+        const blendedDir = new THREE.Vector3().lerpVectors(
+          dirStandard,
+          dirCentered,
+          centeringWeight
+        ).normalize();
+
+        // 6. Calculate up vector based on the blended direction's rotation
         const qCamGeodesic = new THREE.Quaternion().setFromUnitVectors(dirStart, blendedDir);
         
         const pFinal = blendedDir.multiplyScalar(currentDist);
