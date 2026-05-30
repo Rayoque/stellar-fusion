@@ -415,7 +415,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
       <div
         className="absolute left-1/2 -translate-x-1/2 pointer-events-auto hud-bottom-container"
       >
-        <div className="flex flex-col items-center gap-2 xs:gap-3.5 pointer-events-none select-none max-w-[94vw] xs:max-w-[88vw] sm:max-w-md md:max-w-xl">
+        <div className="flex flex-col items-center gap-2 xs:gap-3.5 pointer-events-none select-none max-w-[94vw]">
           {/* Pinch-to-zoom hint, floated directly above the instructions line */}
           {showZoomHint && <ZoomTooltip />}
 
@@ -426,7 +426,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
 
           {/* Elements Tray Wrapper Container with Smart Touch Orbiting handlers */}
           <div 
-            className="glass-panel rounded-[20px] xs:rounded-[22px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center overflow-hidden w-full max-w-full pointer-events-auto border border-white/8"
+            className="glass-panel rounded-[20px] xs:rounded-[22px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center overflow-hidden max-w-full pointer-events-auto border border-white/8"
             style={{ 
               borderColor: `${currentThemeColor}15`,
               boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px ${currentThemeColor}05`
@@ -547,7 +547,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
             {/* Scrollable Elements List */}
             <div 
               ref={trayRef}
-              className="flex items-center gap-1.5 xs:gap-2.5 overflow-x-auto no-scrollbar pl-2.5 xs:pl-3.5 py-2.5 xs:py-3 pr-1.5 xs:pr-2.5 flex-grow min-w-0"
+              className="flex items-center gap-1.5 xs:gap-2.5 overflow-x-auto no-scrollbar pl-2.5 xs:pl-3.5 py-2.5 xs:py-3 pr-1.5 xs:pr-2.5 min-w-0"
               style={{
                 cursor: isDragging ? 'grabbing' : 'grab',
                 userSelect: 'none',
