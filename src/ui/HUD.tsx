@@ -6,6 +6,7 @@ import { useGameStore } from '../game/state';
 import { getStarAgeInfo } from '../game/phases';
 import { LEVELS } from '../game/levels';
 import { playSpawnTick } from '../audio/synth';
+import { ZoomTooltip } from './ZoomTooltip';
 
 interface HUDProps {
   phase: Phase;
@@ -15,6 +16,7 @@ interface HUDProps {
   onOpenMenu: () => void;
   onOpenCodex: () => void;
   onOpenObjectives?: () => void;
+  showZoomHint?: boolean;
 }
 
 const PHASE_ICONS: Record<Phase, string> = {
@@ -81,7 +83,7 @@ const PHASE_COLORS: Record<Phase, string> = {
   collapse: '#a855f7',      // Purple
 };
 
-export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCodex, onOpenObjectives }: HUDProps) {
+export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCodex, onOpenObjectives, showZoomHint }: HUDProps) {
   const state = useGameStore();
   const ageInfo = getStarAgeInfo(state);
   const compactAge = ageInfo.formatted
@@ -414,6 +416,9 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
         className="absolute left-1/2 -translate-x-1/2 pointer-events-auto hud-bottom-container"
       >
         <div className="flex flex-col items-center gap-2 xs:gap-3.5 pointer-events-none select-none max-w-[94vw] xs:max-w-[88vw] sm:max-w-md md:max-w-xl">
+          {/* Pinch-to-zoom hint, floated directly above the instructions line */}
+          {showZoomHint && <ZoomTooltip />}
+
           {/* Dynamic Instructions placed directly above the Elements Tray */}
           <div className="text-[8px] xs:text-[9px] sm:text-[10px] opacity-35 tracking-[2px] xs:tracking-[4px] font-mono uppercase whitespace-nowrap mb-0.5 select-none">
             {state.astrophysicistMode ? 'FUSE NUCLEI ALL THE WAY TO IRON-56' : 'DRAG TILES TO FUSE • BUILD YOUR STAR'}

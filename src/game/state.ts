@@ -110,7 +110,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
   hasSeenNucleationTutorial: localStorage.getItem('stellar_seen_nucleation') === 'true',
   history: [],
   hasPlayedHeliumLaugh: false,
-  hasManuallyZoomed: localStorage.getItem('stellar_has_manually_zoomed') === 'true',
+  hasManuallyZoomed: (() => {
+    const lastZoomTime = localStorage.getItem('stellar_last_zoom_time');
+    if (lastZoomTime) {
+      const daysPassed = (Date.now() - parseInt(lastZoomTime, 10)) / (1000 * 60 * 60 * 24);
+      if (daysPassed < 7) {
+        return true;
+      }
+    }
+    return false;
+  })(),
   isOrbitingFromHUD: false,
   isSphereTooBig: false,
   lastMoveFaceId: null,
@@ -798,7 +807,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ hasSeenNucleationTutorial: false, showNucleationTutorial: false });
   },
   setManuallyZoomed: () => {
-    localStorage.setItem('stellar_has_manually_zoomed', 'true');
+    localStorage.setItem('stellar_last_zoom_time', Date.now().toString());
     set({ hasManuallyZoomed: true });
   },
 }));

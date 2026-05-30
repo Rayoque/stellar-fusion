@@ -15,7 +15,6 @@ import { CampaignObjectiveOverlay } from './ui/CampaignObjectiveOverlay';
 import { DebugPanel } from './ui/DebugPanel';
 import { ELEMENTS } from './game/elements';
 import type { ElementSymbol } from './game/types';
-import { ZoomTooltip } from './ui/ZoomTooltip';
 import { AstroFe56Overlay } from './ui/AstroFe56Overlay';
 
 export default function App() {
@@ -156,6 +155,29 @@ export default function App() {
       setDelayedShowNucleation(false);
     }
   }, [showNucleationTutorial]);
+
+  const [shouldShowZoomTooltip, setShouldShowZoomTooltip] = React.useState(false);
+
+  useEffect(() => {
+    const canShow = isSphereTooBig && 
+                    !hasManuallyZoomed && 
+                    !showStart && 
+                    !isPaused && 
+                    !showCampaign && 
+                    !showCodex && 
+                    !delayedShowNucleation && 
+                    showObjectiveLevelId === null;
+
+    if (canShow) {
+      const timer = setTimeout(() => {
+        setShouldShowZoomTooltip(true);
+      }, 5000);
+      return () => clearTimeout(timer);
+    } else {
+      setShouldShowZoomTooltip(false);
+    }
+  }, [isSphereTooBig, hasManuallyZoomed, showStart, isPaused, showCampaign, showCodex, delayedShowNucleation, showObjectiveLevelId]);
+
 
   // Dynamic Ambient Drone Phase updates
   useEffect(() => {
@@ -380,6 +402,7 @@ export default function App() {
         onOpenMenu={() => setPaused(true)}
         onOpenCodex={() => setShowCodex(true)}
         onOpenObjectives={currentLevelId !== null ? () => { setObjectiveIsBriefing(false); setShowObjectiveLevelId(currentLevelId); } : undefined}
+        showZoomHint={shouldShowZoomTooltip}
       />
 
       {/* Standard Sandbox End Screen */}
@@ -519,6 +542,7 @@ export default function App() {
         </div>
       )}
 
+
       {/* Subtle discovery dynamic toast notification gated to avoid overlaps */}
       {activeToastElement && !showStart && !isPaused && !showCampaign && !showCodex && !delayedShowNucleation && showObjectiveLevelId === null && !showStatusOverlay && (
         <div 
@@ -538,11 +562,6 @@ export default function App() {
             <span className="text-xs">✦</span>
           </div>
         </div>
-      )}
-
-      {/* Subtle, gated backgroundless Pinch-to-Zoom Tooltip */}
-      {isSphereTooBig && !hasManuallyZoomed && !showStart && !isPaused && !showCampaign && !showCodex && !delayedShowNucleation && showObjectiveLevelId === null && (
-        <ZoomTooltip />
       )}
 
       {debugOpen && (
