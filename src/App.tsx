@@ -459,13 +459,13 @@ export default function App() {
       {isEditorMode && <ScenarioEditor />}
 
       {isTestingCustomScenario && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100]">
+        <div className="fixed right-4 z-[100] top-[calc(1.4rem+env(safe-area-inset-top,0px))]">
           <button
             onClick={() => {
               const setEditorMode = useGameStore.getState().setEditorMode;
               setEditorMode(true);
             }}
-            className="glass-pill px-6 py-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold font-mono tracking-[2px] text-[10px] uppercase shadow-[0_0_24px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95 transition-all"
+            className="glass-pill px-4 sm:px-6 py-2 sm:py-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold font-mono tracking-[1.5px] sm:tracking-[2px] text-[8.5px] sm:text-[10px] uppercase shadow-[0_0_24px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95 transition-all"
           >
             Return to Editor
           </button>

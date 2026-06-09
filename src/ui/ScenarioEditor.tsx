@@ -417,8 +417,11 @@ export function ScenarioEditor() {
           {brushBtn('clear', 'Eraser ✕', 'bg-white/20 border-dotted', 'bg-white/5')}
         </div>
 
-        <div className="text-[8px] text-white/35 text-center mt-2 leading-tight">
-          Select brush above, then tap faces on the 3D sphere.
+        <div className="text-[8px] text-white/35 text-center mt-2 leading-tight flex flex-col gap-1">
+          <div>Select brush above, then tap faces on the 3D sphere.</div>
+          <div className="text-amber-500/70 font-semibold uppercase tracking-wider text-[7px] leading-tight mt-0.5">
+            ⚠️ Environmental factors (CME, Anomaly, Wormhole) are in active development and may exhibit unexpected behavior.
+          </div>
         </div>
       </div>
 
