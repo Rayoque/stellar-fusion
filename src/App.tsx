@@ -14,9 +14,11 @@ import { CampaignStatusOverlay } from './ui/CampaignStatusOverlay';
 import { CampaignObjectiveOverlay } from './ui/CampaignObjectiveOverlay';
 import { DebugPanel } from './ui/DebugPanel';
 import { AutoPlayerDriver } from './game/AutoPlayerDriver';
+import { LEVELS } from './game/levels';
 import { ELEMENTS } from './game/elements';
 import type { ElementSymbol } from './game/types';
 import { AstroFe56Overlay } from './ui/AstroFe56Overlay';
+import { ScenarioEditor } from './ui/ScenarioEditor';
 
 export default function App() {
   const newGame = useGameStore(s => s.newGame);
@@ -37,6 +39,8 @@ export default function App() {
   const levelFailed = useGameStore(s => s.levelFailed);
   const activeToastElement = useGameStore(s => s.activeToastElement);
   const dismissToast = useGameStore(s => s.dismissToast);
+  const systemToast = useGameStore(s => s.systemToast);
+  const dismissSystemToast = useGameStore(s => s.dismissSystemToast);
 
   // Nucleation Tutorial state bindings
   const showNucleationTutorial = useGameStore(s => s.showNucleationTutorial);
@@ -45,6 +49,9 @@ export default function App() {
   const hasManuallyZoomed = useGameStore(s => s.hasManuallyZoomed);
   const isSphereTooBig = useGameStore(s => s.isSphereTooBig);
   const showFe56Splash = useGameStore(s => s.showFe56Splash);
+  const tilesCount = useGameStore(s => s.tiles.size);
+  const isEditorMode = useGameStore(s => s.isEditorMode);
+  const isTestingCustomScenario = useGameStore(s => s.isTestingCustomScenario);
 
   const [showAstroOverlay, setShowAstroOverlay] = React.useState(false);
 
@@ -125,6 +132,16 @@ export default function App() {
     }
   }, [activeToastElement, dismissToast]);
 
+  // Auto-dismiss the system toast after 3.5 seconds
+  useEffect(() => {
+    if (systemToast) {
+      const timer = setTimeout(() => {
+        dismissSystemToast();
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [systemToast, dismissSystemToast]);
+
   const [showStatusOverlay, setShowStatusOverlay] = React.useState(false);
   const [showObjectiveLevelId, setShowObjectiveLevelId] = React.useState<number | null>(null);
   // Tracks whether the objective overlay is the game-start briefing (plays a tick on dismiss)
@@ -187,8 +204,9 @@ export default function App() {
     // So it plays when the phase is 'collapse' AND the splash screen is NOT active (endState === null).
     // Conversely, on the splash screen itself (endState !== null), it plays the pre-collapse (Supergiant) sound.
     const isCoreCollapseActive = phase === 'collapse' && endState === null;
-    updateAmbientDrone(phase, isCoreCollapseActive);
-  }, [phase, endState]);
+    const isBoardTense = tilesCount >= 28;
+    updateAmbientDrone(phase, isCoreCollapseActive, isBoardTense);
+  }, [phase, endState, tilesCount]);
 
   // Re-assert drone playback when returning to the foreground / after an OS audio
   // interruption (app-switch, lock-unlock, Bluetooth handoff, phone call).
@@ -286,7 +304,7 @@ export default function App() {
   };
 
   const handleNextLevel = () => {
-    if (currentLevelId !== null && currentLevelId < 10) {
+    if (currentLevelId !== null && currentLevelId < LEVELS.length) {
       setShowStatusOverlay(false); // Instantly hide stale overlay
       newGame(undefined, currentLevelId + 1);
       const completed = useGameStore.getState().completedLevels;
@@ -384,6 +402,16 @@ export default function App() {
     };
   }, []);
 
+  const prevEditorModeRef = React.useRef(isEditorMode);
+  useEffect(() => {
+    if (isEditorMode) {
+      setShowStart(false);
+    } else if (prevEditorModeRef.current && !isEditorMode && !isTestingCustomScenario) {
+      setShowStart(true);
+    }
+    prevEditorModeRef.current = isEditorMode;
+  }, [isEditorMode, isTestingCustomScenario]);
+
   if (showStart) {
     return (
       <>
@@ -415,16 +443,34 @@ export default function App() {
       <TouchIndicator />
       <AutoPlayerDriver />
 
-      <HUD
-        phase={phase}
-        starMass={starMass}
-        turn={turn}
-        elementCounts={elementCounts}
-        onOpenMenu={() => setPaused(true)}
-        onOpenCodex={() => setShowCodex(true)}
-        onOpenObjectives={currentLevelId !== null ? () => { setObjectiveIsBriefing(false); setShowObjectiveLevelId(currentLevelId); } : undefined}
-        showZoomHint={shouldShowZoomTooltip}
-      />
+      {!isEditorMode && (
+        <HUD
+          phase={phase}
+          starMass={starMass}
+          turn={turn}
+          elementCounts={elementCounts}
+          onOpenMenu={() => setPaused(true)}
+          onOpenCodex={() => setShowCodex(true)}
+          onOpenObjectives={currentLevelId !== null ? () => { setObjectiveIsBriefing(false); setShowObjectiveLevelId(currentLevelId); } : undefined}
+          showZoomHint={shouldShowZoomTooltip}
+        />
+      )}
+
+      {isEditorMode && <ScenarioEditor />}
+
+      {isTestingCustomScenario && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100]">
+          <button
+            onClick={() => {
+              const setEditorMode = useGameStore.getState().setEditorMode;
+              setEditorMode(true);
+            }}
+            className="glass-pill px-6 py-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold font-mono tracking-[2px] text-[10px] uppercase shadow-[0_0_24px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95 transition-all"
+          >
+            Return to Editor
+          </button>
+        </div>
+      )}
 
       {/* Standard Sandbox End Screen */}
       {endState && currentLevelId === null && (
@@ -484,14 +530,22 @@ export default function App() {
         <CampaignStatusOverlay
           levelId={currentLevelId}
           status={levelObjectiveMet ? 'win' : 'fail'}
-          onNextLevel={currentLevelId < 10 ? handleNextLevel : undefined}
+          onNextLevel={isTestingCustomScenario ? undefined : (currentLevelId < LEVELS.length ? handleNextLevel : undefined)}
           onRetry={handleRetryLevel}
-          onBackToCampaign={() => {
-            setShowStatusOverlay(false); // Instantly hide stale overlay
-            newGame();
-            setShowStart(true);
-            setShowCampaign(true);
-          }}
+          onBackToCampaign={
+            isTestingCustomScenario
+              ? () => {
+                  setShowStatusOverlay(false);
+                  const setEditorMode = useGameStore.getState().setEditorMode;
+                  setEditorMode(true);
+                }
+              : () => {
+                  setShowStatusOverlay(false); // Instantly hide stale overlay
+                  newGame();
+                  setShowStart(true);
+                  setShowCampaign(true);
+                }
+          }
         />
       )}
 
@@ -563,6 +617,23 @@ export default function App() {
         </div>
       )}
 
+
+      {/* System Warning Toast (e.g. autoplay high score tracking disabled) */}
+      {systemToast && !showStart && !isPaused && !showCampaign && !showCodex && !delayedShowNucleation && showObjectiveLevelId === null && !showStatusOverlay && (
+        <div 
+          className="fixed left-1/2 -translate-x-1/2 z-50 pointer-events-none flex justify-center w-full max-w-[90vw] sm:max-w-none hud-system-toast-container"
+        >
+          <div 
+            className="glass-pill px-6 py-3 rounded-full border border-amber-500/30 text-amber-400 font-bold tracking-[2px] text-[8px] sm:text-[9px] shadow-[0_0_24px_rgba(245,158,11,0.2)] flex items-center justify-center text-center gap-2.5 uppercase font-mono pointer-events-auto cursor-pointer select-none animate-fade-in-up"
+            onClick={dismissSystemToast}
+            title="Dismiss warning"
+          >
+            <span className="text-[10px] text-amber-500 animate-pulse">⚠️</span>
+            <span>{systemToast}</span>
+            <span className="text-[10px] text-amber-500 animate-pulse">⚠️</span>
+          </div>
+        </div>
+      )}
 
       {/* Subtle discovery dynamic toast notification gated to avoid overlaps */}
       {activeToastElement && !showStart && !isPaused && !showCampaign && !showCodex && !delayedShowNucleation && showObjectiveLevelId === null && !showStatusOverlay && (

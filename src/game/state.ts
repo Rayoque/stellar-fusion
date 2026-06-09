@@ -1,6 +1,6 @@
 // src/game/state.ts
 import { create } from 'zustand';
-import type { GameState, EndState, Phase, ElementSymbol, Tile } from './types';
+import type { GameState, EndState, Phase, ElementSymbol, Tile, ObstacleInstance, Level } from './types';
 import { generateTruncatedIcosahedron } from '../geometry/truncatedIcosahedron';
 import { ELEMENTS } from './elements';
 import { currentPhaseRule, updatePhase } from './phases';
@@ -8,8 +8,20 @@ import { spawnHydrogen } from './spawn';
 import { checkEndState } from './endgame';
 import { detectMerge, applyMerge, DECAY_POINTS } from './rules';
 import { executeSlide } from '../geometry/slide';
-import { playMerge, playBlocked, playHeliumLaugh, playSuccess } from '../audio/synth';
+import { playMerge, playBlocked, playHeliumLaugh, playSuccess, playSlide, playSpawnTick } from '../audio/synth';
 import { LEVELS } from './levels';
+
+function submitScoreToGameCenter(score: number, isAstro: boolean): void {
+  try {
+    if (typeof window !== 'undefined' && (window as any).Capacitor) {
+      const GameServices = (window as any).Capacitor.Plugins.GameServices;
+      if (GameServices) {
+        const leaderboardId = isAstro ? 'stellar_fusion_astro_leaderboard' : 'stellar_fusion_standard_leaderboard';
+        GameServices.submitScore({ leaderboardId, score }).catch(() => {});
+      }
+    }
+  } catch (err) {}
+}
 
 interface GameActions {
   newGame: (mass?: number, levelId?: number, isAstro?: boolean) => void;
@@ -32,6 +44,19 @@ interface GameActions {
   setAutoPlay: (on: boolean) => void;
   setAutoPlaySpeed: (speed: number) => void;
   setAutoRotateTarget: (faceId: number | null) => void;
+  toggleZenMode: () => void;
+  dismissSystemToast: () => void;
+
+  // Scenario Editor Actions
+  setEditorMode: (isOpen: boolean) => void;
+  setEditorBrush: (brush: any) => void;
+  updateEditorMetadata: (metadata: Partial<GameState['editorLevelMetadata']>) => void;
+  applyEditorBrush: (faceId: number) => void;
+  saveEditorDraft: () => void;
+  loadEditorDraft: () => void;
+  publishScenario: () => void;
+  deleteScenario: (id: number) => void;
+  loadScenarioForEditing: (level: Level) => void;
 }
 
 type GameStore = GameState & GameActions;
@@ -72,6 +97,7 @@ interface SavedGame {
   astrophysicistMode: boolean;
   hasPlayedHeliumLaugh: boolean;
   hasSeenFe56Splash: boolean;
+  wasAutoPlayedThisRun?: boolean;
 }
 
 const saveKey = (isAstro: boolean) => (isAstro ? 'stellar_save_astro' : 'stellar_save_standard');
@@ -96,10 +122,35 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // Campaign initial states loaded from localStorage
   currentLevelId: null,
   completedLevels: JSON.parse(localStorage.getItem('stellar_completed_levels') || '[]'),
+  perfectLevels: JSON.parse(localStorage.getItem('stellar_perfect_levels') || '[]'),
+  showZenMode: false,
   levelObjectiveMet: false,
   levelFailed: false,
   unlockedElements: JSON.parse(localStorage.getItem('stellar_unlocked_elements') || '["H", "He"]'),
   activeToastElement: null,
+
+  // Scenario Editor & Obstacles initial state
+  obstacles: new Map(),
+  isEditorMode: false,
+  isTestingCustomScenario: false,
+  editorBrush: 'H',
+  editorLevelMetadata: {
+    title: 'New Scenario',
+    description: 'Use the editor to build your custom nucleosynthesis puzzle.',
+    author: 'Stellar Architect',
+    starMass: 4.0,
+    maxTurns: 10,
+    parMoves: 6,
+    objectives: [{ type: 'has_element', element: 'He', count: 1, hint: 'Create Helium' }],
+    disableSpawns: true,
+  },
+  customScenarios: (() => {
+    try {
+      return JSON.parse(localStorage.getItem('stellar_custom_scenarios') || '[]');
+    } catch {
+      return [];
+    }
+  })(),
 
   selectedFaceId: null,
   dragTargetId: null,
@@ -131,15 +182,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
   autoPlay: false,
   autoPlaySpeed: 1,
   autoRotateTargetFaceId: null,
+  wasAutoPlayedThisRun: false,
+  systemToast: null,
 
   dismissToast: () => {
     set({ activeToastElement: null });
+  },
+
+  dismissSystemToast: () => {
+    set({ systemToast: null });
   },
 
   newGame: (mass, levelId, isAstro) => {
     const faces = generateTruncatedIcosahedron();
     let starMass = mass ?? (1 + Math.random() * 29); // 1–30 M☉
     const initialTiles = new Map<number, Tile>();
+    const initialObstacles = new Map<number, ObstacleInstance>();
     let currentLevelId: number | null = null;
     const isAstroMode = isAstro ?? false;
 
@@ -157,16 +215,40 @@ export const useGameStore = create<GameStore>((set, get) => ({
         emptyIndices.splice(idx, 1);
       }
     } else if (levelId !== undefined) {
-      const level = LEVELS.find(l => l.id === levelId);
-      if (level) {
-        currentLevelId = levelId;
-        starMass = level.starMass;
-        for (const t of level.initialTiles) {
-          initialTiles.set(t.faceId, {
-            faceId: t.faceId,
-            element: t.element,
-            spawnedAtTurn: 0,
-          });
+      if (levelId === 9999) {
+        currentLevelId = 9999;
+        const raw = localStorage.getItem('stellar_editor_draft');
+        if (raw) {
+          const draft = JSON.parse(raw);
+          starMass = draft.metadata.starMass;
+          if (draft.tiles) {
+            for (const [fid, t] of draft.tiles) {
+              initialTiles.set(fid, { ...t, spawnedAtTurn: 0 });
+            }
+          }
+          if (draft.obstacles) {
+            for (const [fid, o] of draft.obstacles) {
+              initialObstacles.set(fid, { ...o });
+            }
+          }
+        }
+      } else {
+        const level = LEVELS.find(l => l.id === levelId) || get().customScenarios.find(l => l.id === levelId);
+        if (level) {
+          currentLevelId = levelId;
+          starMass = level.starMass;
+          for (const t of level.initialTiles) {
+            initialTiles.set(t.faceId, {
+              faceId: t.faceId,
+              element: t.element,
+              spawnedAtTurn: 0,
+            });
+          }
+          if (level.obstacles) {
+            for (const obs of level.obstacles) {
+              initialObstacles.set(obs.faceId, { ...obs });
+            }
+          }
         }
       }
     } else {
@@ -200,6 +282,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       starMass,
       faces,
       tiles: initialTiles,
+      obstacles: initialObstacles,
       turn: 0,
       phase: 'main_sequence',
       elementCounts: initialCounts,
@@ -234,6 +317,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       showFe56Splash: false,
       autoPlay: false,
       autoRotateTargetFaceId: null,
+      wasAutoPlayedThisRun: false,
+      systemToast: null,
     });
   },
 
@@ -279,6 +364,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (moved) {
         const tile = state.tiles.get(fromFaceId)!;
         const duration = (slideResult.path.length - 1) * 180;
+        
+        // Play slide sound (synesthetic pitch mapped)
+        playSlide(tile.element, slideResult.path.length - 1);
         
         // Save pre-move snapshot to history stack
         const snapshot = {
@@ -362,7 +450,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           playMerge(parentElement, mergeRule.output);
           // Eslint-clean, snappy instant merges just like 2048: no artificial lag or delays!
 
-          // Trigger Astrophysicist Mode Iron-56 Splash screen upon successful synthesis
+          // Trigger Astrophysicist Mode Iron-56 Synthesis Congratulations Overlay
           if (state.astrophysicistMode && mergeRule.output === 'Fe56' && !state.hasSeenFe56Splash) {
             state.levelObjectiveMet = true;
             state.showFe56Splash = true;
@@ -371,8 +459,83 @@ export const useGameStore = create<GameStore>((set, get) => ({
           }
         }
 
+        // Vaporize tiles sitting on active CMEs (pre-turn check)
+        if (state.obstacles) {
+          for (const [faceId, obs] of state.obstacles.entries()) {
+            if (obs.type === 'cme' && obs.state === 'active') {
+              state.tiles.delete(faceId);
+            }
+          }
+        }
+
         // Increment turn
         state.turn += 1;
+
+        // Gravitational Anomaly Repulsion: Push adjacent tiles 1 step away into empty neighbors
+        if (state.obstacles) {
+          const pushedTiles = new Map<number, number>();
+          for (const [faceId, obs] of state.obstacles.entries()) {
+            if (obs.type !== 'gravity') continue;
+            const A = state.faces[faceId];
+            if (!A) continue;
+            for (const B_id of A.neighbors) {
+              if (state.tiles.has(B_id)) {
+                const B = state.faces[B_id];
+                let bestC_id = -1;
+                let minDot = Infinity;
+                for (const C_id of B.neighbors) {
+                  if (C_id === faceId) continue;
+                  const C = state.faces[C_id];
+                  const dotVal = A.center.x * C.center.x + A.center.y * C.center.y + A.center.z * C.center.z;
+                  if (dotVal < minDot) {
+                    minDot = dotVal;
+                    bestC_id = C_id;
+                  }
+                }
+                if (bestC_id !== -1) {
+                  const hasTile = state.tiles.has(bestC_id);
+                  const hasGravity = state.obstacles.get(bestC_id)?.type === 'gravity';
+                  if (!hasTile && !hasGravity) {
+                    pushedTiles.set(B_id, bestC_id);
+                  }
+                }
+              }
+            }
+          }
+          if (pushedTiles.size > 0) {
+            const nextTiles = new Map(state.tiles);
+            for (const [fromId, toId] of pushedTiles.entries()) {
+              const tileVal = nextTiles.get(fromId);
+              if (tileVal) {
+                nextTiles.delete(fromId);
+                nextTiles.set(toId, { ...tileVal, faceId: toId, spawnReason: 'slide' });
+              }
+            }
+            state.tiles = nextTiles;
+          }
+        }
+
+        // Cycle CME phases: inactive -> warning -> active -> inactive
+        if (state.obstacles) {
+          const nextObstacles = new Map(state.obstacles);
+          for (const [faceId, obs] of nextObstacles.entries()) {
+            if (obs.type === 'cme') {
+              let nextState: 'inactive' | 'warning' | 'active' = 'inactive';
+              if (obs.state === 'inactive') nextState = 'warning';
+              else if (obs.state === 'warning') nextState = 'active';
+              else nextState = 'inactive';
+              nextObstacles.set(faceId, { ...obs, state: nextState });
+            }
+          }
+          state.obstacles = nextObstacles;
+
+          // Vaporize tiles sitting on newly active CMEs (post-turn check)
+          for (const [faceId, obs] of state.obstacles.entries()) {
+            if (obs.type === 'cme' && obs.state === 'active') {
+              state.tiles.delete(faceId);
+            }
+          }
+        }
 
         // Astrophysicist Mode: Decay Stage
         if (state.astrophysicistMode) {
@@ -432,10 +595,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         state.elementCounts = newCounts;
 
         // Check high score
-        if (state.score > state.highScore) {
+        if (!state.wasAutoPlayedThisRun && state.score > state.highScore) {
           state.highScore = state.score;
           const lsKey = state.astrophysicistMode ? 'stellar_high_score_astro' : 'stellar_high_score';
           localStorage.setItem(lsKey, state.highScore.toString());
+          submitScoreToGameCenter(state.score, state.astrophysicistMode);
         }
 
         // Update phase
@@ -505,12 +669,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
             if (allObjectivesMet) {
               levelObjectiveMet = true;
+              
               const currentCompleted = get().completedLevels;
+              let nextCompleted = currentCompleted;
               if (!currentCompleted.includes(level.id)) {
-                const nextCompleted = [...currentCompleted, level.id];
+                nextCompleted = [...currentCompleted, level.id];
                 localStorage.setItem('stellar_completed_levels', JSON.stringify(nextCompleted));
-                set({ completedLevels: nextCompleted });
               }
+
+              const currentPerfect = get().perfectLevels || [];
+              let nextPerfect = currentPerfect;
+              if (state.turn <= (level as any).parMoves && !currentPerfect.includes(level.id)) {
+                nextPerfect = [...currentPerfect, level.id];
+                localStorage.setItem('stellar_perfect_levels', JSON.stringify(nextPerfect));
+              }
+
+              set({ completedLevels: nextCompleted, perfectLevels: nextPerfect });
+
               if (!state.levelObjectiveMet) {
                 playSuccess();
               }
@@ -652,6 +827,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       astrophysicistMode: s.astrophysicistMode,
       hasPlayedHeliumLaugh: s.hasPlayedHeliumLaugh,
       hasSeenFe56Splash: s.hasSeenFe56Splash,
+      wasAutoPlayedThisRun: s.wasAutoPlayedThisRun,
     };
     try {
       localStorage.setItem(saveKey(s.astrophysicistMode), JSON.stringify(data));
@@ -698,7 +874,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       phase: data.phase,
       elementCounts: data.elementCounts,
       score: data.score,
-      highScore: Math.max(highScore, data.score || 0),
+      highScore: data.wasAutoPlayedThisRun ? highScore : Math.max(highScore, data.score || 0),
       phaseTransitions: data.phaseTransitions,
       currentLevelId: null,
       levelObjectiveMet: false,
@@ -721,6 +897,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lastMoveFaceId: null,
       hasSeenFe56Splash: data.hasSeenFe56Splash,
       showFe56Splash: false,
+      wasAutoPlayedThisRun: data.wasAutoPlayedThisRun || false,
+      systemToast: null,
     });
     return true;
   },
@@ -819,12 +997,257 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ hasManuallyZoomed: true });
   },
   setAutoPlay: (on) => {
-    set({ autoPlay: on, autoRotateTargetFaceId: null });
+    const wasAutoPlayedThisRun = on ? true : get().wasAutoPlayedThisRun;
+    const systemToast = on ? "High score tracking disabled for this run" : get().systemToast;
+    set({ 
+      autoPlay: on, 
+      autoRotateTargetFaceId: null,
+      wasAutoPlayedThisRun,
+      systemToast
+    });
   },
   setAutoPlaySpeed: (speed) => {
     set({ autoPlaySpeed: speed });
   },
   setAutoRotateTarget: (faceId) => {
     set({ autoRotateTargetFaceId: faceId });
+  },
+  toggleZenMode: () => {
+    set(state => ({ showZenMode: !state.showZenMode }));
+  },
+
+  setEditorMode: (isOpen) => {
+    if (isOpen) {
+      set({
+        isEditorMode: true,
+        isPaused: false,
+        currentLevelId: null,
+        isTestingCustomScenario: false,
+      });
+      get().loadEditorDraft();
+    } else {
+      set({ isEditorMode: false, isTestingCustomScenario: false });
+      get().newGame();
+    }
+  },
+
+  setEditorBrush: (brush) => {
+    set({ editorBrush: brush });
+  },
+
+  updateEditorMetadata: (metadata) => {
+    set(state => ({
+      editorLevelMetadata: {
+        ...state.editorLevelMetadata,
+        ...metadata,
+      }
+    }));
+    get().saveEditorDraft();
+  },
+
+  applyEditorBrush: (faceId) => {
+    const state = get();
+    const brush = state.editorBrush;
+    const tiles = new Map(state.tiles);
+    const obstacles = new Map(state.obstacles);
+
+    if (brush === 'clear') {
+      tiles.delete(faceId);
+      const obs = obstacles.get(faceId);
+      if (obs && obs.type === 'wormhole' && obs.targetFaceId !== undefined) {
+        const partner = obstacles.get(obs.targetFaceId);
+        if (partner && partner.type === 'wormhole') {
+          obstacles.set(obs.targetFaceId, { ...partner, targetFaceId: undefined });
+        }
+      }
+      obstacles.delete(faceId);
+    } else if (['H', 'He', 'C', 'O', 'Ne', 'Mg', 'Si', 'Fe'].includes(brush)) {
+      tiles.set(faceId, { faceId, element: brush as ElementSymbol, spawnedAtTurn: 0 });
+      const obs = obstacles.get(faceId);
+      if (obs && (obs.type === 'gravity' || obs.type === 'wormhole')) {
+        if (obs.type === 'wormhole' && obs.targetFaceId !== undefined) {
+          const partner = obstacles.get(obs.targetFaceId);
+          if (partner && partner.type === 'wormhole') {
+            obstacles.set(obs.targetFaceId, { ...partner, targetFaceId: undefined });
+          }
+        }
+        obstacles.delete(faceId);
+      }
+    } else if (brush === 'gravity') {
+      tiles.delete(faceId);
+      obstacles.set(faceId, { type: 'gravity', faceId });
+    } else if (brush === 'cme') {
+      const existing = obstacles.get(faceId);
+      if (existing && existing.type === 'cme') {
+        if (existing.state === 'inactive') {
+          obstacles.set(faceId, { type: 'cme', faceId, state: 'warning' });
+        } else if (existing.state === 'warning') {
+          obstacles.set(faceId, { type: 'cme', faceId, state: 'active' });
+        } else {
+          obstacles.delete(faceId);
+        }
+      } else {
+        obstacles.set(faceId, { type: 'cme', faceId, state: 'inactive' });
+      }
+    } else if (brush === 'wormhole') {
+      tiles.delete(faceId);
+      const existing = obstacles.get(faceId);
+      if (existing && existing.type === 'wormhole') {
+        if (existing.targetFaceId !== undefined) {
+          const partner = obstacles.get(existing.targetFaceId);
+          if (partner && partner.type === 'wormhole') {
+            obstacles.set(existing.targetFaceId, { ...partner, targetFaceId: undefined });
+          }
+        }
+        obstacles.delete(faceId);
+      } else {
+        let unpairedId: number | null = null;
+        for (const [id, obs] of obstacles.entries()) {
+          if (obs.type === 'wormhole' && obs.targetFaceId === undefined) {
+            unpairedId = id;
+            break;
+          }
+        }
+        if (unpairedId !== null) {
+          obstacles.set(faceId, { type: 'wormhole', faceId, targetFaceId: unpairedId });
+          obstacles.set(unpairedId, { type: 'wormhole', faceId: unpairedId, targetFaceId: faceId });
+        } else {
+          obstacles.set(faceId, { type: 'wormhole', faceId });
+        }
+      }
+    }
+
+    set({ tiles, obstacles });
+    get().saveEditorDraft();
+  },
+
+  saveEditorDraft: () => {
+    const state = get();
+    const draft = {
+      metadata: state.editorLevelMetadata,
+      tiles: Array.from(state.tiles.entries()),
+      obstacles: Array.from(state.obstacles.entries()),
+    };
+    localStorage.setItem('stellar_editor_draft', JSON.stringify(draft));
+  },
+
+  loadEditorDraft: () => {
+    try {
+      const raw = localStorage.getItem('stellar_editor_draft');
+      if (raw) {
+        const draft = JSON.parse(raw);
+        set({
+          editorLevelMetadata: draft.metadata,
+          tiles: new Map(draft.tiles),
+          obstacles: new Map(draft.obstacles),
+        });
+      } else {
+        set({
+          editorLevelMetadata: {
+            title: 'New Scenario',
+            description: 'Use the editor to build your custom nucleosynthesis puzzle.',
+            author: 'Stellar Architect',
+            starMass: 4.0,
+            maxTurns: 10,
+            parMoves: 6,
+            objectives: [{ type: 'has_element', element: 'He', count: 1, hint: 'Create Helium' }],
+            disableSpawns: true,
+          },
+          tiles: new Map(),
+          obstacles: new Map(),
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load editor draft:', err);
+    }
+  },
+
+  publishScenario: () => {
+    const state = get();
+    const meta = state.editorLevelMetadata;
+    const initialTiles = Array.from(state.tiles.entries()).map(([faceId, t]) => ({
+      faceId,
+      element: t.element,
+    }));
+    const levelObstacles = Array.from(state.obstacles.values());
+
+    const currentScenarios = [...state.customScenarios];
+    let levelId = (meta as any).id;
+    let isNew = false;
+    if (!levelId) {
+      levelId = 1000 + (Date.now() % 100000);
+      isNew = true;
+      (meta as any).id = levelId;
+      set({ editorLevelMetadata: { ...meta, id: levelId } as any });
+      get().saveEditorDraft();
+    }
+
+    const newLevel: Level = {
+      id: levelId,
+      title: meta.title,
+      description: meta.description,
+      author: meta.author,
+      starMass: meta.starMass,
+      maxTurns: meta.maxTurns,
+      parMoves: meta.parMoves,
+      initialTiles,
+      objectives: meta.objectives,
+      campaign: 'custom',
+      disableSpawns: meta.disableSpawns,
+      obstacles: levelObstacles,
+    };
+
+    let nextScenarios;
+    if (isNew) {
+      nextScenarios = [...currentScenarios, newLevel];
+    } else {
+      nextScenarios = currentScenarios.map(l => (l.id === levelId ? newLevel : l));
+      if (!currentScenarios.some(l => l.id === levelId)) {
+        nextScenarios = [...currentScenarios, newLevel];
+      }
+    }
+
+    localStorage.setItem('stellar_custom_scenarios', JSON.stringify(nextScenarios));
+    set({ customScenarios: nextScenarios });
+  },
+
+  deleteScenario: (id) => {
+    const nextScenarios = get().customScenarios.filter(l => l.id !== id);
+    localStorage.setItem('stellar_custom_scenarios', JSON.stringify(nextScenarios));
+    set({ customScenarios: nextScenarios });
+  },
+
+  loadScenarioForEditing: (level) => {
+    const initialTiles = new Map<number, Tile>();
+    for (const t of level.initialTiles) {
+      initialTiles.set(t.faceId, { faceId: t.faceId, element: t.element, spawnedAtTurn: 0 });
+    }
+    const initialObstacles = new Map<number, ObstacleInstance>();
+    if (level.obstacles) {
+      for (const obs of level.obstacles) {
+        initialObstacles.set(obs.faceId, { ...obs });
+      }
+    }
+
+    const metadata = {
+      id: level.id,
+      title: level.title,
+      description: level.description,
+      author: level.author,
+      starMass: level.starMass,
+      maxTurns: level.maxTurns,
+      parMoves: level.parMoves,
+      objectives: level.objectives,
+      disableSpawns: level.disableSpawns ?? true,
+    };
+
+    set({
+      isEditorMode: true,
+      editorLevelMetadata: metadata as any,
+      tiles: initialTiles,
+      obstacles: initialObstacles,
+      isTestingCustomScenario: false,
+    });
+    get().saveEditorDraft();
   },
 }));

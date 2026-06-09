@@ -1,6 +1,6 @@
 // src/ui/CampaignObjectiveOverlay.tsx
 import React from 'react';
-import { LEVELS } from '../game/levels';
+import { LEVELS, formatScenarioNumber } from '../game/levels';
 import { ELEMENTS } from '../game/elements';
 
 interface CampaignObjectiveOverlayProps {
@@ -28,7 +28,7 @@ export function CampaignObjectiveOverlay({ levelId, onStart }: CampaignObjective
       >
         <div className="relative z-10">
           <div className="uppercase tracking-[4.5px] text-[8.5px] sm:text-[9.5px] text-cyan-400 mb-2.5 font-mono font-bold">
-            ✦ Scenario {level.id} • Objective ✦
+            ✦ Scenario {formatScenarioNumber(level.id)} • Objective ✦
           </div>
           
           <h1 className="text-2xl sm:text-3xl font-light tracking-wide mb-3 text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 uppercase">

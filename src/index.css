@@ -165,6 +165,10 @@ canvas {
   top: calc(7.8rem + env(safe-area-inset-top, 0px));
 }
 
+.hud-system-toast-container {
+  top: calc(11.2rem + env(safe-area-inset-top, 0px));
+}
+
 /* Reignite quick-reset floats just under the top info bar (absolute, so it never
    displaces the centered bar). */
 .hud-reignite-container {
@@ -184,8 +188,126 @@ canvas {
     top: calc(7.2rem + env(safe-area-inset-top, 0px));
   }
 
+  .hud-system-toast-container {
+    top: calc(10.6rem + env(safe-area-inset-top, 0px));
+  }
+
   .hud-reignite-container {
     top: calc(4.2rem + env(safe-area-inset-top, 0px));
   }
 }
+
+/* Landscape Mobile side-docking overrides (Inspired by The Room's immersive focused space) */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hud-top-container {
+    left: calc(0.8rem + env(safe-area-inset-left, 0px)) !important;
+    right: auto !important;
+    top: calc(0.8rem + env(safe-area-inset-top, 0px)) !important;
+    bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px)) !important;
+    width: 135px !important;
+    height: auto !important;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto auto !important;
+    gap: 0.6rem !important;
+    padding: 0 !important;
+  }
+
+  .hud-top-container .justify-self-center {
+    justify-self: start !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .hud-top-container .glass-pill {
+    width: 100% !important;
+    border-radius: 16px !important;
+    padding: 8px !important;
+    height: auto !important;
+  }
+
+  .hud-top-container .glass-pill > div {
+    flex-direction: column !important;
+    gap: 0.4rem !important;
+    align-items: flex-start !important;
+  }
+
+  .hud-top-container .glass-pill .h-5 {
+    display: none !important;
+  }
+
+  .hud-bottom-container {
+    right: calc(0.8rem + env(safe-area-inset-right, 0px)) !important;
+    left: auto !important;
+    bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px)) !important;
+    top: calc(0.8rem + env(safe-area-inset-top, 0px)) !important;
+    width: 135px !important;
+    height: auto !important;
+    transform: none !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+    gap: 0.6rem !important;
+  }
+
+  .hud-bottom-container > div {
+    flex-direction: column !important;
+    max-width: 100% !important;
+    align-items: center !important;
+    width: 100% !important;
+  }
+
+  .hud-bottom-container .glass-panel {
+    border-radius: 16px !important;
+    padding: 8px 4px !important;
+    width: 100% !important;
+  }
+
+  .hud-bottom-container .no-scrollbar {
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    height: 140px !important;
+    width: 100% !important;
+    padding: 0 4px !important;
+    gap: 0.4rem !important;
+  }
+
+  .hud-bottom-container .no-scrollbar > div {
+    width: 28px !important;
+    height: 28px !important;
+    margin: 0 auto !important;
+  }
+
+  .hud-bottom-container .no-scrollbar > div span {
+    font-size: 8px !important;
+  }
+
+  .hud-bottom-container .no-scrollbar > div .absolute {
+    font-size: 7px !important;
+    width: 12px !important;
+    height: 12px !important;
+  }
+
+  .hud-bottom-container button {
+    width: 28px !important;
+    height: 28px !important;
+    margin: 0 auto !important;
+  }
+
+  .hud-reignite-container {
+    left: calc(0.8rem + env(safe-area-inset-left, 0px)) !important;
+    right: auto !important;
+    transform: none !important;
+    top: auto !important;
+    bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .hud-toast-container {
+    top: calc(0.8rem + env(safe-area-inset-top, 0px)) !important;
+  }
+
+  .hud-system-toast-container {
+    top: calc(3.6rem + env(safe-area-inset-top, 0px)) !important;
+  }
+}
+
 

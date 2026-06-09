@@ -1,6 +1,6 @@
 // src/ui/CampaignSelector.tsx
 import React from 'react';
-import { LEVELS, type Level } from '../game/levels';
+import { LEVELS, type Level, formatScenarioNumber } from '../game/levels';
 import { useGameStore } from '../game/state';
 
 interface CampaignSelectorProps {
@@ -10,10 +10,28 @@ interface CampaignSelectorProps {
 
 export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorProps) {
   const completedLevels = useGameStore(s => s.completedLevels);
-  const [selectedLevelId, setSelectedLevelId] = React.useState<number>(1);
+  const currentLevelId = useGameStore(s => s.currentLevelId);
+
+  const isAdvancedUnlocked = completedLevels.filter(id => id <= 10).length >= 10;
+
+  const customScenarios = useGameStore(s => s.customScenarios) || [];
+
+  const [activeCampaign, setActiveCampaign] = React.useState<'nursery' | 'advanced' | 'custom'>(() => {
+    const activeId = currentLevelId ?? 1;
+    if (activeId >= 1000) return 'custom';
+    if (activeId > 10 && isAdvancedUnlocked) return 'advanced';
+    return 'nursery';
+  });
+
+  const [selectedLevelId, setSelectedLevelId] = React.useState<number>(() => {
+    const activeId = currentLevelId ?? 1;
+    if (activeId > 10 && !isAdvancedUnlocked && activeId < 1000) return 1;
+    return activeId;
+  });
+
   const [activeHintIdx, setActiveHintIdx] = React.useState<number | null>(null);
 
-  const selectedLevel = LEVELS.find(l => l.id === selectedLevelId) || LEVELS[0];
+  const selectedLevel = LEVELS.find(l => l.id === selectedLevelId) || customScenarios.find(l => l.id === selectedLevelId) || LEVELS[0];
 
   React.useEffect(() => {
     setActiveHintIdx(null);
@@ -35,6 +53,28 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
   React.useEffect(() => {
     setTranslateX(0);
   }, [selectedLevelId]);
+
+  // Reset selectedLevelId to first scenario in active campaign if out of bounds
+  React.useEffect(() => {
+    if (activeCampaign === 'nursery') {
+      if (selectedLevelId > 10 || selectedLevelId >= 1000) {
+        setSelectedLevelId(1);
+      }
+    } else if (activeCampaign === 'advanced') {
+      if (selectedLevelId <= 10 || selectedLevelId >= 1000) {
+        setSelectedLevelId(11);
+      }
+    } else if (activeCampaign === 'custom') {
+      if (customScenarios.length > 0) {
+        if (!customScenarios.some(l => l.id === selectedLevelId)) {
+          setSelectedLevelId(customScenarios[0].id);
+        }
+      } else {
+        setActiveCampaign('nursery');
+        setSelectedLevelId(1);
+      }
+    }
+  }, [activeCampaign]);
 
   // Clean up timers on unmount
   React.useEffect(() => {
@@ -106,6 +146,8 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
 
       setHoldProgress(0);
       setTranslateX(0);
+      setActiveCampaign('nursery');
+      setSelectedLevelId(1);
     }, 1000);
   };
 
@@ -121,10 +163,18 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
     setHoldProgress(0);
   };
 
+  const filteredLevels = LEVELS.filter(l => {
+    if (activeCampaign === 'nursery') {
+      return l.id <= 10;
+    } else {
+      return l.id > 10;
+    }
+  });
+
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex justify-center items-center p-4 animate-fade-in-up select-none pointer-events-auto">
-      {/* Modal Container */}
-      <div className="bg-[#0f0f15]/95 border border-white/10 p-6 sm:p-8 rounded-[32px] max-w-3xl w-full max-h-[90vh] md:max-h-[85vh] overflow-hidden flex flex-col gap-6 text-white shadow-[0_16px_48px_rgba(0,0,0,0.7)] relative isolate">
+      {/* Modal Container with stable height to prevent window sizing jumps between campaigns */}
+      <div className="bg-[#0f0f15]/95 border border-white/10 p-6 sm:p-8 rounded-[32px] max-w-3xl w-full h-[620px] max-h-[90vh] md:h-[580px] md:max-h-[85vh] overflow-hidden flex flex-col gap-5 text-white shadow-[0_16px_48px_rgba(0,0,0,0.7)] relative isolate">
         {/* Close Button */}
         <button 
           onClick={onClose}
@@ -142,6 +192,55 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
           </p>
         </div>
 
+        {/* Campaign Tabs */}
+        <div className="flex gap-4 border-b border-white/5 pb-2 select-none flex-shrink-0">
+          <button
+            onClick={() => setActiveCampaign('nursery')}
+            className={`pb-2 text-xs tracking-[2px] uppercase font-bold transition-all relative cursor-pointer ${
+              activeCampaign === 'nursery' ? 'text-cyan-400' : 'text-white/40 hover:text-white/70'
+            }`}
+          >
+            Stellar Nursery
+            {activeCampaign === 'nursery' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 animate-pulse shadow-[0_0_8px_#22d3ee]" />
+            )}
+          </button>
+          <button
+            onClick={() => {
+              if (isAdvancedUnlocked) {
+                setActiveCampaign('advanced');
+              }
+            }}
+            className={`pb-2 text-xs tracking-[2px] uppercase font-bold transition-all relative ${
+              isAdvancedUnlocked 
+                ? activeCampaign === 'advanced' ? 'text-cyan-400 cursor-pointer' : 'text-white/40 hover:text-white/70 cursor-pointer'
+                : 'text-white/15 cursor-not-allowed'
+            }`}
+            title={isAdvancedUnlocked ? "Play advanced challenge levels" : "Complete Stellar Nursery campaign to unlock!"}
+          >
+            <span className="flex items-center gap-1.5">
+              {!isAdvancedUnlocked && '🔒 '}
+              Advanced Fusion
+            </span>
+            {activeCampaign === 'advanced' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 animate-pulse shadow-[0_0_8px_#22d3ee]" />
+            )}
+          </button>
+          {customScenarios.length > 0 && (
+            <button
+              onClick={() => setActiveCampaign('custom')}
+              className={`pb-2 text-xs tracking-[2px] uppercase font-bold transition-all relative cursor-pointer ${
+                activeCampaign === 'custom' ? 'text-cyan-400' : 'text-white/40 hover:text-white/70'
+              }`}
+            >
+              Custom Scenarios
+              {activeCampaign === 'custom' && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 animate-pulse shadow-[0_0_8px_#22d3ee]" />
+              )}
+            </button>
+          )}
+        </div>
+
         {/* Content Body: Left Level Map grid, Right level details */}
         <div className="flex flex-col md:flex-row gap-6 flex-1 overflow-hidden min-h-0">
           
@@ -149,70 +248,117 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
           <div className="h-[130px] md:h-auto flex-shrink-0 md:flex-1 md:max-w-[320px] overflow-y-auto custom-scrollbar pr-1 flex flex-col gap-2">
             <span className="text-[8px] tracking-[2px] text-white/35 font-mono uppercase mb-1 block">SCENARIO LIST</span>
             
-            {LEVELS.map(level => {
-              const isCompleted = completedLevels.includes(level.id);
-              const isUnlocked = level.id === 1 || completedLevels.includes(level.id - 1);
-              const isSelected = selectedLevelId === level.id;
-
-              if (isUnlocked) {
+            {activeCampaign === 'custom' ? (
+              customScenarios.map(level => {
+                const isSelected = selectedLevelId === level.id;
                 return (
-                  <button
-                    key={level.id}
-                    onClick={() => setSelectedLevelId(level.id)}
-                    className={`w-full py-2.5 px-4 rounded-2xl border transition-all text-left flex justify-between items-center active:scale-[0.98] cursor-pointer ${
-                      isSelected
-                        ? 'bg-white/10 border-white/25 shadow-[0_4px_16px_rgba(0,0,0,0.25)]'
-                        : 'bg-black/35 border-white/5 hover:bg-white/5 hover:border-white/12'
-                    }`}
-                  >
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[8px] font-mono tracking-widest text-cyan-400 uppercase leading-none font-bold">
-                        Scenario {level.id}
-                      </span>
-                      <span className="text-xs font-semibold tracking-wide text-white mt-0.5">
-                        {level.title}
-                      </span>
-                    </div>
-
-                    {isCompleted ? (
-                      <span className="text-xs text-emerald-400 font-bold tracking-wide flex items-center gap-1 select-none">
-                        ✓
-                      </span>
-                    ) : (
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#22d3ee] pointer-events-none" />
-                    )}
-                  </button>
-                );
-              } else {
-                return (
-                  <div
-                    key={level.id}
-                    className="w-full py-2.5 px-4 rounded-2xl border border-dashed border-white/5 bg-black/10 flex justify-between items-center opacity-30 select-none cursor-default"
-                  >
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[8px] font-mono tracking-widest text-white/40 uppercase leading-none">
-                        Scenario {level.id}
-                      </span>
-                      <span className="text-xs font-medium text-white/50 mt-0.5 italic">
-                        Locked Star
-                      </span>
-                    </div>
-                    <span className="text-xs text-white/30">🔒</span>
+                  <div key={level.id} className="w-full flex items-center gap-2 pr-1 flex-shrink-0">
+                    <button
+                      onClick={() => setSelectedLevelId(level.id)}
+                      className={`flex-grow py-2.5 px-4 rounded-2xl border transition-all text-left flex justify-between items-center active:scale-[0.98] cursor-pointer ${
+                        isSelected
+                          ? 'bg-white/10 border-white/25 shadow-[0_4px_16px_rgba(0,0,0,0.25)]'
+                          : 'bg-black/35 border-white/5 hover:bg-white/5 hover:border-white/12'
+                      }`}
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[8px] font-mono tracking-widest text-cyan-400 uppercase leading-none font-bold">
+                          Custom Level
+                        </span>
+                        <span className="text-xs font-semibold tracking-wide text-white mt-0.5">
+                          {level.title}
+                        </span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Are you sure you want to delete "${level.title}"?`)) {
+                          const deleteScenario = useGameStore.getState().deleteScenario;
+                          deleteScenario(level.id);
+                          const remaining = useGameStore.getState().customScenarios.filter(l => l.id !== level.id);
+                          if (remaining.length > 0) {
+                            setSelectedLevelId(remaining[0].id);
+                          } else {
+                            setActiveCampaign('nursery');
+                            setSelectedLevelId(1);
+                          }
+                        }
+                      }}
+                      className="p-2 text-white/30 hover:text-red-400 rounded-lg hover:bg-red-500/10 cursor-pointer transition-colors"
+                      title="Delete custom scenario"
+                    >
+                      ✕
+                    </button>
                   </div>
                 );
-              }
-            })}
+              })
+            ) : (
+              filteredLevels.map(level => {
+                const isCompleted = completedLevels.includes(level.id);
+                const isUnlocked = level.id === 1 || level.id === 11 || completedLevels.includes(level.id - 1);
+                const isSelected = selectedLevelId === level.id;
+
+                if (isUnlocked) {
+                  return (
+                    <button
+                      key={level.id}
+                      onClick={() => setSelectedLevelId(level.id)}
+                      className={`w-full py-2.5 px-4 rounded-2xl border transition-all text-left flex justify-between items-center active:scale-[0.98] cursor-pointer ${
+                        isSelected
+                          ? 'bg-white/10 border-white/25 shadow-[0_4px_16px_rgba(0,0,0,0.25)]'
+                          : 'bg-black/35 border-white/5 hover:bg-white/5 hover:border-white/12'
+                      }`}
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[8px] font-mono tracking-widest text-cyan-400 uppercase leading-none font-bold">
+                          Scenario {formatScenarioNumber(level.id)}
+                        </span>
+                        <span className="text-xs font-semibold tracking-wide text-white mt-0.5">
+                          {level.title}
+                        </span>
+                      </div>
+
+                      {isCompleted ? (
+                        <span className="text-xs text-emerald-400 font-bold tracking-wide flex items-center gap-1 select-none">
+                          ✓
+                        </span>
+                      ) : (
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#22d3ee] pointer-events-none" />
+                      )}
+                    </button>
+                  );
+                } else {
+                  return (
+                    <div
+                      key={level.id}
+                      className="w-full py-2.5 px-4 rounded-2xl border border-dashed border-white/5 bg-black/10 flex justify-between items-center opacity-30 select-none cursor-default"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[8px] font-mono tracking-widest text-white/40 uppercase leading-none">
+                          Scenario {formatScenarioNumber(level.id)}
+                        </span>
+                        <span className="text-xs font-medium text-white/50 mt-0.5 italic">
+                          Locked Star
+                        </span>
+                      </div>
+                      <span className="text-xs text-white/30">🔒</span>
+                    </div>
+                  );
+                }
+              })
+            )}
           </div>
 
           {/* Right Panel: Selected Level conditions & Launch Button */}
-          <div className="flex-1 bg-white/3 border border-white/5 rounded-2xl p-4 sm:p-5 flex flex-col justify-between overflow-hidden">
+          <div className="flex-grow flex-1 bg-white/3 border border-white/5 rounded-2xl p-4 sm:p-5 flex flex-col justify-between overflow-hidden">
             {/* Scrollable details container */}
             <div className="flex-grow overflow-y-auto custom-scrollbar pr-1 flex flex-col gap-4">
               {/* Scenario details */}
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
                   <span className="text-[9px] font-mono font-bold text-cyan-400 bg-cyan-950/20 border border-cyan-500/15 px-2.5 py-0.5 rounded-full uppercase leading-none">
-                    Scenario {selectedLevel.id}
+                    Scenario {formatScenarioNumber(selectedLevel.id)}
                   </span>
                   <span className="text-[9px] font-mono font-medium text-white/40 tracking-wider leading-none uppercase">
                     {selectedLevel.author}

@@ -5,6 +5,8 @@ import { useFrame } from '@react-three/fiber';
 import { useGameStore } from '../game/state';
 import { Tile } from './Tile';
 import { AnimatedTile } from './AnimatedTile';
+import { SlideTrail } from './SlideTrail';
+import { FusionParticles } from './FusionParticles';
 
 function hexToRgb(hex: string) {
   const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
@@ -62,8 +64,9 @@ export function Sphere() {
   const starMass = useGameStore(s => s.starMass);
   const levelObjectiveMet = useGameStore(s => s.levelObjectiveMet);
   const showRealtimeGraphics = useGameStore(s => s.showRealtimeGraphics);
+  const endState = useGameStore(s => s.endState);
 
-  const scale = phaseScale(phase);
+  const scale = endState && phase === 'collapse' ? 0.15 : phaseScale(phase);
 
   const groupRef = React.useRef<THREE.Group>(null);
   const isFirstFrame = React.useRef(true);
@@ -88,13 +91,16 @@ export function Sphere() {
   // - Collapse: Energetic Purple
   const msColor = React.useMemo(() => getMainSequenceColor(starMass), [starMass]);
   const auraColor = React.useMemo(() => {
+    if (endState && phase === 'collapse') {
+      return '#6c5ce7'; // Accretion disk purple-violet
+    }
     switch (phase) {
       case 'red_giant':   return '#ff1a1a'; // Deep vibrant Scarlet Red
       case 'supergiant':  return '#f43f5e'; // Hot electric Crimson-Magenta
       case 'collapse':    return '#a855f7'; // Purple
       default:            return msColor;   // Mass-dependent Main Sequence color
     }
-  }, [phase, msColor]);
+  }, [phase, msColor, endState]);
 
   useFrame((state, delta) => {
     const elapsed = state.clock.getElapsedTime();
@@ -120,14 +126,22 @@ export function Sphere() {
       // Premium core emissive intensity pulsing to represent advanced fusion state
       if (innerRef.current.material) {
         const mat = innerRef.current.material as THREE.MeshLambertMaterial;
-        if (phase === 'red_giant') {
-          mat.emissiveIntensity = 0.65 + Math.sin(elapsed * 1.5) * 0.15; // Slow, breathing pulse
-        } else if (phase === 'supergiant') {
-          mat.emissiveIntensity = 0.9 + Math.sin(elapsed * 4.5) * 0.25;  // High frequency energetic boiling
-        } else if (phase === 'collapse') {
-          mat.emissiveIntensity = 0.4 + Math.sin(elapsed * 6.0) * 0.20;  // Highly unstable pre-collapse flicker
+        if (endState && phase === 'collapse') {
+          mat.color.set('#000000');
+          mat.emissive.set('#000000');
+          mat.emissiveIntensity = 0;
         } else {
-          mat.emissiveIntensity = 0.65;
+          mat.color.set(new THREE.Color(auraColor));
+          mat.emissive.set(new THREE.Color(auraColor));
+          if (phase === 'red_giant') {
+            mat.emissiveIntensity = 0.65 + Math.sin(elapsed * 1.5) * 0.15; // Slow, breathing pulse
+          } else if (phase === 'supergiant') {
+            mat.emissiveIntensity = 0.9 + Math.sin(elapsed * 4.5) * 0.25;  // High frequency energetic boiling
+          } else if (phase === 'collapse') {
+            mat.emissiveIntensity = 0.4 + Math.sin(elapsed * 6.0) * 0.20;  // Highly unstable pre-collapse flicker
+          } else {
+            mat.emissiveIntensity = 0.65;
+          }
         }
       }
     }
@@ -260,6 +274,8 @@ export function Sphere() {
         />
       ))}
       <AnimatedTile />
+      <SlideTrail />
+      <FusionParticles />
     </group>
   );
 }

@@ -7,6 +7,7 @@ import { useGameStore } from '../game/state';
 import { resolveSlideTarget } from '../geometry/slide';
 import { SCORE_VALUES } from '../game/rules';
 import { setCameraPos } from './cameraState';
+import { playSpawnTick } from '../audio/synth';
 
 function getElementMass(element: string): number {
   const standardMasses: Record<string, number> = {
@@ -49,6 +50,7 @@ export function Controls() {
   const dragStartPos = useRef<THREE.Vector3 | null>(null);
   const [isDraggingTile, setIsDraggingTile] = React.useState(false);
   const [isPointerDownOnTile, setIsPointerDownOnTile] = React.useState(false);
+  const [isPointerDownOnTileCandidate, setIsPointerDownOnTileCandidate] = React.useState(false);
   const camStartPos = useRef<THREE.Vector3 | null>(null);
   const camStartUp = useRef<THREE.Vector3 | null>(null);
   const slideQuaternion = useRef<THREE.Quaternion | null>(null);
@@ -339,14 +341,14 @@ export function Controls() {
     let targetYaw = 0;
     const maxSpeed = 2.8; // max orbital rad/s
 
-    if (!activeSlide && !isDraggingTile && !isPointerDownOnTile) {
+    if (!activeSlide && !isDraggingTile && !isPointerDownOnTile && !isPointerDownOnTileCandidate) {
       if (keysPressed.current.w) targetPitch = maxSpeed;
       if (keysPressed.current.s) targetPitch = -maxSpeed;
       if (keysPressed.current.a) targetYaw = maxSpeed;
       if (keysPressed.current.d) targetYaw = -maxSpeed;
     }
 
-    if (isDraggingTile || isPointerDownOnTile || activeSlide) {
+    if (isDraggingTile || isPointerDownOnTile || isPointerDownOnTileCandidate || activeSlide) {
       keyPitchVelocity.current = 0;
       keyYawVelocity.current = 0;
     }
@@ -372,7 +374,7 @@ export function Controls() {
 
     const hasKeyboardMovement = keyPitchVelocity.current !== 0 || keyYawVelocity.current !== 0;
 
-    if (hasKeyboardMovement && !activeSlide && !isDraggingTile && !isPointerDownOnTile) {
+    if (hasKeyboardMovement && !activeSlide && !isDraggingTile && !isPointerDownOnTile && !isPointerDownOnTileCandidate) {
       driftVelocity.current = 0; // Cancel manual drag drift instantly
 
       // Horizontal Yaw Orbit rotation
@@ -398,7 +400,7 @@ export function Controls() {
     }
 
     // Reset idle timer instantly during active tile interactions or slide slerps
-    if (activeSlide || isDraggingTile || isPointerDownOnTile) {
+    if (activeSlide || isDraggingTile || isPointerDownOnTile || isPointerDownOnTileCandidate) {
       lastInteractionTime.current = performance.now();
     }
 
@@ -427,7 +429,7 @@ export function Controls() {
     // 3. BACKGROUND MOMENTUM DRIFT PHASE: Coast and decelerate the Buckyball in the slide direction
     if (driftVelocity.current > 0.00005) {
       // Cancel drift instantly if the user interacts with the canvas to guarantee zero lag
-      if (isDraggingTile || isPointerDownOnTile) {
+      if (isDraggingTile || isPointerDownOnTile || isPointerDownOnTileCandidate) {
         driftVelocity.current = 0;
         return;
       }
@@ -482,12 +484,26 @@ export function Controls() {
 
   useEffect(() => {
     const dom = gl.domElement;
+    let lastTapTime = 0;
+
+    let pointerDownTime = 0;
+    let pointerDownX = 0;
+    let pointerDownY = 0;
+    let pointerDownFaceId: number | null = null;
 
     const onPointerDown = (event: PointerEvent) => {
       // Cancel background drift on any user interaction
       driftVelocity.current = 0;
 
       if (isAnimating) return;
+
+      pointerDownTime = performance.now();
+      pointerDownX = event.clientX;
+      pointerDownY = event.clientY;
+
+      const now = performance.now();
+      const isDoubleTap = now - lastTapTime < 280;
+      lastTapTime = now;
 
       // BYPASS tile grabbing if we are orbiting programmatically from the HUD elements tray
       if ((window as any).isOrbitingFromHUD === true) {
@@ -516,6 +532,18 @@ export function Controls() {
         }
       }
 
+      pointerDownFaceId = hitFaceId;
+
+      if (hitFaceId === null) {
+        if (isDoubleTap) {
+          const toggleZen = (useGameStore.getState() as any).toggleZenMode;
+          if (toggleZen) {
+            toggleZen();
+            playSpawnTick();
+          }
+        }
+      }
+
       // Only begin tracking a drag if the clicked face actually has an active tile on it!
       if (hitFaceId !== null && tiles.has(hitFaceId)) {
         const fromFace = faces[hitFaceId];
@@ -531,22 +559,21 @@ export function Controls() {
             dragStartPos.current = null;
             setIsDraggingTile(false);
             setIsPointerDownOnTile(false);
+            setIsPointerDownOnTileCandidate(false);
             return;
           }
         }
 
         dragStartFaceId.current = hitFaceId;
         dragStartPos.current = new THREE.Vector3(x, y, 0);
-        setIsPointerDownOnTile(true);
-        startDrag(hitFaceId); // Morph into blob immediately on click/press!
-        try {
-          dom.setPointerCapture(event.pointerId);
-        } catch (err) {}
+        setIsPointerDownOnTileCandidate(true);
+        // Do NOT set isPointerDownOnTile or startDrag yet to check gesture alignment
       } else {
         dragStartFaceId.current = null;
         dragStartPos.current = null;
         setIsDraggingTile(false);
         setIsPointerDownOnTile(false);
+        setIsPointerDownOnTileCandidate(false);
       }
     };
 
@@ -561,12 +588,53 @@ export function Controls() {
       const deltaYTouch = y - dragStartPos.current.y;
       const distFromTouch = Math.sqrt(deltaXTouch * deltaXTouch + deltaYTouch * deltaYTouch);
 
-      // If we haven't locked into tile dragging yet, check if the swipe threshold is crossed (deliberate swipe)
-      if (!isDraggingTile) {
-        if (distFromTouch > 0.05) {
-          setIsDraggingTile(true);
+      // GESTURE CLASSIFIER: Check if swipe is aligned with valid tile sliding corridor
+      if (!isDraggingTile && !isPointerDownOnTile) {
+        if (distFromTouch > 0.04) {
+          const fromFace = faces[dragStartFaceId.current];
+          if (fromFace) {
+            const dragVec = new THREE.Vector3(x - dragStartPos.current.x, y - dragStartPos.current.y, 0);
+            const aspect = rect.width / rect.height;
+            const dragVecCorrected = new THREE.Vector3(dragVec.x * aspect, dragVec.y, 0);
+            const dragDir = dragVecCorrected.clone().transformDirection(camera.matrixWorld).normalize();
+
+            // Tangent projection check
+            const normal = new THREE.Vector3(fromFace.tangentFrame.n.x, fromFace.tangentFrame.n.y, fromFace.tangentFrame.n.z);
+            const dTangent = dragDir.clone().sub(normal.clone().multiplyScalar(dragDir.dot(normal))).normalize();
+
+            let bestDot = -Infinity;
+            for (const neighborId of fromFace.neighbors) {
+              const neighbor = faces[neighborId];
+              const toNeighbor = new THREE.Vector3(neighbor.center.x, neighbor.center.y, neighbor.center.z)
+                .sub(new THREE.Vector3(fromFace.center.x, fromFace.center.y, fromFace.center.z));
+              const projected = toNeighbor.clone().sub(normal.clone().multiplyScalar(toNeighbor.dot(normal))).normalize();
+              const dotVal = projected.dot(dTangent);
+              if (dotVal > bestDot) {
+                bestDot = dotVal;
+              }
+            }
+
+            // Lock to sliding only if highly aligned (bestDot > 0.82)
+            if (bestDot > 0.82) {
+              setIsDraggingTile(true);
+              setIsPointerDownOnTile(true);
+              setIsPointerDownOnTileCandidate(false);
+              startDrag(dragStartFaceId.current);
+              try {
+                dom.setPointerCapture(event.pointerId);
+              } catch (err) {}
+            } else {
+              // Treated as board rotation. Cancel slide tracking.
+              dragStartFaceId.current = null;
+              dragStartPos.current = null;
+              setIsDraggingTile(false);
+              setIsPointerDownOnTile(false);
+              setIsPointerDownOnTileCandidate(false);
+              useGameStore.setState({ selectedFaceId: null });
+              return;
+            }
+          }
         } else {
-          // Otherwise, allow OrbitControls to rotate the sphere (blocked immediately by isPointerDownOnTile anyway)
           return;
         }
       }
@@ -612,6 +680,24 @@ export function Controls() {
         dom.releasePointerCapture(event.pointerId);
       } catch (err) {}
 
+      const clickDuration = performance.now() - pointerDownTime;
+      const clickDist = Math.hypot(event.clientX - pointerDownX, event.clientY - pointerDownY);
+      const isEditorMode = useGameStore.getState().isEditorMode;
+
+      if (isEditorMode && clickDuration < 300 && clickDist < 8 && pointerDownFaceId !== null) {
+        const applyBrush = useGameStore.getState().applyEditorBrush;
+        if (applyBrush) {
+          applyBrush(pointerDownFaceId);
+        }
+        dragStartFaceId.current = null;
+        dragStartPos.current = null;
+        setIsDraggingTile(false);
+        setIsPointerDownOnTile(false);
+        setIsPointerDownOnTileCandidate(false);
+        useGameStore.setState({ selectedFaceId: null });
+        return;
+      }
+
       const startFaceId = dragStartFaceId.current;
       const startPos = dragStartPos.current;
       const wasDragging = isDraggingTile;
@@ -619,6 +705,7 @@ export function Controls() {
       // Reset states
       setIsDraggingTile(false);
       setIsPointerDownOnTile(false);
+      setIsPointerDownOnTileCandidate(false);
       dragStartFaceId.current = null;
       dragStartPos.current = null;
       setDragTargetId(null);
@@ -674,9 +761,9 @@ export function Controls() {
       dom.removeEventListener('pointerup', onPointerUp);
       dom.removeEventListener('pointercancel', onPointerUp);
     };
-  }, [camera, gl, scene, startDrag, endDrag, setDragTargetId, faces, tiles, isAnimating, isDraggingTile]);
+  }, [camera, gl, scene, startDrag, endDrag, setDragTargetId, faces, tiles, isAnimating, isDraggingTile, isPointerDownOnTile]);
 
-  const showControls = !(isAnimating || isDraggingTile || isPointerDownOnTile);
+  const showControls = !(isAnimating || isDraggingTile || isPointerDownOnTile || isPointerDownOnTileCandidate);
 
   // Decouple rotation speed from viewport size by scaling it proportionally to width
   const referenceWidth = 400; // width at which default speed (1.0) felt good

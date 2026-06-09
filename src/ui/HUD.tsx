@@ -85,6 +85,8 @@ const PHASE_COLORS: Record<Phase, string> = {
 
 export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCodex, onOpenObjectives, showZoomHint }: HUDProps) {
   const state = useGameStore();
+  const showZenMode = useGameStore(s => (s as any).showZenMode);
+  const zenClass = showZenMode ? 'opacity-0 pointer-events-none transition-all duration-500' : 'transition-all duration-500';
   const ageInfo = getStarAgeInfo(state);
   const compactAge = ageInfo.formatted
     .replace(' Billion Years', 'B')
@@ -258,7 +260,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
     <div className="absolute inset-0 z-10 pointer-events-none select-none">
       {/* Top HUD Header Bar: 1fr/auto/1fr grid keeps the center info bar screen-centered
           regardless of the left/right widths, only shrinking it if it can't fit. */}
-      <div className="absolute top-0 left-0 right-0 px-4 pointer-events-none select-none hud-top-container grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
+      <div className={`absolute top-0 left-0 right-0 px-4 pointer-events-none select-none hud-top-container grid grid-cols-[1fr_auto_1fr] items-center gap-2.5 ${zenClass}`}>
         {/* Left Section: Menu Button */}
         <div className="pointer-events-auto flex-shrink-0 justify-self-start">
           <button 
@@ -324,9 +326,18 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
               <div className="h-5 w-px bg-white/15" />
 
               <div>
-                <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">TURN</div>
+                <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">
+                  {level ? 'TURN / PAR' : 'TURN'}
+                </div>
                 <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums text-white/90 whitespace-nowrap">
-                  {turn}{maxTurns !== null ? ` / ${maxTurns}` : ''}
+                  {turn}
+                  {level ? (
+                    <>
+                      {' / '}<span className="text-cyan-400 font-bold">{(level as any).parMoves ?? maxTurns}</span>
+                    </>
+                  ) : maxTurns !== null ? (
+                    ` / ${maxTurns}`
+                  ) : ''}
                 </div>
               </div>
             </div>
@@ -351,7 +362,16 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                 </>
               )}
               <span className="opacity-25">•</span>
-              <span className="text-white">T{turn}{maxTurns !== null ? `/${maxTurns}` : ''}</span>
+              <span className="text-white">
+                T{turn}
+                {level ? (
+                  <>
+                    {' '}<span className="text-cyan-400 font-bold">({(level as any).parMoves ?? maxTurns})</span>
+                  </>
+                ) : maxTurns !== null ? (
+                  `/${maxTurns}`
+                ) : ''}
+              </span>
             </div>
           </div>
 
@@ -381,11 +401,12 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
             </div>
 
             <div 
-              className="flex flex-col items-center justify-center bg-black/40 backdrop-blur-md px-2.5 xs:px-3 h-11 rounded-2xl border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)] font-mono"
-              style={{ borderColor: `${currentThemeColor}20` }}
+              className={`flex flex-col items-center justify-center bg-black/40 backdrop-blur-md px-2.5 xs:px-3 h-11 rounded-2xl border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)] font-mono transition-all duration-300 ${state.wasAutoPlayedThisRun ? 'opacity-50' : ''}`}
+              style={{ borderColor: state.wasAutoPlayedThisRun ? '#f59e0b40' : `${currentThemeColor}20` }}
+              title={state.wasAutoPlayedThisRun ? "High score tracking disabled (Autoplayer used this run)" : "Your high score"}
             >
-              <div className="text-[6.5px] tracking-[1px] text-white/40 leading-none">BEST</div>
-              <div className="text-[11px] xs:text-[12px] font-bold text-cyan-400 leading-tight mt-0.5 tabular-nums">
+              <div className={`text-[6.5px] tracking-[1px] leading-none ${state.wasAutoPlayedThisRun ? 'text-amber-400 font-semibold' : 'text-white/40'}`}>BEST</div>
+              <div className={`text-[11px] xs:text-[12px] font-bold leading-tight mt-0.5 tabular-nums ${state.wasAutoPlayedThisRun ? 'text-amber-500/70 line-through decoration-amber-500' : 'text-cyan-400'}`}>
                 {state.highScore % 1 === 0 ? state.highScore.toString() : state.highScore.toFixed(1)}
               </div>
             </div>
@@ -399,7 +420,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
       {/* In-game Reignite quick-reset — only in the collapse stage, floated under the
           top bar (absolute, so it never displaces the centered info bar). */}
       {currentLevelId === null && phase === 'collapse' && (
-        <div className="absolute left-1/2 -translate-x-1/2 hud-reignite-container pointer-events-none flex justify-center">
+        <div className={`absolute left-1/2 -translate-x-1/2 hud-reignite-container pointer-events-none flex justify-center ${zenClass}`}>
           <button
             onClick={() => { state.reset(); playSpawnTick(); }}
             className="pointer-events-auto flex items-center gap-1 glass-pill px-2.5 py-1 rounded-full text-[7.5px] font-mono tracking-[2.5px] uppercase text-white/40 hover:text-white/80 border border-white/8 hover:bg-white/5 active:scale-[0.95] transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.25)] animate-fade-in-up"
@@ -413,7 +434,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
       )}
 
       <div
-        className="absolute left-1/2 -translate-x-1/2 pointer-events-auto hud-bottom-container"
+        className={`absolute left-1/2 -translate-x-1/2 pointer-events-auto hud-bottom-container ${zenClass}`}
       >
         <div className="flex flex-col items-center gap-2 xs:gap-3.5 pointer-events-none select-none max-w-[94vw]">
           {/* Pinch-to-zoom hint, floated directly above the instructions line */}

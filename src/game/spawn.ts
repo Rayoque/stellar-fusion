@@ -1,6 +1,7 @@
 // src/game/spawn.ts
 import type { GameState, ElementSymbol } from './types';
 import { currentPhaseRule } from './phases';
+import { LEVELS } from './levels';
 
 // Hydrogen "rain" may land on pentagons too, but much less often than hexagons.
 // This is a per-slot weight: a pentagon is ~30% as likely to be picked as a hexagon.
@@ -16,6 +17,22 @@ const PENTAGON_SPAWN_WEIGHT = 0.3;
  * by dragging H onto a pentagon) — but silently, since this isn't a player action.
  */
 export function spawnHydrogen(state: GameState): void {
+  if (state.currentLevelId !== null) {
+    let disableSpawns = false;
+    if (state.currentLevelId === 9999) {
+      const raw = localStorage.getItem('stellar_editor_draft');
+      if (raw) {
+        disableSpawns = JSON.parse(raw).metadata.disableSpawns ?? true;
+      }
+    } else {
+      const level = LEVELS.find(l => l.id === state.currentLevelId) || (state as any).customScenarios?.find((l: any) => l.id === state.currentLevelId);
+      if (level && level.disableSpawns) {
+        disableSpawns = true;
+      }
+    }
+    if (disableSpawns) return;
+  }
+
   const phaseRule = currentPhaseRule(state);
   const rate = state.astrophysicistMode ? 1 : phaseRule.hSpawnRate;
 

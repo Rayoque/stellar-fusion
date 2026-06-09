@@ -28,6 +28,7 @@ export function Tile({ face, tile }: TileProps) {
   const dragOffset3D = useGameStore(s => s.dragOffset3D);
   const activeSlide = useGameStore(s => s.activeSlide);
   const isAstro = useGameStore(s => s.astrophysicistMode);
+  const obstacle = useGameStore(s => s.obstacles?.get(face.id));
 
   const isSelected = face.id === selectedFaceId;
   const isTarget = face.id === dragTargetId;
@@ -144,6 +145,13 @@ export function Tile({ face, tile }: TileProps) {
   const decayTextRef = React.useRef<any>(null);
   const pentagonRef = React.useRef<THREE.Mesh>(null);
   const smoothOpacityRef = React.useRef(0.12);
+
+  // Obstacle Animation Refs
+  const cmeRef = React.useRef<THREE.Mesh>(null);
+  const gravityRef1 = React.useRef<THREE.Mesh>(null);
+  const gravityRef2 = React.useRef<THREE.Mesh>(null);
+  const wormholeRef = React.useRef<THREE.Mesh>(null);
+  const wormholeTextRef = React.useRef<any>(null);
 
   const selectedTimeRef = React.useRef<number>(0);
   const prevIsSelectedRef = React.useRef<boolean>(false);
@@ -348,6 +356,54 @@ export function Tile({ face, tile }: TileProps) {
       const scalePulse = 1.0 + Math.sin(elapsed * 2.2) * 0.012 * (smoothOpacityRef.current / 0.12);
       pentagonRef.current.scale.set(scalePulse, scalePulse, scalePulse);
     }
+
+    // Animate Coronal Mass Ejection (CME)
+    if (cmeRef.current && obstacle && obstacle.type === 'cme') {
+      const elapsed = state.clock.getElapsedTime();
+      if (obstacle.state === 'active') {
+        const pulse = 0.55 + Math.sin(elapsed * 8.5) * 0.35;
+        const scale = 1.0 + Math.sin(elapsed * 8.5) * 0.12;
+        (cmeRef.current.material as THREE.MeshBasicMaterial).opacity = pulse;
+        cmeRef.current.scale.set(scale, scale, scale);
+      } else if (obstacle.state === 'warning') {
+        const pulse = 0.35 + Math.sin(elapsed * 4.5) * 0.25;
+        (cmeRef.current.material as THREE.MeshBasicMaterial).opacity = pulse;
+        cmeRef.current.scale.set(1.0, 1.0, 1.0);
+      } else {
+        (cmeRef.current.material as THREE.MeshBasicMaterial).opacity = 0.2;
+        cmeRef.current.scale.set(0.9, 0.9, 0.9);
+      }
+    }
+
+    // Animate Gravitational Anomaly (swirling double-vortex)
+    if (obstacle && obstacle.type === 'gravity') {
+      const elapsed = state.clock.getElapsedTime();
+      if (gravityRef1.current) {
+        gravityRef1.current.rotation.z = elapsed * 1.8;
+        (gravityRef1.current.material as THREE.MeshBasicMaterial).opacity = 0.32 + Math.sin(elapsed * 2.8) * 0.08;
+      }
+      if (gravityRef2.current) {
+        gravityRef2.current.rotation.z = -elapsed * 3.2;
+      }
+    }
+
+    // Animate Stellar Wormhole
+    if (wormholeRef.current && obstacle && obstacle.type === 'wormhole') {
+      const elapsed = state.clock.getElapsedTime();
+      const pulse = 0.42 + Math.sin(elapsed * 2.8) * 0.12;
+      const scale = 1.0 + Math.sin(elapsed * 2.8) * 0.06;
+      (wormholeRef.current.material as THREE.MeshBasicMaterial).opacity = pulse;
+      wormholeRef.current.scale.set(scale, scale, scale);
+      
+      if (wormholeTextRef.current) {
+        const camDir = tempCamDir;
+        const qCam = state.camera.quaternion;
+        const localNormal = tempWorldCenter;
+        const qGeodesic = new THREE.Quaternion().setFromUnitVectors(camDir, localNormal);
+        const finalQ = qGeodesic.clone().multiply(qCam);
+        wormholeTextRef.current.quaternion.copy(finalQ);
+      }
+    }
   });
 
   return (
@@ -442,6 +498,101 @@ export function Tile({ face, tile }: TileProps) {
           </Text>
         )}
       </group>
+
+      {/* Obstacles Rendering (Stay anchored to the grid face, independent of grab pulls!) */}
+      {obstacle && obstacle.type === 'cme' && (
+        <mesh 
+          ref={cmeRef}
+          position={[face.center.x * 1.025, face.center.y * 1.025, face.center.z * 1.025]} 
+          quaternion={textQuaternion}
+          renderOrder={1}
+        >
+          <circleGeometry args={[0.22, 32]} />
+          <meshBasicMaterial
+            color={
+              obstacle.state === 'active' ? '#ef4444' :
+              obstacle.state === 'warning' ? '#eab308' : '#7f1d1d'
+            }
+            transparent
+            opacity={0.2}
+            blending={THREE.AdditiveBlending}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
+          <Edges 
+            scale={1.02}
+            threshold={15}
+            color={
+              obstacle.state === 'active' ? '#ef4444' :
+              obstacle.state === 'warning' ? '#f59e0b' : '#7f1d1d'
+            }
+          />
+        </mesh>
+      )}
+
+      {obstacle && obstacle.type === 'gravity' && (
+        <group 
+          position={[face.center.x * 1.025, face.center.y * 1.025, face.center.z * 1.025]} 
+          quaternion={textQuaternion}
+        >
+          <mesh ref={gravityRef1} renderOrder={1}>
+            <circleGeometry args={[0.22, 32]} />
+            <meshBasicMaterial
+              color="#a855f7"
+              transparent
+              opacity={0.4}
+              blending={THREE.AdditiveBlending}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+          <mesh ref={gravityRef2} renderOrder={1}>
+            <circleGeometry args={[0.15, 32]} />
+            <meshBasicMaterial
+              color="#d946ef"
+              transparent
+              opacity={0.6}
+              blending={THREE.AdditiveBlending}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+          <Edges scale={1.02} threshold={15} color="#c084fc" />
+        </group>
+      )}
+
+      {obstacle && obstacle.type === 'wormhole' && (
+        <group 
+          position={[face.center.x * 1.025, face.center.y * 1.025, face.center.z * 1.025]} 
+          quaternion={textQuaternion}
+        >
+          <mesh ref={wormholeRef} renderOrder={1}>
+            <circleGeometry args={[0.2, 32]} />
+            <meshBasicMaterial
+              color="#06b6d4"
+              transparent
+              opacity={0.5}
+              blending={THREE.AdditiveBlending}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+          <Edges scale={1.02} threshold={15} color="#22d3ee" />
+          <Text
+            ref={wormholeTextRef}
+            position={[0, 0, 0.01]}
+            fontSize={0.14}
+            color="#ffffff"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.006}
+            outlineColor="#000000"
+            renderOrder={3}
+          >
+            {obstacle.targetFaceId === undefined ? '?' : (face.id < obstacle.targetFaceId ? 'A' : 'B')}
+          </Text>
+        </group>
+      )}
 
       {/* Drag target indicator overlay (keeps separate from pulling content, stays anchored on the target slot!) */}
       {isTarget && (

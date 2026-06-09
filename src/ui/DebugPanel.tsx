@@ -1,7 +1,7 @@
 import React from 'react';
 import { useGameStore } from '../game/state';
 import { SHORTCUTS } from '../game/shortcuts';
-import { LEVELS } from '../game/levels';
+import { LEVELS, formatScenarioNumber } from '../game/levels';
 import type { ElementSymbol } from '../game/types';
 
 interface DebugPanelProps {
@@ -20,6 +20,7 @@ export function DebugPanel({ onClose, onJumpAstro, onJumpLevel }: DebugPanelProp
   const setAutoPlay = useGameStore(s => s.setAutoPlay);
   const autoPlaySpeed = useGameStore(s => s.autoPlaySpeed);
   const setAutoPlaySpeed = useGameStore(s => s.setAutoPlaySpeed);
+  const setEditorMode = useGameStore(s => s.setEditorMode);
 
   const unlockAll = () => {
     const allLevels = LEVELS.map(l => l.id);
@@ -85,6 +86,15 @@ export function DebugPanel({ onClose, onJumpAstro, onJumpLevel }: DebugPanelProp
 
       <div className="text-[8px] tracking-[2px] text-amber-500/60 uppercase mb-1.5">Dev Actions</div>
       <div className="flex flex-col gap-1 mb-3">
+        <button
+          onClick={() => {
+            setEditorMode(true);
+            onClose();
+          }}
+          className={btn}
+        >
+          Enter Scenario Editor
+        </button>
         <button onClick={onJumpAstro} className={btn}>Jump to Astrophysicist Mode</button>
         <button onClick={unlockAll} className={btn}>Unlock all ({completedLevels.length}/{LEVELS.length})</button>
         <button onClick={() => setShowRealtimeGraphics(!showRealtimeGraphics)} className={btn}>
@@ -102,9 +112,9 @@ export function DebugPanel({ onClose, onJumpAstro, onJumpLevel }: DebugPanelProp
             key={l.id}
             onClick={() => onJumpLevel(l.id)}
             title={l.title}
-            className="py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-200 transition-colors cursor-pointer"
+            className="py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-200 transition-colors cursor-pointer text-[8px]"
           >
-            {l.id}
+            {formatScenarioNumber(l.id)}
           </button>
         ))}
       </div>

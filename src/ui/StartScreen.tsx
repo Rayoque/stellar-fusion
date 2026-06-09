@@ -12,7 +12,7 @@ interface StartScreenProps {
 
 export function StartScreen({ onStart, onOpenCampaign, onStartAstro }: StartScreenProps) {
   const completedLevels = useGameStore(s => s.completedLevels);
-  const isAstroUnlocked = completedLevels.length >= 10;
+  const isAstroUnlocked = completedLevels.length >= 25;
   const [pendingAction, setPendingAction] = useState<'sandbox' | 'campaign' | 'astro' | null>(null);
 
   useEffect(() => {
@@ -129,7 +129,7 @@ export function StartScreen({ onStart, onOpenCampaign, onStartAstro }: StartScre
           ) : (
             <button
               className="group px-8 py-3.5 border border-white/5 bg-white/3 text-white/20 text-xs font-bold tracking-[3px] rounded-full flex items-center gap-3 cursor-not-allowed opacity-50"
-              title="Locked: Complete all 10 Campaign Scenarios to unlock!"
+              title="Locked: Complete all 25 Campaign Scenarios to unlock!"
             >
               🔒 ASTROPHYSICIST MODE
             </button>

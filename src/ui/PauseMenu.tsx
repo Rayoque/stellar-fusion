@@ -1,7 +1,16 @@
 // src/ui/PauseMenu.tsx
 import React, { useState } from 'react';
 import { useGameStore } from '../game/state';
-import { isBgSoundEnabled, setBgSoundEnabled, isEffectsSoundEnabled, setEffectsSoundEnabled } from '../audio/synth';
+import { 
+  isBgSoundEnabled, 
+  setBgSoundEnabled, 
+  getBgVolume, 
+  setBgVolume, 
+  isEffectsSoundEnabled, 
+  setEffectsSoundEnabled, 
+  getEffectsVolume, 
+  setEffectsVolume 
+} from '../audio/synth';
 import { APP_VERSION } from '../version';
 
 interface PauseMenuProps {
@@ -20,6 +29,8 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCodex, onOpenCampaign }:
   const [showGuide, setShowGuide] = useState(false);
   const [bgSound, setBgSound] = useState(isBgSoundEnabled());
   const [effectsSound, setEffectsSound] = useState(isEffectsSoundEnabled());
+  const [bgVolume, setBgVolumeState] = useState(getBgVolume());
+  const [effectsVolume, setEffectsVolumeState] = useState(getEffectsVolume());
 
   const handleToggleBgSound = () => {
     const nextVal = !bgSound;
@@ -31,6 +42,16 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCodex, onOpenCampaign }:
     const nextVal = !effectsSound;
     setEffectsSound(nextVal);
     setEffectsSoundEnabled(nextVal);
+  };
+
+  const handleBgVolumeChange = (val: number) => {
+    setBgVolumeState(val);
+    setBgVolume(val);
+  };
+
+  const handleEffectsVolumeChange = (val: number) => {
+    setEffectsVolumeState(val);
+    setEffectsVolume(val);
   };
 
   const handleReset = () => {
@@ -191,43 +212,77 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCodex, onOpenCampaign }:
                 </div>
 
                 {/* Background Sound Toggle */}
-                <div className="flex items-center justify-between border-t border-white/5 pt-3">
-                  <div className="pr-4">
-                    <div className="text-xs font-semibold text-white/90">Background Drone</div>
-                    <div className="text-[10px] text-white/40 mt-1 leading-normal">Low-frequency atmospheric background drone.</div>
-                  </div>
-                  <button
-                    onClick={handleToggleBgSound}
-                    className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      bgSound ? 'bg-cyan-500' : 'bg-white/20'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                        bgSound ? 'translate-x-5' : 'translate-x-0'
+                <div className="flex flex-col border-t border-white/5 pt-3 gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="pr-4">
+                      <div className="text-xs font-semibold text-white/90">Background Drone</div>
+                      <div className="text-[10px] text-white/40 mt-1 leading-normal">Low-frequency atmospheric background drone.</div>
+                    </div>
+                    <button
+                      onClick={handleToggleBgSound}
+                      className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        bgSound ? 'bg-cyan-500' : 'bg-white/20'
                       }`}
-                    />
-                  </button>
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          bgSound ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {bgSound && (
+                    <div className="flex items-center gap-3 animate-fade-in-up mt-1">
+                      <span className="text-[9px] text-white/45 font-mono uppercase tracking-wider">Vol</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={bgVolume}
+                        onChange={(e) => handleBgVolumeChange(Number(e.target.value))}
+                        className="flex-1 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                        style={{ outline: 'none' }}
+                      />
+                      <span className="text-[9px] text-white/60 font-mono w-6 text-right">{bgVolume}%</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Effects Sound Toggle */}
-                <div className="flex items-center justify-between border-t border-white/5 pt-3">
-                  <div className="pr-4">
-                    <div className="text-xs font-semibold text-white/90">Sound Effects</div>
-                    <div className="text-[10px] text-white/40 mt-1 leading-normal">Nuclei spawning tick, blocked shake, and fusion merges.</div>
-                  </div>
-                  <button
-                    onClick={handleToggleEffectsSound}
-                    className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      effectsSound ? 'bg-cyan-500' : 'bg-white/20'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                        effectsSound ? 'translate-x-5' : 'translate-x-0'
+                <div className="flex flex-col border-t border-white/5 pt-3 gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="pr-4">
+                      <div className="text-xs font-semibold text-white/90">Sound Effects</div>
+                      <div className="text-[10px] text-white/40 mt-1 leading-normal">Nuclei spawning tick, blocked shake, and fusion merges.</div>
+                    </div>
+                    <button
+                      onClick={handleToggleEffectsSound}
+                      className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        effectsSound ? 'bg-cyan-500' : 'bg-white/20'
                       }`}
-                    />
-                  </button>
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          effectsSound ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {effectsSound && (
+                    <div className="flex items-center gap-3 animate-fade-in-up mt-1">
+                      <span className="text-[9px] text-white/45 font-mono uppercase tracking-wider">Vol</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={effectsVolume}
+                        onChange={(e) => handleEffectsVolumeChange(Number(e.target.value))}
+                        className="flex-1 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                        style={{ outline: 'none' }}
+                      />
+                      <span className="text-[9px] text-white/60 font-mono w-6 text-right">{effectsVolume}%</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

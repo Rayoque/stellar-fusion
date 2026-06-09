@@ -149,9 +149,11 @@ export function generateTruncatedIcosahedron(): Face[] {
     // Sort points CCW around the face center
     const faceCenter = normalize(icoVerts[i]); // good enough approximation
     pentPoints.sort((p1, p2) => {
-      const c1 = cross(faceCenter, p1);
-      const c2 = cross(faceCenter, p2);
-      return dot(c1, p2) - dot(c2, p1); // rough angular sort
+      const u = normalize(subtract(pentPoints[0], faceCenter));
+      const v = normalize(cross(faceCenter, u));
+      const a1 = Math.atan2(dot(subtract(p1, faceCenter), v), dot(subtract(p1, faceCenter), u));
+      const a2 = Math.atan2(dot(subtract(p2, faceCenter), v), dot(subtract(p2, faceCenter), u));
+      return a1 - a2;
     });
 
     const tangent = createTangentFrame(faceCenter);
