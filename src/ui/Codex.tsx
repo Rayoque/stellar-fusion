@@ -99,7 +99,7 @@ export function Codex({ onClose, initialElement }: CodexProps) {
       {/* Modal Card */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-[#0f0f15]/95 border border-white/10 p-6 sm:p-8 rounded-[32px] max-w-2xl w-full h-[580px] md:h-[480px] max-h-[90vh] overflow-hidden flex flex-col gap-5 text-white shadow-[0_16px_48px_rgba(0,0,0,0.7)] relative isolate"
+        className="bg-[#0f0f15]/95 border border-white/10 p-6 sm:p-8 rounded-[32px] max-w-2xl w-full h-[85dvh] md:h-[480px] max-h-[90vh] overflow-hidden flex flex-col gap-5 text-white shadow-[0_16px_48px_rgba(0,0,0,0.7)] relative isolate"
       >
         {/* Close Button */}
         <button 
@@ -120,10 +120,12 @@ export function Codex({ onClose, initialElement }: CodexProps) {
           </p>
         </div>
 
-        {/* Content Body: Split layout on desktop, stacked on mobile */}
-        <div className="flex flex-col md:flex-row gap-5 flex-1 overflow-hidden min-h-0">
+        {/* Content Body: split layout with independent scrolls on desktop;
+            on mobile the whole body is ONE scroll surface so neither panel
+            gets scrunched into a tiny nested scroller. */}
+        <div className="flex flex-col md:flex-row gap-5 flex-1 overflow-y-auto md:overflow-hidden min-h-0 custom-scrollbar">
           {/* Left Panel: Grid of elements */}
-          <div className="flex-1 md:max-w-[280px] overflow-y-auto pr-1 custom-scrollbar">
+          <div className="flex-shrink-0 md:flex-1 md:max-w-[280px] md:overflow-y-auto pr-1 custom-scrollbar">
             <div className="grid grid-cols-4 gap-2">
               {activeIsotopes.map((sym) => {
                 const el = ELEMENTS[sym];
@@ -172,7 +174,7 @@ export function Codex({ onClose, initialElement }: CodexProps) {
           </div>
 
           {/* Right Panel: Selected Element scientific detail card */}
-          <div className="flex-1 bg-white/3 border border-white/5 rounded-2xl p-4 flex flex-col justify-between overflow-y-auto custom-scrollbar">
+          <div className="flex-shrink-0 md:flex-1 bg-white/3 border border-white/5 rounded-2xl p-4 flex flex-col justify-between md:overflow-y-auto custom-scrollbar">
             {selectedSym ? (
               <div className="flex flex-col gap-4 animate-fade-in-up">
                 <div className="flex items-center gap-3">

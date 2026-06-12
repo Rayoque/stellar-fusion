@@ -19,6 +19,9 @@ export function ScenarioEditor() {
   const newGame = useGameStore(s => s.newGame);
 
   const [activeTab, setActiveTab] = React.useState<'metadata' | 'objectives' | 'saved'>('metadata');
+  // Drawer state: the panel slides away so the sphere is paintable on small
+  // screens. Tap outside closes it; a floating tab brings it back.
+  const [panelOpen, setPanelOpen] = React.useState(true);
 
   if (!isEditorMode) return null;
 
@@ -89,18 +92,55 @@ export function ScenarioEditor() {
   };
 
   return (
-    <div className="fixed top-4 left-4 z-[150] w-[340px] max-h-[92vh] overflow-hidden rounded-[24px] border border-white/10 bg-[#0c0c10]/95 backdrop-blur-lg flex flex-col text-white shadow-[0_16px_48px_rgba(0,0,0,0.8)] select-none">
-      
+    <>
+      {/* Tap-outside-to-dismiss backdrop (small screens only — on desktop the
+          panel and the sphere coexist). Invisible: the sphere stays in view,
+          and the dismissing tap never paints a face. */}
+      {panelOpen && (
+        <div
+          className="fixed inset-0 z-[140] md:hidden"
+          onPointerDown={() => setPanelOpen(false)}
+        />
+      )}
+
+      {/* Floating reopen tab while the drawer is tucked away */}
+      {!panelOpen && (
+        <button
+          onClick={() => setPanelOpen(true)}
+          className="fixed left-0 top-1/2 -translate-y-1/2 z-[150] pl-2 pr-3 py-4 rounded-r-2xl border border-l-0 border-emerald-500/30 bg-[#0c0c10]/90 backdrop-blur-md text-emerald-300 shadow-[0_8px_24px_rgba(0,0,0,0.5)] cursor-pointer active:scale-95 transition-all flex flex-col items-center gap-1.5 animate-fade-in-up"
+          title="Open the scenario editor panel"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+          <span className="text-[8px] font-mono font-bold tracking-[2px] uppercase" style={{ writingMode: 'vertical-rl' }}>Editor</span>
+        </button>
+      )}
+
+      <div className={`fixed top-4 left-4 z-[150] w-[340px] max-w-[88vw] max-h-[92vh] overflow-hidden rounded-[24px] border border-white/10 bg-[#0c0c10]/95 backdrop-blur-lg flex flex-col text-white shadow-[0_16px_48px_rgba(0,0,0,0.8)] select-none transition-transform duration-300 ease-out ${panelOpen ? 'translate-x-0' : '-translate-x-[120%] pointer-events-none'}`}>
+
       {/* Header */}
       <div className="p-4 border-b border-white/5 flex flex-col gap-1 flex-shrink-0">
         <div className="flex items-center justify-between">
           <span className="text-[8px] font-mono tracking-[3px] text-cyan-400 font-bold uppercase">Stellar Core Builder</span>
-          <button 
-            onClick={() => setEditorMode(false)}
-            className="text-white/40 hover:text-white text-xs cursor-pointer px-1.5 py-0.5 rounded hover:bg-white/5"
-          >
-            Exit
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPanelOpen(false)}
+              className="text-white/40 hover:text-white cursor-pointer px-1.5 py-0.5 rounded hover:bg-white/5 flex items-center gap-1 text-[10px]"
+              title="Tuck the panel away to paint the sphere (tap the sphere area or this button)"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              Hide
+            </button>
+            <button
+              onClick={() => setEditorMode(false)}
+              className="text-white/40 hover:text-white text-xs cursor-pointer px-1.5 py-0.5 rounded hover:bg-white/5"
+            >
+              Exit
+            </button>
+          </div>
         </div>
         <h2 className="text-sm font-semibold tracking-wide uppercase">Scenario Editor</h2>
       </div>
@@ -418,13 +458,14 @@ export function ScenarioEditor() {
         </div>
 
         <div className="text-[8px] text-white/35 text-center mt-2 leading-tight flex flex-col gap-1">
-          <div>Select brush above, then tap faces on the 3D sphere.</div>
+          <div>Select brush above, then hide this panel and tap faces on the 3D sphere.</div>
           <div className="text-amber-500/70 font-semibold uppercase tracking-wider text-[7px] leading-tight mt-0.5">
             ⚠️ Environmental factors (CME, Anomaly, Wormhole) are in active development and may exhibit unexpected behavior.
           </div>
         </div>
       </div>
 
-    </div>
+      </div>
+    </>
   );
 }

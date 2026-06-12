@@ -103,6 +103,11 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
   const [isDragging, setIsDragging] = React.useState(false);
   const dragStartRef = React.useRef<{ x: number; y: number } | null>(null);
   const hasDispatchedDownRef = React.useRef(false);
+  // One gesture model for the whole tray, mouse and touch alike:
+  // vertical-dominant drags orbit the star, horizontal-dominant drags scroll
+  // the tray. Decided once per gesture at a small movement threshold.
+  const gestureModeRef = React.useRef<'orbit' | 'tray' | null>(null);
+  const trayScrollStartRef = React.useRef(0);
 
   React.useEffect(() => {
     const tray = trayRef.current;
@@ -117,46 +122,15 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
     };
     tray.addEventListener('wheel', handleWheel, { passive: false });
 
-    // Click and drag mouse behavior
-    let isDown = false;
-    let startX = 0;
-    let scrollLeft = 0;
-
-    const handleMouseDown = (e: MouseEvent) => {
-      isDown = true;
-      setIsDragging(true);
-      startX = e.clientX;
-      scrollLeft = tray.scrollLeft;
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDown) return;
-      const x = e.clientX;
-      const walk = (x - startX) * 1.8; // scroll multiplier
-      tray.scrollLeft = scrollLeft - walk;
-    };
-
-    const handleMouseUp = () => {
-      isDown = false;
-      setIsDragging(false);
-    };
-
     // Block native image/text drag-drop ghosting to prevent scroll hijacking
     const handleDragStart = (e: DragEvent) => {
       e.preventDefault();
     };
-
-    tray.addEventListener('mousedown', handleMouseDown);
     tray.addEventListener('dragstart', handleDragStart);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
       tray.removeEventListener('wheel', handleWheel);
-      tray.removeEventListener('mousedown', handleMouseDown);
       tray.removeEventListener('dragstart', handleDragStart);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
     };
   }, []);
 
@@ -262,9 +236,11 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
     <div className="absolute inset-0 z-10 pointer-events-none select-none">
       {/* Top HUD Header Bar: 1fr/auto/1fr grid keeps the center info bar screen-centered
           regardless of the left/right widths, only shrinking it if it can't fit. */}
-      <div className={`absolute top-0 left-0 right-0 px-4 pointer-events-none select-none hud-top-container grid grid-cols-[1fr_auto_1fr] items-center gap-2.5 ${zenClass}`}>
-        {/* Left Section: Menu Button + quiet single-step Undo below it */}
-        <div className="pointer-events-auto flex-shrink-0 justify-self-start flex flex-col items-start gap-2">
+      {/* items-start keeps the menu button, stats pill, and score pills on one
+          shared top line — the undo glyph hangs beneath without sinking the row. */}
+      <div className={`absolute top-0 left-0 right-0 px-4 pointer-events-none select-none hud-top-container grid grid-cols-[1fr_auto_1fr] items-start gap-2.5 ${zenClass}`}>
+        {/* Left Section: Menu Button + quiet single-step Undo beneath it */}
+        <div className="pointer-events-auto flex-shrink-0 justify-self-start flex flex-col items-center gap-2.5 w-11">
           <button
             onClick={onOpenMenu}
             className="flex items-center justify-center bg-black/40 backdrop-blur-md w-11 h-11 rounded-full border border-white/10 cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.92] transition-all text-white text-base select-none shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
@@ -273,20 +249,22 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
           >
             ☰
           </button>
-          {/* Undo: appears once there is a move to take back, fades while spent.
-              Single-step by design — a mercy, not a search tool. */}
-          {state.history.length > 0 && !state.endState && (
+          {/* Undo: a bare glyph, centered under the menu — no chrome. Single
+              step by design (a mercy, not a search tool); near-invisible once
+              spent, back at full presence after the next move. Hidden in the
+              post-collapse epilogue, where forward is the only direction. */}
+          {state.history.length > 0 && !state.endState && !state.endlessMode && (
             <button
               onClick={() => { state.undo(); }}
               disabled={state.lastActionWasUndo}
-              className={`flex items-center justify-center bg-black/30 backdrop-blur-md w-9 h-9 rounded-full border border-white/8 transition-all select-none animate-fade-in-up ${
+              className={`flex items-center justify-center w-9 h-9 transition-all duration-300 select-none animate-fade-in-up ${
                 state.lastActionWasUndo
-                  ? 'opacity-15 cursor-default'
-                  : 'opacity-40 hover:opacity-90 hover:bg-white/10 active:scale-[0.9] cursor-pointer'
+                  ? 'opacity-[0.08] cursor-default'
+                  : 'opacity-50 hover:opacity-95 active:scale-[0.88] cursor-pointer'
               }`}
               title="Undo last move"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M9 14 4 9l5-5" />
                 <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
               </svg>
@@ -454,8 +432,11 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
         </div>
       )}
 
+      {/* pointer-events-none here: the strip of empty screen around the tray
+          must fall through to the canvas so it stays usable as orbit space
+          when the star fills the screen. The panel re-enables its own events. */}
       <div
-        className={`absolute left-1/2 -translate-x-1/2 pointer-events-auto hud-bottom-container ${zenClass}`}
+        className={`absolute left-1/2 -translate-x-1/2 pointer-events-none hud-bottom-container ${zenClass}`}
       >
         <div className="flex flex-col items-center gap-2 xs:gap-3.5 pointer-events-none select-none max-w-[94vw]">
           {/* Pinch-to-zoom hint, floated directly above the instructions line */}
@@ -467,11 +448,15 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
           </div>
 
           {/* Elements Tray Wrapper Container with Smart Touch Orbiting handlers */}
-          <div 
+          <div
             className="glass-panel rounded-[20px] xs:rounded-[22px] shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center overflow-hidden max-w-full pointer-events-auto border border-white/8"
-            style={{ 
+            style={{
               borderColor: `${currentThemeColor}15`,
-              boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px ${currentThemeColor}05`
+              boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px ${currentThemeColor}05`,
+              // Without this, mobile browsers steal the gesture for native
+              // scrolling (pointercancel) and the tray can neither orbit nor
+              // scroll reliably by touch.
+              touchAction: 'none'
             }}
             onPointerDown={(e) => {
               if ((e.target as HTMLElement).closest('button')) {
@@ -482,61 +467,59 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
               } catch (err) {}
 
               dragStartRef.current = { x: e.clientX, y: e.clientY };
+              gestureModeRef.current = null;
+              trayScrollStartRef.current = trayRef.current?.scrollLeft ?? 0;
               hasDispatchedDownRef.current = false;
-              (window as any).isOrbitingFromHUD = true;
             }}
             onPointerMove={(e) => {
               if (!dragStartRef.current) return;
 
               const dx = e.clientX - dragStartRef.current.x;
               const dy = e.clientY - dragStartRef.current.y;
-              const dist = Math.sqrt(dx * dx + dy * dy);
 
-              let shouldOrbit = false;
-              if (state.astrophysicistMode) {
-                if (!hasDispatchedDownRef.current && dist > 8) {
-                  if (Math.abs(dy) > Math.abs(dx) * 0.8) {
-                    shouldOrbit = true;
-                  } else {
-                    dragStartRef.current = null;
-                    (window as any).isOrbitingFromHUD = false;
-                    return;
-                  }
-                } else if (hasDispatchedDownRef.current) {
-                  shouldOrbit = true;
-                }
-              } else {
-                if (dist > 3 || hasDispatchedDownRef.current) {
-                  shouldOrbit = true;
+              // Decide the gesture once: up/down swings the star, left/right
+              // slides the tray. Same rule in every mode.
+              if (gestureModeRef.current === null) {
+                if (Math.hypot(dx, dy) < 7) return;
+                gestureModeRef.current = Math.abs(dy) >= Math.abs(dx) ? 'orbit' : 'tray';
+                if (gestureModeRef.current === 'orbit') {
+                  (window as any).isOrbitingFromHUD = true;
+                } else {
+                  setIsDragging(true);
                 }
               }
 
-              if (shouldOrbit) {
-                const canvas = document.querySelector('canvas');
-                if (canvas) {
-                  if (!hasDispatchedDownRef.current) {
-                    hasDispatchedDownRef.current = true;
-                    const downEvent = new PointerEvent('pointerdown', {
-                      bubbles: true,
-                      cancelable: true,
-                      clientX: dragStartRef.current.x,
-                      clientY: dragStartRef.current.y,
-                      pointerId: e.pointerId,
-                      pointerType: e.pointerType,
-                    });
-                    canvas.dispatchEvent(downEvent);
-                  }
+              if (gestureModeRef.current === 'tray') {
+                if (trayRef.current) {
+                  trayRef.current.scrollLeft = trayScrollStartRef.current - dx;
+                }
+                return;
+              }
 
-                  const moveEvent = new PointerEvent('pointermove', {
+              const canvas = document.querySelector('canvas');
+              if (canvas) {
+                if (!hasDispatchedDownRef.current) {
+                  hasDispatchedDownRef.current = true;
+                  const downEvent = new PointerEvent('pointerdown', {
                     bubbles: true,
                     cancelable: true,
-                    clientX: e.clientX,
-                    clientY: e.clientY,
+                    clientX: dragStartRef.current.x,
+                    clientY: dragStartRef.current.y,
                     pointerId: e.pointerId,
                     pointerType: e.pointerType,
                   });
-                  canvas.dispatchEvent(moveEvent);
+                  canvas.dispatchEvent(downEvent);
                 }
+
+                const moveEvent = new PointerEvent('pointermove', {
+                  bubbles: true,
+                  cancelable: true,
+                  clientX: e.clientX,
+                  clientY: e.clientY,
+                  pointerId: e.pointerId,
+                  pointerType: e.pointerType,
+                });
+                canvas.dispatchEvent(moveEvent);
               }
             }}
             onPointerUp={(e) => {
@@ -559,8 +542,10 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                 }
               }
               dragStartRef.current = null;
+              gestureModeRef.current = null;
               hasDispatchedDownRef.current = false;
               (window as any).isOrbitingFromHUD = false;
+              setIsDragging(false);
             }}
             onPointerCancel={(e) => {
               try {
@@ -582,8 +567,10 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                 }
               }
               dragStartRef.current = null;
+              gestureModeRef.current = null;
               hasDispatchedDownRef.current = false;
               (window as any).isOrbitingFromHUD = false;
+              setIsDragging(false);
             }}
           >
             {/* Scrollable Elements List */}
@@ -593,6 +580,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
               style={{
                 cursor: isDragging ? 'grabbing' : 'grab',
                 userSelect: 'none',
+                touchAction: 'none',
               }}
             >
               {activeIsotopes.map((sym) => {

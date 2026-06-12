@@ -490,10 +490,30 @@ export function Controls() {
     let pointerDownX = 0;
     let pointerDownY = 0;
     let pointerDownFaceId: number | null = null;
+    // Live multi-touch tracking: a second finger means a camera gesture
+    // (pinch-zoom), which must never read as a double-tap or a tile grab.
+    const activePointers = new Set<number>();
 
     const onPointerDown = (event: PointerEvent) => {
+      activePointers.add(event.pointerId);
+
       // Cancel background drift on any user interaction
       driftVelocity.current = 0;
+
+      if (activePointers.size > 1) {
+        // Pinch begins: squash the double-tap timer (two fingers landing
+        // within 280ms used to toggle zen mode and hide the HUD), release
+        // any tile candidacy so TrackballControls keeps full rotate/zoom
+        // authority — including the moment one finger lifts mid-pinch.
+        lastTapTime = 0;
+        dragStartFaceId.current = null;
+        dragStartPos.current = null;
+        setIsDraggingTile(false);
+        setIsPointerDownOnTile(false);
+        setIsPointerDownOnTileCandidate(false);
+        useGameStore.setState({ selectedFaceId: null, dragOffset3D: null });
+        return;
+      }
 
       if (isAnimating) return;
 
@@ -676,6 +696,8 @@ export function Controls() {
     };
 
     const onPointerUp = (event: PointerEvent) => {
+      activePointers.delete(event.pointerId);
+
       try {
         dom.releasePointerCapture(event.pointerId);
       } catch (err) {}
