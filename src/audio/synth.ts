@@ -297,6 +297,46 @@ export function playSupernova(): void {
   triggerHaptic('error');
 }
 
+/**
+ * Play Shell Shed (planetary nebula)
+ * The gentle counterpart to the supernova: a soft, airy exhale for low-mass
+ * endings (white dwarf, failed collapse). Slow attack, no bite — a release,
+ * not an explosion.
+ */
+export function playShellShed(): void {
+  if (!effectsSoundEnabled || !audioCtx) return;
+  initAudio();
+  const now = audioCtx.currentTime;
+
+  const freqs = [116.5, 174.6, 233.1]; // Bb2, F3, Bb3 — the drone's own chord, exhaled
+  freqs.forEach((f, i) => {
+    const osc = audioCtx!.createOscillator();
+    const gain = audioCtx!.createGain();
+    const filter = audioCtx!.createBiquadFilter();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(f, now);
+    osc.frequency.linearRampToValueAtTime(f * 0.84, now + 2.4);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, now);
+    filter.frequency.exponentialRampToValueAtTime(120, now + 2.4);
+
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.10 * (effectsVolume / 100), now + 0.5 + i * 0.12);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.6);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx!.destination);
+
+    osc.start(now);
+    osc.stop(now + 2.8);
+  });
+
+  triggerHaptic('medium');
+}
+
 let ambientOsc1: OscillatorNode | null = null;
 let ambientOsc2: OscillatorNode | null = null;
 let ambientOsc3: OscillatorNode | null = null;

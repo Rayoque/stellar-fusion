@@ -1,7 +1,8 @@
 // src/ui/CampaignObjectiveOverlay.tsx
 import React from 'react';
-import { LEVELS, formatScenarioNumber } from '../game/levels';
+import { findLevel, formatScenarioNumber } from '../game/levels';
 import { ELEMENTS } from '../game/elements';
+import { useGameStore } from '../game/state';
 
 interface CampaignObjectiveOverlayProps {
   levelId: number;
@@ -9,7 +10,9 @@ interface CampaignObjectiveOverlayProps {
 }
 
 export function CampaignObjectiveOverlay({ levelId, onStart }: CampaignObjectiveOverlayProps) {
-  const level = LEVELS.find(l => l.id === levelId);
+  const customScenarios = useGameStore(s => s.customScenarios);
+  const editorLevelMetadata = useGameStore(s => s.editorLevelMetadata);
+  const level = findLevel(levelId, customScenarios, editorLevelMetadata);
   if (!level) return null;
 
   return (

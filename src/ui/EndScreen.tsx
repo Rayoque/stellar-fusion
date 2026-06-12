@@ -42,7 +42,10 @@ const CONTINUE_DESCRIPTIONS: Record<EndState, string> = {
 export function EndScreen({ endState, starMass, elementCounts, score, highScore, astrophysicistMode, onPlayAgain, onMainMenu }: EndScreenProps) {
   const totalElements = Object.values(elementCounts).reduce((a, b) => a + b, 0);
   const continueEndless = useGameStore(s => s.continueEndless);
-  const isNewBest = score >= highScore && score > 0;
+  const undo = useGameStore(s => s.undo);
+  const canUndo = useGameStore(s => s.history.length > 0 && !s.lastActionWasUndo);
+  const wasAutoPlayed = useGameStore(s => s.wasAutoPlayedThisRun);
+  const isNewBest = !wasAutoPlayed && score >= highScore && score > 0;
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
@@ -114,6 +117,21 @@ export function EndScreen({ endState, starMass, elementCounts, score, highScore,
                   {CONTINUE_DESCRIPTIONS[endState]}
                 </div>
               </>
+            )}
+
+            {/* Mercy take-back on a jam: undoing restores the pre-jam snapshot
+                (endState null), which dismisses this screen automatically. */}
+            {endState === 'jammed' && canUndo && (
+              <button
+                onClick={undo}
+                className="w-full py-3.5 bg-white/5 border border-white/10 text-white/80 hover:bg-white/10 rounded-full font-semibold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase cursor-pointer flex items-center justify-center gap-2"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M9 14 4 9l5-5" />
+                  <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+                </svg>
+                TAKE BACK LAST MOVE
+              </button>
             )}
 
             <button

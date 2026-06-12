@@ -239,6 +239,17 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
               )}
             </button>
           )}
+          {/* Scenario Editor — for every stellar architect, not just devs */}
+          <button
+            onClick={() => {
+              useGameStore.getState().setEditorMode(true);
+              onClose();
+            }}
+            className="pb-2 text-xs tracking-[2px] uppercase font-bold transition-all relative cursor-pointer text-emerald-400/70 hover:text-emerald-300 ml-auto"
+            title="Build your own scenario in the editor"
+          >
+            + Create
+          </button>
         </div>
 
         {/* Content Body: Left Level Map grid, Right level details */}

@@ -9,7 +9,7 @@ import { checkEndState } from './endgame';
 import { detectMerge, applyMerge, DECAY_POINTS } from './rules';
 import { executeSlide } from '../geometry/slide';
 import { playMerge, playBlocked, playHeliumLaugh, playSuccess, playSlide, playSpawnTick } from '../audio/synth';
-import { LEVELS } from './levels';
+import { LEVELS, findLevel } from './levels';
 
 function submitScoreToGameCenter(score: number, isAstro: boolean): void {
   try {
@@ -184,6 +184,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   autoRotateTargetFaceId: null,
   wasAutoPlayedThisRun: false,
   systemToast: null,
+  runGeneration: 0,
+  lastActionWasUndo: false,
 
   dismissToast: () => {
     set({ activeToastElement: null });
@@ -319,6 +321,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       autoRotateTargetFaceId: null,
       wasAutoPlayedThisRun: false,
       systemToast: null,
+      runGeneration: get().runGeneration + 1,
+      lastActionWasUndo: false,
     });
   },
 
@@ -337,6 +341,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({ selectedFaceId: null, dragTargetId: null });
       return;
     }
+
+    // Capture the run this move belongs to. If newGame/loadSavedGame replaces
+    // the run while we're awaiting an animation below, the mutated `state`
+    // snapshot would clobber the fresh game — so re-check after every await.
+    const runGen = state.runGeneration;
 
     set({ isAnimating: true, selectedFaceId: null, dragTargetId: null });
 
@@ -409,7 +418,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
         // Wait for slide animation
         await new Promise(r => setTimeout(r, duration));
-        
+
+        // Run was replaced mid-animation (reset, retry, mode switch) — abort
+        // before committing anything from the dead run.
+        if (get().runGeneration !== runGen) return;
+
         // Place tile at destination and handle merge detection
         let mergeRule = null;
         let mergeLandedId = landedId;
@@ -574,6 +587,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
                   tile.spawnedAtTurn = state.turn; // mark as transformed on this turn
                   tile.spawnReason = 'slide';      // trigger animation
                   tile.decayTurns = undefined;     // stable output
+
+                  // Fe56 only ever arises from Ni56 decay (the alpha ladder
+                  // tops out at Ni56), so the synthesis congratulations must
+                  // fire HERE — the merge-output check can never reach it.
+                  if (nextElement === 'Fe56' && !state.hasSeenFe56Splash) {
+                    state.showFe56Splash = true;
+                    state.hasSeenFe56Splash = true;
+                    playSuccess();
+                  }
                 }
               }
             }
@@ -642,7 +664,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         levelFailed = false;
 
         if (state.currentLevelId !== null) {
-          const level = LEVELS.find(l => l.id === state.currentLevelId);
+          const level = findLevel(state.currentLevelId, get().customScenarios, get().editorLevelMetadata);
           if (level) {
             let allObjectivesMet = true;
             for (const obj of level.objectives) {
@@ -669,17 +691,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
             if (allObjectivesMet) {
               levelObjectiveMet = true;
-              
+
+              // Only built-in campaign levels count toward progression —
+              // custom scenarios and editor playtests must not inflate the
+              // completion count that gates Astrophysicist Mode.
+              const isCampaignLevel = LEVELS.some(l => l.id === level.id);
+
               const currentCompleted = get().completedLevels;
               let nextCompleted = currentCompleted;
-              if (!currentCompleted.includes(level.id)) {
+              if (isCampaignLevel && !currentCompleted.includes(level.id)) {
                 nextCompleted = [...currentCompleted, level.id];
                 localStorage.setItem('stellar_completed_levels', JSON.stringify(nextCompleted));
               }
 
               const currentPerfect = get().perfectLevels || [];
               let nextPerfect = currentPerfect;
-              if (state.turn <= (level as any).parMoves && !currentPerfect.includes(level.id)) {
+              if (isCampaignLevel && state.turn <= (level as any).parMoves && !currentPerfect.includes(level.id)) {
                 nextPerfect = [...currentPerfect, level.id];
                 localStorage.setItem('stellar_perfect_levels', JSON.stringify(nextPerfect));
               }
@@ -732,6 +759,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const settleDelay = 40;
         await new Promise(r => setTimeout(r, settleDelay));
 
+        if (get().runGeneration !== runGen) return;
+
         const triggerTutorial = isNucleation && !state.hasSeenNucleationTutorial;
         if (triggerTutorial) {
           localStorage.setItem('stellar_seen_nucleation', 'true');
@@ -752,6 +781,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           hasSeenNucleationTutorial: triggerTutorial ? true : state.hasSeenNucleationTutorial,
           score: state.score,
           highScore: state.highScore,
+          lastActionWasUndo: false,
         });
         // Persist the in-progress open-ended game after each committed move.
         get().saveCurrentGame();
@@ -899,6 +929,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       showFe56Splash: false,
       wasAutoPlayedThisRun: data.wasAutoPlayedThisRun || false,
       systemToast: null,
+      runGeneration: get().runGeneration + 1,
+      lastActionWasUndo: false,
     });
     return true;
   },
@@ -961,6 +993,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   undo: () => {
     const state = get();
     if (state.isAnimating || state.history.length === 0) return;
+    // One step of mercy, not a search tool: a second undo needs a move between.
+    if (state.lastActionWasUndo) return;
 
     const nextHistory = [...state.history];
     const snapshot = nextHistory.pop()!;
@@ -981,6 +1015,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       dragTargetId: null,
       dragOffset3D: null,
       activeSlide: undefined,
+      lastActionWasUndo: true,
     });
   },
 

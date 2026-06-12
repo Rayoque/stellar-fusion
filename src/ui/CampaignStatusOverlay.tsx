@@ -1,6 +1,6 @@
 // src/ui/CampaignStatusOverlay.tsx
 import React from 'react';
-import { LEVELS, formatScenarioNumber } from '../game/levels';
+import { findLevel, formatScenarioNumber } from '../game/levels';
 import { useGameStore } from '../game/state';
 
 interface CampaignStatusOverlayProps {
@@ -68,7 +68,9 @@ const FAILURE_MESSAGES: Record<number, string> = {
 };
 
 export function CampaignStatusOverlay({ levelId, status, onNextLevel, onRetry, onBackToCampaign }: CampaignStatusOverlayProps) {
-  const level = LEVELS.find(l => l.id === levelId);
+  const customScenarios = useGameStore(s => s.customScenarios);
+  const editorLevelMetadata = useGameStore(s => s.editorLevelMetadata);
+  const level = findLevel(levelId, customScenarios, editorLevelMetadata);
   if (!level) return null;
 
   const isWin = status === 'win';

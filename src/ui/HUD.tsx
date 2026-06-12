@@ -4,7 +4,7 @@ import type { Phase, ElementSymbol } from '../game/types';
 import { ELEMENTS } from '../game/elements';
 import { useGameStore } from '../game/state';
 import { getStarAgeInfo } from '../game/phases';
-import { LEVELS } from '../game/levels';
+import { findLevel } from '../game/levels';
 import { playSpawnTick } from '../audio/synth';
 import { ZoomTooltip } from './ZoomTooltip';
 
@@ -160,9 +160,11 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
     };
   }, []);
 
-  // Campaign support
+  // Campaign support (resolves built-in, custom, and editor-playtest levels)
   const currentLevelId = useGameStore(s => s.currentLevelId);
-  const level = currentLevelId !== null ? LEVELS.find(l => l.id === currentLevelId) : null;
+  const customScenarios = useGameStore(s => s.customScenarios);
+  const editorLevelMetadata = useGameStore(s => s.editorLevelMetadata);
+  const level = currentLevelId !== null ? (findLevel(currentLevelId, customScenarios, editorLevelMetadata) ?? null) : null;
   const maxTurns = level ? level.maxTurns : null;
 
   // Dynamic astrophysics ages based on stellar mass: T_MS = 10 / M^2.5 Billion Years
@@ -261,9 +263,9 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
       {/* Top HUD Header Bar: 1fr/auto/1fr grid keeps the center info bar screen-centered
           regardless of the left/right widths, only shrinking it if it can't fit. */}
       <div className={`absolute top-0 left-0 right-0 px-4 pointer-events-none select-none hud-top-container grid grid-cols-[1fr_auto_1fr] items-center gap-2.5 ${zenClass}`}>
-        {/* Left Section: Menu Button */}
-        <div className="pointer-events-auto flex-shrink-0 justify-self-start">
-          <button 
+        {/* Left Section: Menu Button + quiet single-step Undo below it */}
+        <div className="pointer-events-auto flex-shrink-0 justify-self-start flex flex-col items-start gap-2">
+          <button
             onClick={onOpenMenu}
             className="flex items-center justify-center bg-black/40 backdrop-blur-md w-11 h-11 rounded-full border border-white/10 cursor-pointer hover:bg-white/10 hover:border-white/20 active:scale-[0.92] transition-all text-white text-base select-none shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
             style={{ borderColor: `${currentThemeColor}25` }}
@@ -271,6 +273,25 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
           >
             ☰
           </button>
+          {/* Undo: appears once there is a move to take back, fades while spent.
+              Single-step by design — a mercy, not a search tool. */}
+          {state.history.length > 0 && !state.endState && (
+            <button
+              onClick={() => { state.undo(); }}
+              disabled={state.lastActionWasUndo}
+              className={`flex items-center justify-center bg-black/30 backdrop-blur-md w-9 h-9 rounded-full border border-white/8 transition-all select-none animate-fade-in-up ${
+                state.lastActionWasUndo
+                  ? 'opacity-15 cursor-default'
+                  : 'opacity-40 hover:opacity-90 hover:bg-white/10 active:scale-[0.9] cursor-pointer'
+              }`}
+              title="Undo last move"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 14 4 9l5-5" />
+                <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Center Section: Core Stats Pill & Campaign objective secondary banner */}

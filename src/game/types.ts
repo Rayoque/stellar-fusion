@@ -183,4 +183,12 @@ export interface GameState {
   customScenarios: Level[];
   wasAutoPlayedThisRun: boolean;
   systemToast: string | null;
+
+  // Monotonic run counter. Bumped by newGame/loadSavedGame so async move
+  // pipelines (endDrag) can detect that the run they started in is gone and
+  // abort instead of committing stale state over the fresh game.
+  runGeneration: number;
+  // True right after an undo; cleared by the next committed move. Limits the
+  // undo to a single step back so it stays a mercy, not a search tool.
+  lastActionWasUndo: boolean;
 }

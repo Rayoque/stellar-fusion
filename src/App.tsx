@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { Scene } from './three/Scene';
 import { useGameStore } from './game/state';
-import { initAudio, startAmbientDrone, playSpawnTick, updateAmbientDrone, resumeAmbientDrone, createSilentWavUrl } from './audio/synth';
+import { initAudio, startAmbientDrone, playSpawnTick, updateAmbientDrone, resumeAmbientDrone, createSilentWavUrl, playSupernova, playShellShed } from './audio/synth';
 import { HUD } from './ui/HUD';
 import { EndScreen } from './ui/EndScreen';
 import { StartScreen } from './ui/StartScreen';
@@ -141,6 +141,40 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [systemToast, dismissSystemToast]);
+
+  // End-of-run ceremony: the death of the star plays out (ejecta, boom, flash)
+  // BEFORE the end card arrives. The card is the epilogue, not the event.
+  const [endScreenVisible, setEndScreenVisible] = React.useState(false);
+  const [flashOn, setFlashOn] = React.useState(false);
+
+  useEffect(() => {
+    if (!endState) {
+      setEndScreenVisible(false);
+      setFlashOn(false);
+      return;
+    }
+
+    const violent = endState === 'neutron_star' || endState === 'black_hole';
+    const gentle = endState === 'white_dwarf' || endState === 'failed_collapse';
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    // The sound of the death itself — in sandbox AND campaign (same physics).
+    if (violent) {
+      playSupernova();
+      setFlashOn(true);
+      timers.push(setTimeout(() => setFlashOn(false), 160));
+    } else if (gentle) {
+      playShellShed();
+    }
+
+    // The end card waits for the ceremony (sandbox only; campaign has its own overlay).
+    if (currentLevelId === null) {
+      const delay = violent ? 3000 : gentle ? 2600 : 500; // 'jammed' is quick
+      timers.push(setTimeout(() => setEndScreenVisible(true), delay));
+    }
+
+    return () => timers.forEach(clearTimeout);
+  }, [endState, currentLevelId]);
 
   const [showStatusOverlay, setShowStatusOverlay] = React.useState(false);
   const [showObjectiveLevelId, setShowObjectiveLevelId] = React.useState<number | null>(null);
@@ -472,8 +506,15 @@ export default function App() {
         </div>
       )}
 
-      {/* Standard Sandbox End Screen */}
-      {endState && currentLevelId === null && (
+      {/* Supernova white-out: a beat of pure light at the instant of collapse */}
+      <div
+        className={`fixed inset-0 z-[60] pointer-events-none bg-white transition-opacity ease-out ${
+          flashOn ? 'opacity-90 duration-100' : 'opacity-0 duration-[900ms]'
+        }`}
+      />
+
+      {/* Standard Sandbox End Screen — arrives after the ceremony, not instead of it */}
+      {endScreenVisible && endState && currentLevelId === null && (
         <EndScreen
           endState={endState}
           starMass={starMass}

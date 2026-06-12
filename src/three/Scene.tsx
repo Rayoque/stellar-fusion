@@ -5,6 +5,7 @@ import { OrbitControls } from '@react-three/drei';
 import { Background } from './Background';
 import { Sphere } from './Sphere';
 import { Controls } from './Controls';
+import { EndStateEffect } from './EndStateEffect';
 
 export function Scene() {
   return (
@@ -23,6 +24,9 @@ export function Scene() {
       <React.Suspense fallback={null}>
         <Sphere />
       </React.Suspense>
+      {/* Lives at the root, NOT inside the sphere group: the star collapses
+          beneath the ejecta, which blows outward from where the surface was. */}
+      <EndStateEffect />
       <Controls />
     </Canvas>
   );

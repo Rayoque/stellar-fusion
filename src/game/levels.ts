@@ -3,6 +3,45 @@ import type { Level, LevelObjective, ElementSymbol } from './types';
 
 export type { Level, LevelObjective };
 
+// Resolve a level id against the built-in campaign, the player's published
+// custom scenarios, and (for id 9999) the live editor draft metadata. Every
+// objective/overlay lookup must go through this — LEVELS.find alone silently
+// drops custom scenarios, making them unwinnable.
+export function findLevel(
+  levelId: number | null,
+  customScenarios: Level[],
+  editorMetadata?: {
+    title: string;
+    description: string;
+    author: string;
+    starMass: number;
+    maxTurns: number;
+    parMoves: number;
+    objectives: LevelObjective[];
+    disableSpawns: boolean;
+  }
+): Level | undefined {
+  if (levelId === null) return undefined;
+  const found = LEVELS.find(l => l.id === levelId) || customScenarios.find(l => l.id === levelId);
+  if (found) return found;
+  if (levelId === 9999 && editorMetadata) {
+    return {
+      id: 9999,
+      title: editorMetadata.title,
+      description: editorMetadata.description,
+      author: editorMetadata.author,
+      starMass: editorMetadata.starMass,
+      maxTurns: editorMetadata.maxTurns,
+      parMoves: editorMetadata.parMoves,
+      initialTiles: [],
+      objectives: editorMetadata.objectives,
+      campaign: 'custom',
+      disableSpawns: editorMetadata.disableSpawns,
+    };
+  }
+  return undefined;
+}
+
 export function formatScenarioNumber(levelId: number): string {
   if (levelId >= 1000) {
     return 'Custom';
