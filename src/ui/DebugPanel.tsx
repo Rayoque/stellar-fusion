@@ -2,7 +2,7 @@ import React from 'react';
 import { useGameStore } from '../game/state';
 import { SHORTCUTS } from '../game/shortcuts';
 import { LEVELS, formatScenarioNumber } from '../game/levels';
-import type { ElementSymbol } from '../game/types';
+import type { ElementSymbol, EndState } from '../game/types';
 
 interface DebugPanelProps {
   onClose: () => void;
@@ -45,6 +45,22 @@ export function DebugPanel({ onClose, onJumpAstro, onJumpLevel }: DebugPanelProp
     onClose();
   };
 
+  // Replay any end-state ceremony on the current board without playing to it.
+  // Clearing endState first lets the same ceremony re-trigger back to back.
+  // Collapse-family previews also set the collapse phase so the core shrinks
+  // beneath the ejecta exactly like a real death.
+  const previewEndState = (es: EndState) => {
+    useGameStore.setState({ endState: null });
+    setTimeout(() => {
+      useGameStore.setState({
+        endState: es,
+        endlessMode: false,
+        ...(es !== 'jammed' ? { phase: 'collapse' as const } : {}),
+      });
+    }, 80);
+    onClose();
+  };
+
   const btn = 'w-full text-left px-2.5 py-1.5 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-200 transition-colors cursor-pointer';
 
   return (
@@ -82,6 +98,18 @@ export function DebugPanel({ onClose, onJumpAstro, onJumpLevel }: DebugPanelProp
         <div className="text-[8px] text-amber-500/50 leading-tight px-0.5">
           Watches itself fuse. You can still drag tiles while it runs.
         </div>
+      </div>
+
+      <div className="text-[8px] tracking-[2px] text-amber-500/60 uppercase mb-1.5">End-State Ceremony Preview</div>
+      <div className="grid grid-cols-2 gap-1 mb-1.5">
+        <button onClick={() => previewEndState('white_dwarf')} className={btn}>White Dwarf</button>
+        <button onClick={() => previewEndState('neutron_star')} className={btn}>Neutron Star</button>
+        <button onClick={() => previewEndState('black_hole')} className={btn}>Black Hole</button>
+        <button onClick={() => previewEndState('failed_collapse')} className={btn}>Failed Collapse</button>
+        <button onClick={() => previewEndState('jammed')} className={btn}>Jammed</button>
+      </div>
+      <div className="text-[8px] text-amber-500/50 leading-tight px-0.5 mb-3">
+        Plays the full ceremony on the current board. Needs tiles in play for ejecta.
       </div>
 
       <div className="text-[8px] tracking-[2px] text-amber-500/60 uppercase mb-1.5">Dev Actions</div>

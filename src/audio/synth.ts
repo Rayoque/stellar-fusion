@@ -255,44 +255,110 @@ export function playBlocked(): void {
 }
 
 /**
- * Play Supernova / Iron Lock Core Boom
- * A deep sub-bass cosmic explosion that shakes the devices.
+ * Play Collapse Crack
+ * The detonation tick before the vacuum — thin, high, gone instantly.
+ * (Seismic-charge profile, part 1 of 3: crack → silence → WHOMM.)
+ */
+export function playCollapseCrack(): void {
+  if (!effectsSoundEnabled || !audioCtx) return;
+  initAudio();
+  const now = audioCtx.currentTime;
+  const vol = effectsVolume / 100;
+
+  const len = 0.045;
+  const buf = audioCtx.createBuffer(1, Math.ceil(audioCtx.sampleRate * len), audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+
+  const crack = audioCtx.createBufferSource();
+  crack.buffer = buf;
+  const hp = audioCtx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 2200;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.15 * vol, now);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+
+  crack.connect(hp);
+  hp.connect(g);
+  g.connect(audioCtx.destination);
+  crack.start(now);
+
+  triggerHaptic('light');
+}
+
+/**
+ * Play Supernova — the WHOMM.
+ * Sharp-attack shockwave voice (bandpassed sawtooth falling an octave-plus),
+ * detuned sub foundation dropping to the floor, and a filtered-noise debris
+ * tail. Designed to land ~0.7s after playCollapseCrack with the ambient
+ * drone ducked: detonation, vacuum, then this.
  */
 export function playSupernova(): void {
   if (!effectsSoundEnabled || !audioCtx) return;
   initAudio();
   const now = audioCtx.currentTime;
+  const vol = effectsVolume / 100;
 
-  const osc1 = audioCtx.createOscillator();
-  const osc2 = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  const filter = audioCtx.createBiquadFilter();
+  // The shockwave's voice — "bwah"
+  const bwah = audioCtx.createOscillator();
+  const bwahGain = audioCtx.createGain();
+  const bwahFilter = audioCtx.createBiquadFilter();
+  bwah.type = 'sawtooth';
+  bwah.frequency.setValueAtTime(180, now);
+  bwah.frequency.exponentialRampToValueAtTime(48, now + 1.1);
+  bwahFilter.type = 'bandpass';
+  bwahFilter.Q.value = 1.1;
+  bwahFilter.frequency.setValueAtTime(640, now);
+  bwahFilter.frequency.exponentialRampToValueAtTime(110, now + 1.2);
+  bwahGain.gain.setValueAtTime(0, now);
+  bwahGain.gain.linearRampToValueAtTime(0.34 * vol, now + 0.025);
+  bwahGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
+  bwah.connect(bwahFilter);
+  bwahFilter.connect(bwahGain);
+  bwahGain.connect(audioCtx.destination);
+  bwah.start(now);
+  bwah.stop(now + 1.7);
 
-  osc1.type = 'sawtooth';
-  osc1.frequency.setValueAtTime(80, now);
-  osc1.frequency.linearRampToValueAtTime(25, now + 1.6);
+  // Sub foundation — two detuned voices falling to the floor
+  [52, 52.8].forEach(f => {
+    const osc = audioCtx!.createOscillator();
+    const g = audioCtx!.createGain();
+    const lp = audioCtx!.createBiquadFilter();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(f, now);
+    osc.frequency.exponentialRampToValueAtTime(f / 2.1, now + 2.0);
+    lp.type = 'lowpass';
+    lp.frequency.value = 110;
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.42 * vol, now + 0.035);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 2.4);
+    osc.connect(lp);
+    lp.connect(g);
+    g.connect(audioCtx!.destination);
+    osc.start(now);
+    osc.stop(now + 2.5);
+  });
 
-  osc2.type = 'square';
-  osc2.frequency.setValueAtTime(80.5, now);
-  osc2.frequency.linearRampToValueAtTime(24.5, now + 1.6);
-
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(500, now);
-  filter.frequency.exponentialRampToValueAtTime(18, now + 1.5);
-
-  gain.gain.setValueAtTime(0, now);
-  gain.gain.linearRampToValueAtTime(0.32 * (effectsVolume / 100), now + 0.06);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.9);
-
-  osc1.connect(filter);
-  osc2.connect(filter);
-  filter.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  osc1.start(now);
-  osc2.start(now);
-  osc1.stop(now + 2.0);
-  osc2.stop(now + 2.0);
+  // Debris rumble — filtered noise tail
+  const len = 1.6;
+  const buf = audioCtx.createBuffer(1, Math.ceil(audioCtx.sampleRate * len), audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buf;
+  const ng = audioCtx.createGain();
+  const nf = audioCtx.createBiquadFilter();
+  nf.type = 'lowpass';
+  nf.frequency.setValueAtTime(420, now);
+  nf.frequency.exponentialRampToValueAtTime(60, now + len);
+  ng.gain.setValueAtTime(0, now);
+  ng.gain.linearRampToValueAtTime(0.16 * vol, now + 0.05);
+  ng.gain.exponentialRampToValueAtTime(0.0001, now + len);
+  noise.connect(nf);
+  nf.connect(ng);
+  ng.connect(audioCtx.destination);
+  noise.start(now);
 
   triggerHaptic('error');
 }
@@ -423,6 +489,29 @@ export function resumeAmbientDrone(): void {
   if (!ambientOsc1) startAmbientDrone();
 }
 
+// While ducked, updateAmbientDrone must not re-schedule gain ramps on top of
+// the duck envelope — the silence IS the effect (seismic-charge vacuum).
+let droneDuckedUntil = 0;
+
+/**
+ * Duck the ambient drone to near-silence almost instantly, hold, then breathe
+ * back in. The beat of nothing before the supernova WHOMM.
+ */
+export function duckAmbientDrone(holdSeconds: number): void {
+  if (!audioCtx || !ambientGain) return;
+  const now = audioCtx.currentTime;
+  droneDuckedUntil = now + holdSeconds + 2.5;
+
+  ambientGain.gain.cancelScheduledValues(now);
+  ambientGain.gain.setValueAtTime(Math.max(ambientGain.gain.value, 0.0001), now);
+  ambientGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+  ambientGain.gain.setValueAtTime(0.0001, now + holdSeconds);
+  ambientGain.gain.exponentialRampToValueAtTime(
+    Math.max(currentBaseGain * (bgVolume / 100), 0.0001),
+    now + holdSeconds + 2.5
+  );
+}
+
 export function stopAmbientDrone(): void {
   if (ambientOsc1) {
     try { ambientOsc1.stop(); } catch {}
@@ -445,6 +534,8 @@ export function stopAmbientDrone(): void {
  */
 export function updateAmbientDrone(phase: string, hasCollapsed: boolean, boardTension: boolean = false): void {
   if (!bgSoundEnabled || !audioCtx || !ambientGain || !ambientOsc2 || !ambientFilter || !osc3GainNode || !osc4GainNode) return;
+  // Respect an active duck — the ceremony owns the gain envelope right now.
+  if (audioCtx.currentTime < droneDuckedUntil) return;
 
   const now = audioCtx.currentTime;
   const transitionTime = 2.0;

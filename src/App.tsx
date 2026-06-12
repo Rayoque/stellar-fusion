@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { Scene } from './three/Scene';
 import { useGameStore } from './game/state';
-import { initAudio, startAmbientDrone, playSpawnTick, updateAmbientDrone, resumeAmbientDrone, createSilentWavUrl, playSupernova, playShellShed } from './audio/synth';
+import { initAudio, startAmbientDrone, playSpawnTick, updateAmbientDrone, resumeAmbientDrone, createSilentWavUrl, playSupernova, playShellShed, playCollapseCrack, duckAmbientDrone } from './audio/synth';
 import { HUD } from './ui/HUD';
 import { EndScreen } from './ui/EndScreen';
 import { StartScreen } from './ui/StartScreen';
@@ -158,18 +158,25 @@ export default function App() {
     const gentle = endState === 'white_dwarf' || endState === 'failed_collapse';
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    // The sound of the death itself — in sandbox AND campaign (same physics).
+    // Seismic-charge choreography, in sandbox AND campaign (same physics):
+    // detonation crack → the drone drops out (vacuum) while the core
+    // collapses → at +700ms the WHOMM, flash, ring, and ejecta land together.
     if (violent) {
-      playSupernova();
-      setFlashOn(true);
-      timers.push(setTimeout(() => setFlashOn(false), 160));
+      playCollapseCrack();
+      duckAmbientDrone(0.7);
+      timers.push(setTimeout(() => {
+        playSupernova();
+        setFlashOn(true);
+      }, 700));
+      timers.push(setTimeout(() => setFlashOn(false), 880));
     } else if (gentle) {
-      playShellShed();
+      duckAmbientDrone(0.3);
+      timers.push(setTimeout(() => playShellShed(), 300));
     }
 
     // The end card waits for the ceremony (sandbox only; campaign has its own overlay).
     if (currentLevelId === null) {
-      const delay = violent ? 3000 : gentle ? 2600 : 500; // 'jammed' is quick
+      const delay = violent ? 3800 : gentle ? 2900 : 500; // 'jammed' is quick
       timers.push(setTimeout(() => setEndScreenVisible(true), delay));
     }
 
