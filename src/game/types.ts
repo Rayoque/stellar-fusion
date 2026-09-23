@@ -82,7 +82,45 @@ export type EndState =
   | 'neutron_star'
   | 'black_hole'
   | 'failed_collapse'
+  | 'core_full'    // Astrophysicist Mode: the sphere filled before iron-56 was made
   | 'jammed';
+
+// Why a run ended: the player forged iron, the star's lifetime ran out, or no move was left.
+export type EndReason = 'iron' | 'lifetime' | 'full' | 'jammed';
+
+export type StarClassId = 'sunlike' | 'massive' | 'very_massive';
+
+// Dev auto-player personalities (src/game/bots.ts).
+export type BotId = 'greedy' | 'planner' | 'patient' | 'random' | 'solver';
+
+// One finished auto-played run, for the debug panel's run log.
+export interface AutoRunRecord {
+  run: number;             // runGeneration, so each run is logged once
+  bot: BotId;
+  turbo: boolean;
+  mode: string;            // "Astro", a star name, or "Scenario 07"
+  result: string;          // short outcome, e.g. "Iron core" or "Solved at par"
+  score: number;
+  moves: number;
+}
+
+// Pre-move snapshot kept for the single-step undo. Tiles and obstacles are deep
+// copies, so nothing the next move mutates can leak back into it.
+export interface MoveSnapshot {
+  tiles: Map<number, Tile>;
+  obstacles: Map<number, ObstacleInstance>;
+  turn: number;
+  phase: Phase;
+  phaseTransitions: GameState['phaseTransitions'];
+  elementCounts: Record<ElementSymbol, number>;
+  levelObjectiveMet: boolean;
+  levelFailed: boolean;
+  endState: EndState | null;
+  endReason: EndReason | null;
+  score: number;
+  hasPlayedHeliumLaugh: boolean;
+  lastMoveFaceId: number | null;
+}
 
 export interface GameState {
   // immutable per run
@@ -111,12 +149,19 @@ export interface GameState {
   unlockedElements: ElementSymbol[]; // elements discovered across all plays
   activeToastElement: ElementSymbol | null; // currently showing toast notification
 
+  // Stellar Life: the chosen star and its move budget (null in campaign/astro runs)
+  starClass: StarClassId | null;
+  lifetime: number | null;
+  // Heavier star unlocked by the ending of this run, for the end card.
+  unlockedStarThisRun: StarClassId | null;
+
   // UI state
   selectedFaceId: number | null;
   dragTargetId: number | null;
   isAnimating: boolean;
   endState: EndState | null;
-  endlessMode: boolean;
+  endReason: EndReason | null;
+  supernovaBonus: number;
   astrophysicistMode: boolean;
   isPaused: boolean;
   showRealtimeGraphics: boolean;
@@ -137,16 +182,7 @@ export interface GameState {
   blockedFaceId?: number | null;
   blockedTime?: number;
   dragOffset3D?: Vec3 | null;
-  history: Array<{
-    tiles: Map<number, Tile>;
-    turn: number;
-    phase: Phase;
-    elementCounts: Record<ElementSymbol, number>;
-    levelObjectiveMet: boolean;
-    levelFailed: boolean;
-    endState: EndState | null;
-    score: number;
-  }>;
+  history: MoveSnapshot[];
   hasPlayedHeliumLaugh: boolean;
   hasManuallyZoomed: boolean;
   isOrbitingFromHUD: boolean;
@@ -159,6 +195,14 @@ export interface GameState {
   autoPlay: boolean;
   // Auto-player pace multiplier (0.5×–4×); scales the dwell + idle between moves.
   autoPlaySpeed: number;
+  // Which bot drives, whether moves skip their animation (turbo), and whether a
+  // finished run is followed by a fresh one (or the next scenario).
+  autoPlayBot: BotId;
+  autoPlayTurbo: boolean;
+  autoPlayLoop: boolean;
+  // What the bot is up to, shown in the debug panel (the Solver reports its plan).
+  autoPlayNote: string | null;
+  autoRunLog: AutoRunRecord[];
   // When set, Controls smoothly orbits the camera to bring this face to the front,
   // so the auto-player can fetch a piece that's currently on the back.
   autoRotateTargetFaceId: number | null;

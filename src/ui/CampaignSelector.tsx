@@ -2,6 +2,7 @@
 import React from 'react';
 import { LEVELS, type Level, formatScenarioNumber } from '../game/levels';
 import { useGameStore } from '../game/state';
+import { LockIcon } from './icons';
 
 interface CampaignSelectorProps {
   onClose: () => void;
@@ -10,6 +11,7 @@ interface CampaignSelectorProps {
 
 export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorProps) {
   const completedLevels = useGameStore(s => s.completedLevels);
+  const perfectLevels = useGameStore(s => s.perfectLevels) || [];
   const currentLevelId = useGameStore(s => s.currentLevelId);
 
   const isAdvancedUnlocked = completedLevels.filter(id => id <= 10).length >= 10;
@@ -174,7 +176,7 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex justify-center items-center p-4 animate-fade-in-up select-none pointer-events-auto">
       {/* Modal Container with stable height to prevent window sizing jumps between campaigns */}
-      <div className="bg-[#0f0f15]/95 border border-white/10 p-6 sm:p-8 rounded-[32px] max-w-3xl w-full h-[620px] max-h-[90vh] md:h-[580px] md:max-h-[85vh] overflow-hidden flex flex-col gap-5 text-white shadow-[0_16px_48px_rgba(0,0,0,0.7)] relative isolate">
+      <div className="bg-[#0f0f15]/95 border border-white/10 p-6 sm:p-8 rounded-[32px] max-w-3xl w-full max-h-[92dvh] md:h-[580px] md:max-h-[85vh] overflow-hidden flex flex-col gap-4 text-white shadow-[0_16px_48px_rgba(0,0,0,0.7)] relative isolate">
         {/* Close Button */}
         <button 
           onClick={onClose}
@@ -188,7 +190,7 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
           <span className="text-[9px] tracking-[3px] text-cyan-400 font-bold uppercase font-mono">Stellar Ignition Map</span>
           <h2 className="text-xl font-light tracking-[0.12em] uppercase">STELLAR CAMPAIGN</h2>
           <p className="text-xs text-white/55 font-light leading-relaxed">
-            Progress through curated cosmic puzzle scenarios. Achieve specific nuclear fusion milestones.
+            Hand-built puzzles. Par is the fewest moves each one can be solved in.
           </p>
         </div>
 
@@ -219,7 +221,7 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
             title={isAdvancedUnlocked ? "Play advanced challenge levels" : "Complete Stellar Nursery campaign to unlock!"}
           >
             <span className="flex items-center gap-1.5">
-              {!isAdvancedUnlocked && '🔒 '}
+              {!isAdvancedUnlocked && <LockIcon size={11} />}
               Advanced Fusion
             </span>
             {activeCampaign === 'advanced' && (
@@ -253,11 +255,39 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
         </div>
 
         {/* Content Body: Left Level Map grid, Right level details */}
-        <div className="flex flex-col md:flex-row gap-6 flex-1 overflow-hidden min-h-0">
+        <div className="flex flex-col md:flex-row gap-5 flex-1 min-h-0 overflow-y-auto md:overflow-hidden custom-scrollbar">
           
           {/* Left Panel: Level selection scrollable grid */}
-          <div className="h-[130px] md:h-auto flex-shrink-0 md:flex-1 md:max-w-[320px] overflow-y-auto custom-scrollbar pr-1 flex flex-col gap-2">
-            <span className="text-[8px] tracking-[2px] text-white/35 font-mono uppercase mb-1 block">SCENARIO LIST</span>
+          <div className="flex-shrink-0 md:flex-1 md:max-w-[320px] md:overflow-y-auto custom-scrollbar pr-1 flex flex-col gap-2">
+            <span className="text-[8px] tracking-[2px] text-white/35 font-mono uppercase mb-1 hidden md:block">SCENARIO LIST</span>
+
+            {/* Phones: a compact grid of numbered chips instead of a tall list */}
+            {activeCampaign !== 'custom' && (
+              <div className="grid grid-cols-5 gap-2 md:hidden">
+                {filteredLevels.map(level => {
+                  const isCompleted = completedLevels.includes(level.id);
+                  const isUnlocked = level.id === 1 || level.id === 11 || completedLevels.includes(level.id - 1);
+                  const isSelected = selectedLevelId === level.id;
+                  return (
+                    <button
+                      key={level.id}
+                      disabled={!isUnlocked}
+                      onClick={() => setSelectedLevelId(level.id)}
+                      className={`h-11 rounded-xl border text-xs font-mono font-bold flex items-center justify-center gap-1 transition-all ${
+                        !isUnlocked
+                          ? 'border-dashed border-white/5 text-white/20'
+                          : isSelected
+                            ? 'bg-white/10 border-white/30 text-white'
+                            : 'bg-black/35 border-white/5 text-white/70 active:scale-95 cursor-pointer'
+                      }`}
+                    >
+                      {isUnlocked ? formatScenarioNumber(level.id).split('-')[1] : <LockIcon size={11} />}
+                      {isCompleted && <span className="text-emerald-400 text-[10px]">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             
             {activeCampaign === 'custom' ? (
               customScenarios.map(level => {
@@ -315,7 +345,7 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
                     <button
                       key={level.id}
                       onClick={() => setSelectedLevelId(level.id)}
-                      className={`w-full py-2.5 px-4 rounded-2xl border transition-all text-left flex justify-between items-center active:scale-[0.98] cursor-pointer ${
+                      className={`hidden md:flex w-full py-2.5 px-4 rounded-2xl border transition-all text-left justify-between items-center active:scale-[0.98] cursor-pointer ${
                         isSelected
                           ? 'bg-white/10 border-white/25 shadow-[0_4px_16px_rgba(0,0,0,0.25)]'
                           : 'bg-black/35 border-white/5 hover:bg-white/5 hover:border-white/12'
@@ -332,6 +362,7 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
 
                       {isCompleted ? (
                         <span className="text-xs text-emerald-400 font-bold tracking-wide flex items-center gap-1 select-none">
+                          {perfectLevels.includes(level.id) ? <span className="text-[9px] font-mono text-cyan-300">PAR</span> : null}
                           ✓
                         </span>
                       ) : (
@@ -343,7 +374,7 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
                   return (
                     <div
                       key={level.id}
-                      className="w-full py-2.5 px-4 rounded-2xl border border-dashed border-white/5 bg-black/10 flex justify-between items-center opacity-30 select-none cursor-default"
+                      className="hidden md:flex w-full py-2.5 px-4 rounded-2xl border border-dashed border-white/5 bg-black/10 justify-between items-center opacity-30 select-none cursor-default"
                     >
                       <div className="flex flex-col gap-0.5">
                         <span className="text-[8px] font-mono tracking-widest text-white/40 uppercase leading-none">
@@ -353,7 +384,7 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
                           Locked Star
                         </span>
                       </div>
-                      <span className="text-xs text-white/30">🔒</span>
+                      <LockIcon size={12} className="text-white/30" />
                     </div>
                   );
                 }
@@ -362,9 +393,9 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
           </div>
 
           {/* Right Panel: Selected Level conditions & Launch Button */}
-          <div className="flex-grow flex-1 bg-white/3 border border-white/5 rounded-2xl p-4 sm:p-5 flex flex-col justify-between overflow-hidden">
+          <div className="md:flex-1 bg-white/3 border border-white/5 rounded-2xl p-4 sm:p-5 flex flex-col justify-between md:overflow-hidden">
             {/* Scrollable details container */}
-            <div className="flex-grow overflow-y-auto custom-scrollbar pr-1 flex flex-col gap-4">
+            <div className="md:flex-grow md:overflow-y-auto custom-scrollbar pr-1 flex flex-col gap-4">
               {/* Scenario details */}
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
@@ -385,45 +416,49 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
               </p>
 
               {/* Conditions Card */}
-              <div className="grid grid-cols-2 gap-3 border-t border-white/5 pt-4 text-xs font-mono select-none">
+              <div className="grid grid-cols-3 gap-2 border-t border-white/5 pt-4 text-xs font-mono select-none">
                 <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col gap-1">
-                  <span className="text-[7.5px] text-white/40 tracking-wider font-semibold uppercase">Stellar Mass</span>
+                  <span className="text-[7.5px] text-white/40 tracking-wider font-semibold uppercase">Star</span>
                   <span className="font-bold text-white/90">{selectedLevel.starMass.toFixed(1)} M☉</span>
                 </div>
                 <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col gap-1">
-                  <span className="text-[7.5px] text-white/40 tracking-wider font-semibold uppercase">Turn Limit</span>
-                  <span className="font-bold text-white/90">{selectedLevel.maxTurns} slides</span>
+                  <span className="text-[7.5px] text-white/40 tracking-wider font-semibold uppercase">Par</span>
+                  <span className="font-bold text-cyan-300">{selectedLevel.parMoves} {selectedLevel.parMoves === 1 ? 'move' : 'moves'}</span>
+                </div>
+                <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col gap-1">
+                  <span className="text-[7.5px] text-white/40 tracking-wider font-semibold uppercase">Limit</span>
+                  <span className="font-bold text-white/90">{selectedLevel.maxTurns} moves</span>
                 </div>
               </div>
 
               {/* Objectives lists */}
               <div className="flex flex-col gap-2 border-t border-white/5 pt-4">
-                <span className="text-[8px] tracking-[2px] text-white/35 font-mono uppercase mb-0.5">Scenario Objectives (Tap to view details)</span>
+                <span className="text-[8px] tracking-[2px] text-white/35 font-mono uppercase mb-0.5">Objective · tap for a hint</span>
                 {selectedLevel.objectives.map((obj, i) => {
                   const isHintActive = activeHintIdx === i;
                   let text = "";
                   if (obj.type === 'has_element') {
-                    text = `Fuse and synthesize a stable '${obj.element}' tile.`;
+                    text = `Make ${(obj.count ?? 1) > 1 ? `${obj.count} ` : ''}${obj.element}.`;
                   } else if (obj.type === 'has_element_on_pentagon') {
-                    text = `Fuse a '${obj.element}' tile on one of the 12 pentagon faces (CNO catalyst).`;
+                    text = `Get ${obj.element} onto a pentagon.`;
                   } else if (obj.type === 'has_element_count') {
-                    text = `Possess at least ${obj.count} '${obj.element}' tiles on the board simultaneously.`;
+                    text = `Hold ${obj.count} ${obj.element} at once.`;
                   } else if (obj.type === 'has_all_elements') {
-                    text = `Reach complete equilibrium: possess all 8 stable elements on the board simultaneously.`;
+                    text = `Hold all 8 elements at once: H, He, C, O, Ne, Mg, Si and Fe.`;
                   }
                   return (
                     <div key={i} className="flex flex-col gap-1">
                       <div 
                         onClick={() => setActiveHintIdx(isHintActive ? null : i)}
                         className="flex gap-2 items-start text-xs font-light text-cyan-300 cursor-pointer hover:text-cyan-200 active:scale-[0.99] transition-all select-none"
-                        title="Click to view detailed scientific objective guide"
+                        title="Show a hint"
                       >
                         <span className="text-[10px] leading-none mt-0.5">{isHintActive ? '✦' : '✧'}</span>
                         <span className="leading-relaxed border-b border-dashed border-cyan-400/25 hover:border-cyan-300/60 pb-0.5">{text}</span>
                       </div>
                       {isHintActive && obj.hint && (
                         <div className="pl-4 pr-2 py-2 mt-1 rounded-lg bg-cyan-950/20 border border-cyan-500/10 text-[10.5px] leading-relaxed text-white/70 font-light animate-fade-in-up">
-                          <span className="text-cyan-400 font-semibold font-mono block mb-0.5 text-[8.5px] tracking-[1.5px] uppercase">ASTRONOMICAL GUIDE:</span>
+                          <span className="text-cyan-400 font-semibold font-mono block mb-0.5 text-[8.5px] tracking-[1.5px] uppercase">HINT</span>
                           {obj.hint}
                         </div>
                       )}

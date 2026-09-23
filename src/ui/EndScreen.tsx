@@ -3,6 +3,8 @@ import React from 'react';
 import type { EndState, ElementSymbol } from '../game/types';
 import { ELEMENTS } from '../game/elements';
 import { useGameStore } from '../game/state';
+import { getStarClass } from '../game/stars';
+import { UndoIcon } from './icons';
 
 interface EndScreenProps {
   endState: EndState;
@@ -12,77 +14,108 @@ interface EndScreenProps {
   highScore: number;
   astrophysicistMode: boolean;
   onPlayAgain: () => void;
+  onChooseStar: () => void;
   onMainMenu: () => void;
 }
 
+const END_TITLES: Record<EndState, string> = {
+  white_dwarf: 'White Dwarf',
+  neutron_star: 'Neutron Star',
+  black_hole: 'Black Hole',
+  failed_collapse: 'Failed Collapse',
+  core_full: 'Core Full',
+  jammed: 'Jammed',
+};
+
 const END_DESCRIPTIONS: Record<EndState, string> = {
-  white_dwarf: 'The star has shed its outer layers. A dense carbon-oxygen core remains.',
-  neutron_star: 'Core collapse halted by neutron degeneracy pressure. Extreme density achieved.',
-  black_hole: 'Gravity wins. The core has collapsed beyond the event horizon.',
-  failed_collapse: 'Iron formed too early. The star could not sustain fusion long enough.',
-  jammed: 'The sphere is full. No further fusion reactions are possible.',
+  white_dwarf: 'The star shed its outer layers. A dense carbon–oxygen core remains, cooling for billions of years.',
+  neutron_star: 'The core collapsed and rebounded in a supernova. What is left is a city-sized ball of neutrons.',
+  black_hole: 'The core collapsed and nothing could stop it. Gravity won.',
+  failed_collapse: 'The core collapsed without a proper explosion.',
+  core_full: 'Every face of the core filled up before it completed iron-56.',
+  jammed: 'No move is left: every tile is blocked and nothing can fuse.',
 };
 
-const CONTINUE_LABELS: Record<EndState, string> = {
-  white_dwarf: "Expand White Dwarf Core",
-  neutron_star: "Ignite Neutron Degeneracy",
-  black_hole: "Enter Singularity Core",
-  failed_collapse: "Force Super-Ignition",
-  jammed: "Trigger Stellar Wind",
+// Where a star like this one ends up in us. Kept strictly true: carbon comes
+// largely from low-mass stars, iron partly from core-collapse supernovae, and
+// oxygen mostly from massive stars.
+const EPILOGUES: Partial<Record<EndState, string>> = {
+  white_dwarf: 'Much of the carbon in your body was made by stars like this one.',
+  neutron_star: 'Some of the iron in your blood was forged in a star like this.',
+  black_hole: 'Most of the oxygen you breathe was made in stars this massive.',
 };
 
-const CONTINUE_DESCRIPTIONS: Record<EndState, string> = {
-  white_dwarf: "Keep fusing your carbon-oxygen ash into a massive super white dwarf.",
-  neutron_star: "Defy degeneracy pressure and keep packing neutrons into exotic heavy matter.",
-  black_hole: "Play beyond the event horizon. Defy gravitational infinity and keep fusing.",
-  failed_collapse: "Inject quantum thermal energy to force iron core fusion to burn.",
-  jammed: "Vaporize the 4 lightest nuclei via a violent solar flare to clear space.",
-};
-
-export function EndScreen({ endState, starMass, elementCounts, score, highScore, astrophysicistMode, onPlayAgain, onMainMenu }: EndScreenProps) {
-  const totalElements = Object.values(elementCounts).reduce((a, b) => a + b, 0);
-  const continueEndless = useGameStore(s => s.continueEndless);
+export function EndScreen({ endState, starMass, elementCounts, score, highScore, astrophysicistMode, onPlayAgain, onChooseStar, onMainMenu }: EndScreenProps) {
   const undo = useGameStore(s => s.undo);
   const canUndo = useGameStore(s => s.history.length > 0 && !s.lastActionWasUndo);
   const wasAutoPlayed = useGameStore(s => s.wasAutoPlayedThisRun);
+  const endReason = useGameStore(s => s.endReason);
+  const supernovaBonus = useGameStore(s => s.supernovaBonus);
+  const turn = useGameStore(s => s.turn);
+  const lifetime = useGameStore(s => s.lifetime);
+  const star = getStarClass(useGameStore(s => s.starClass));
+  const unlockedStar = getStarClass(useGameStore(s => s.unlockedStarThisRun));
   const isNewBest = !wasAutoPlayed && score >= highScore && score > 0;
 
+  const astroIronCore = astrophysicistMode && endState === 'neutron_star';
+  const title = astroIronCore ? 'Iron Core Collapse' : END_TITLES[endState];
+  const description = astroIronCore
+    ? 'Your iron-56 core could burn no further. It collapsed, as the core of every star massive enough to build one does.'
+    : END_DESCRIPTIONS[endState];
+
+  let result: string | null = null;
+  if (endReason === 'iron' && lifetime !== null) {
+    const spare = lifetime - turn;
+    result = `You forged iron with ${spare} ${spare === 1 ? 'move' : 'moves'} to spare. Supernova bonus +${supernovaBonus}.`;
+  } else if (endReason === 'lifetime' && star && star.ceiling === 'Fe') {
+    result = 'Time ran out before you forged iron. No supernova bonus.';
+  } else if (astroIronCore) {
+    result = 'You completed an iron-56 core before the sphere filled.';
+  }
+
+  const epilogue = EPILOGUES[endState];
+
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
-      <div 
-        className="border border-white/10 rounded-[32px] p-8 sm:p-10 max-w-md w-full mx-4 text-center shadow-[0_16px_48px_rgba(0,0,0,0.65)] relative overflow-hidden animate-fade-in-up isolate"
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+      <div
+        className="border border-white/10 rounded-[32px] p-7 sm:p-10 max-w-md w-full max-h-[92dvh] overflow-y-auto custom-scrollbar text-center shadow-[0_16px_48px_rgba(0,0,0,0.65)] relative animate-fade-in-up isolate"
         style={{
           background: 'radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.08), transparent 45%), radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.08), transparent 45%), rgba(15, 15, 19, 0.95)',
         }}
       >
         <div className="relative z-10">
-          <div className="uppercase tracking-[4px] text-[8px] sm:text-[9px] text-white/35 mb-2 font-mono">STELLAR END STATE</div>
-          
-          <h1 className="text-3xl sm:text-4xl font-light tracking-wide mb-3 capitalize text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70">
-            {endState.replace('_', ' ')}
-          </h1>
-          
-          <p className="text-white/50 mb-8 text-xs sm:text-sm leading-relaxed max-w-[280px] sm:max-w-xs mx-auto font-light font-normal">
-            {END_DESCRIPTIONS[endState]}
-          </p>
-
-          <div className="bg-white/5 border border-white/5 rounded-2xl p-4 sm:p-5 mb-6 max-w-[280px] sm:max-w-xs mx-auto">
-            <div className="text-[9px] tracking-[2.5px] text-white/35 mb-3.5 uppercase font-mono text-center">FINAL COMPOSITION</div>
-            <div className="space-y-2 text-left">
-              {Object.entries(elementCounts).filter(([,c]) => c > 0).map(([sym, count]) => (
-                <div key={sym} className="flex justify-between items-center text-xs tracking-wide">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full shadow-[0_0_6px_currentColor]" style={{ color: ELEMENTS[sym as ElementSymbol].color, backgroundColor: 'currentColor' }} />
-                    <span className="text-white/70">{ELEMENTS[sym as ElementSymbol].displayName}</span>
-                  </div>
-                  <span className="font-mono tabular-nums font-bold text-white/90">{count}</span>
-                </div>
-              ))}
-            </div>
+          <div className="uppercase tracking-[4px] text-[8px] sm:text-[9px] text-white/35 mb-2 font-mono">
+            {astrophysicistMode ? 'Core Result' : star ? star.name : 'Stellar End State'}
           </div>
 
+          <h1 className="text-3xl sm:text-4xl font-light tracking-wide mb-3 text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70">
+            {title}
+          </h1>
+
+          <p className="text-white/55 mb-4 text-xs sm:text-sm leading-relaxed max-w-[300px] mx-auto font-light">
+            {description}
+          </p>
+
+          {result && (
+            <p className="text-cyan-300/90 mb-4 text-[11px] sm:text-xs leading-relaxed max-w-[300px] mx-auto font-mono">
+              {result}
+            </p>
+          )}
+
+          {epilogue && (
+            <p className="text-white/80 mb-6 text-sm leading-relaxed max-w-[300px] mx-auto font-light italic">
+              {epilogue}
+            </p>
+          )}
+
+          {unlockedStar && (
+            <div className="mb-6 mx-auto max-w-[300px] px-4 py-3 rounded-2xl border border-amber-300/25 bg-amber-300/5 text-amber-200 text-xs">
+              New star unlocked: <span className="font-semibold">{unlockedStar.name}</span> · {unlockedStar.mass} M☉
+            </div>
+          )}
+
           {/* Score summary */}
-          <div className="flex items-stretch gap-3 max-w-[280px] sm:max-w-xs mx-auto mb-5">
+          <div className="flex items-stretch gap-3 max-w-[300px] mx-auto mb-3">
             <div className="flex-1 bg-white/5 border border-white/5 rounded-2xl py-3">
               <div className="text-[8px] tracking-[2px] text-white/35 uppercase font-mono">Score</div>
               <div className="text-xl font-bold font-mono tabular-nums text-white/90 mt-0.5">{score.toLocaleString()}</div>
@@ -93,32 +126,23 @@ export function EndScreen({ endState, starMass, elementCounts, score, highScore,
             </div>
           </div>
           {isNewBest && (
-            <div className="text-[9px] text-cyan-400 font-mono tracking-[2px] uppercase mb-5 -mt-2 select-none">★ New Personal Best</div>
+            <div className="text-[9px] text-cyan-400 font-mono tracking-[2px] uppercase mb-3 select-none">New personal best</div>
           )}
 
-          <div className="text-[9px] text-white/30 mb-6 font-mono tracking-wider">
-            INITIAL MASS: <span className="font-bold text-white/50">{starMass.toFixed(1)} M☉</span> •
-            TOTAL NUCLEI: <span className="font-bold text-white/50">{totalElements}</span>
+          <div className="flex flex-wrap justify-center gap-x-3 gap-y-1.5 max-w-[300px] mx-auto mb-6">
+            {Object.entries(elementCounts).filter(([, c]) => c > 0).map(([sym, count]) => (
+              <span key={sym} className="flex items-center gap-1.5 text-[11px] font-mono text-white/70">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: ELEMENTS[sym as ElementSymbol].color }} />
+                {sym} <span className="text-white/90 font-bold">{count}</span>
+              </span>
+            ))}
           </div>
 
-          {/* Buttons. Astrophysicist mode has no "continue" — reaching no-legal-moves
-              is the run's true, full stop, so we offer a fresh run or the menu. */}
-          <div className="flex flex-col gap-3 max-w-[280px] sm:max-w-xs mx-auto">
-            {!astrophysicistMode && (
-              <>
-                <button
-                  onClick={continueEndless}
-                  className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-full font-bold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase shadow-[0_4px_16px_rgba(6,182,212,0.25)] cursor-pointer"
-                  title={CONTINUE_DESCRIPTIONS[endState]}
-                >
-                  {CONTINUE_LABELS[endState]}
-                </button>
-                <div className="text-[9px] text-cyan-400/70 font-mono tracking-wider max-w-[280px] leading-normal font-medium mb-2 uppercase text-center select-none">
-                  {CONTINUE_DESCRIPTIONS[endState]}
-                </div>
-              </>
-            )}
+          <div className="text-[9px] text-white/30 mb-6 font-mono tracking-wider uppercase">
+            {astrophysicistMode ? `${turn} moves` : `${starMass.toFixed(starMass % 1 === 0 ? 0 : 1)} M☉ · ${turn} moves`}
+          </div>
 
+          <div className="flex flex-col gap-3 max-w-[300px] mx-auto">
             {/* Mercy take-back on a jam: undoing restores the pre-jam snapshot
                 (endState null), which dismisses this screen automatically. */}
             {endState === 'jammed' && canUndo && (
@@ -126,26 +150,40 @@ export function EndScreen({ endState, starMass, elementCounts, score, highScore,
                 onClick={undo}
                 className="w-full py-3.5 bg-white/5 border border-white/10 text-white/80 hover:bg-white/10 rounded-full font-semibold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase cursor-pointer flex items-center justify-center gap-2"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M9 14 4 9l5-5" />
-                  <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
-                </svg>
-                TAKE BACK LAST MOVE
+                <UndoIcon size={13} strokeWidth={2.5} />
+                Take back last move
               </button>
             )}
 
-            <button
-              onClick={onPlayAgain}
-              className="w-full py-3.5 bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-full font-semibold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase cursor-pointer"
-            >
-              FUSE ANOTHER STAR
-            </button>
+            {astrophysicistMode ? (
+              <button
+                onClick={onPlayAgain}
+                className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-full font-bold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase shadow-[0_4px_16px_rgba(6,182,212,0.25)] cursor-pointer"
+              >
+                Fuse another core
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={onChooseStar}
+                  className="w-full py-3.5 bg-white text-black hover:bg-white/95 rounded-full font-bold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase shadow-[0_4px_16px_rgba(255,255,255,0.12)] cursor-pointer"
+                >
+                  Choose a star
+                </button>
+                <button
+                  onClick={onPlayAgain}
+                  className="w-full py-3.5 bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-full font-semibold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase cursor-pointer"
+                >
+                  Burn this star again
+                </button>
+              </>
+            )}
 
             <button
               onClick={onMainMenu}
               className="w-full py-3.5 bg-transparent border border-white/10 text-white/70 hover:bg-white/5 hover:text-white rounded-full font-semibold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase cursor-pointer"
             >
-              GAME MENU
+              Game menu
             </button>
           </div>
         </div>

@@ -47,15 +47,17 @@ export const PHASES: PhaseRule[] = [
       const totalHeliumOrHeavier = He + C + O + Ne + Mg + Si + Fe;
       const totalCarbonOrHeavier = C + O + Ne + Mg + Si + Fe;
       
-      return totalHeliumOrHeavier >= 8 && totalCarbonOrHeavier >= 4 && C > 0 && s.starMass >= 8;
+      return totalHeliumOrHeavier >= 8 && totalCarbonOrHeavier >= 4 && s.starMass >= 8;
     },
     visualScale: 1.6,
     hSpawnRate: 2,
     unlocksElements: ['H', 'He', 'C', 'O', 'Ne', 'Mg', 'Si'],
   },
   {
+    // Entered only when the run ends (commitMove sets it as the core gives out),
+    // never by composition: iron already on the board is just immovable ash.
     phase: 'collapse',
-    triggers: (s) => s.elementCounts.Fe >= 1,
+    triggers: () => false,
     visualScale: 0.4,
     hSpawnRate: 0,
     unlocksElements: [],
@@ -77,15 +79,6 @@ export function updatePhase(state: GameState): boolean {
   const currentPhaseIndex = PHASES.findIndex(p => p.phase === state.phase);
   const newPhaseRule = currentPhaseRule(state);
   const newPhaseIndex = PHASES.findIndex(p => p.phase === newPhaseRule.phase);
-  
-  // Instant Core Collapse: If Iron is synthesized, bypass intermediate steps and collapse immediately!
-  if (newPhaseRule.phase === 'collapse' && state.phase !== 'collapse') {
-    state.phase = 'collapse';
-    if (state.phaseTransitions) {
-      state.phaseTransitions['collapse'] = state.turn;
-    }
-    return true;
-  }
 
   // Phase progression is strictly ONE-WAY (forward only). A star can only evolve forward!
   if (newPhaseIndex > currentPhaseIndex) {

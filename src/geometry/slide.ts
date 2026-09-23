@@ -6,7 +6,12 @@ import {
   subtract, normalize, dot, projectToPlane, length, EPSILON
 } from '../utils/math';
 import { ELEMENTS } from '../game/elements';
-import { canMerge } from '../game/rules';
+import { pairFusionOutput } from '../game/rules';
+
+export interface SlideResult {
+  path: number[];
+  stoppedReason: 'empty' | 'merge' | 'blocked' | 'limit';
+}
 
 /**
  * Resolve the best neighbor to slide toward given a world-space drag vector from a face.
@@ -35,6 +40,51 @@ export function resolveSlideTarget(
   return bestId >= 0 ? bestId : null;
 }
 
+// World-space drag that resolves to exactly `toFaceId` as the first step.
+export function dragToward(fromFace: Face, toFace: Face): Vec3 {
+  return normalize(subtract(toFace.center, fromFace.center));
+}
+
+export interface LegalMove {
+  fromFaceId: number;
+  firstStepId: number;
+  dragWorld: Vec3;
+  slide: SlideResult;
+}
+
+/**
+ * Every move the player can make. A drag always resolves to one of the tile's
+ * neighbors as its first step and the slide then runs on by itself, so
+ * tiles × neighbors is the complete move set. A move counts only if the tile
+ * actually travels (the same rule endDrag applies).
+ */
+export function listLegalMoves(state: GameState): LegalMove[] {
+  const moves: LegalMove[] = [];
+  for (const [faceId, tile] of state.tiles) {
+    if ((ELEMENTS[tile.element]?.slideDistance ?? 0) <= 0) continue;
+    const face = state.faces[faceId];
+    if (!face) continue;
+    for (const neighborId of face.neighbors) {
+      const dragWorld = dragToward(face, state.faces[neighborId]);
+      const slide = executeSlide(faceId, dragWorld, state);
+      if (slide.path.length > 1) moves.push({ fromFaceId: faceId, firstStepId: neighborId, dragWorld, slide });
+    }
+  }
+  return moves;
+}
+
+export function hasLegalMove(state: GameState): boolean {
+  for (const [faceId, tile] of state.tiles) {
+    if ((ELEMENTS[tile.element]?.slideDistance ?? 0) <= 0) continue;
+    const face = state.faces[faceId];
+    if (!face) continue;
+    for (const neighborId of face.neighbors) {
+      if (executeSlide(faceId, dragToward(face, state.faces[neighborId]), state).path.length > 1) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Execute a slide for a tile.
  * Returns list of faces the tile traversed (for animation chaining).
@@ -44,7 +94,7 @@ export function executeSlide(
   startFaceId: number,
   initialDragWorld: Vec3,
   state: GameState
-): { path: number[]; stoppedReason: 'empty' | 'merge' | 'blocked' | 'limit' } {
+): SlideResult {
   const tile = state.tiles.get(startFaceId);
   if (!tile) return { path: [], stoppedReason: 'blocked' };
 
@@ -110,7 +160,7 @@ export function executeSlide(
           const targetTile = state.tiles.get(targetId);
           if (targetTile) {
             // Target occupied: check if we can merge upon exiting
-            if (canMerge(element, targetTile.element, state.astrophysicistMode)) {
+            if (pairFusionOutput(element, targetTile.element, state) !== null) {
               path.push(nextId);
               path.push(targetId);
               return { path, stoppedReason: 'merge' };
@@ -162,7 +212,7 @@ export function executeSlide(
       // Continue sliding in the same geodesic direction along the sphere's curvature!
       const stepDir = subtract(nextFace.center, currentFace.center);
       currentDrag = normalize(stepDir);
-    } else if (canMerge(element, nextTile.element, state.astrophysicistMode)) {
+    } else if (pairFusionOutput(element, nextTile.element, state) !== null) {
       // Direct pair or pair-alpha merge combinable. Append target face and stop.
       path.push(nextId);
       return { path, stoppedReason: 'merge' };

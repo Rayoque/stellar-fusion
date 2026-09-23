@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { useGameStore } from '../game/state';
 import { Background } from '../three/Background';
 import { APP_VERSION } from '../version';
+import { AtomIcon, LockIcon } from './icons';
 
 interface StartScreenProps {
   onStart: () => void;
@@ -58,7 +59,7 @@ export function StartScreen({ onStart, onOpenCampaign, onStartAstro }: StartScre
               onClick={onStart}
               className="group px-8 py-3.5 bg-white text-black hover:bg-white/95 text-xs font-bold tracking-[3px] rounded-full transition-all duration-300 active:scale-[0.96] flex items-center gap-3 shadow-[0_4px_16px_rgba(255,255,255,0.12)] hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] cursor-pointer"
             >
-              ENDLESS SANDBOX
+              IGNITE A STAR
               <span className="group-hover:translate-x-0.5 transition duration-200">→</span>
             </button>
 
@@ -78,14 +79,15 @@ export function StartScreen({ onStart, onOpenCampaign, onStartAstro }: StartScre
               className="group px-8 py-3.5 border border-cyan-500/35 bg-cyan-950/20 hover:bg-cyan-900/30 text-cyan-300 text-xs font-bold tracking-[3px] rounded-full transition-all duration-300 active:scale-[0.96] flex items-center gap-3 shadow-[0_4px_16px_rgba(6,182,212,0.15)] hover:shadow-[0_0_24px_rgba(6,182,212,0.3)] cursor-pointer"
             >
               ASTROPHYSICIST MODE
-              <span className="text-[10px] select-none animate-spin-slow">☢</span>
+              <AtomIcon size={13} className="animate-spin-slow" />
             </button>
           ) : (
             <button
-              className="group px-8 py-3.5 border border-white/5 bg-white/3 text-white/20 text-xs font-bold tracking-[3px] rounded-full flex items-center gap-3 cursor-not-allowed opacity-50"
-              title="Locked: Complete all 25 Campaign Scenarios to unlock!"
+              className="group px-8 py-3.5 border border-white/5 bg-white/3 text-white/25 text-xs font-bold tracking-[3px] rounded-full flex items-center gap-2.5 cursor-not-allowed opacity-60"
+              title="Complete all 25 scenarios to unlock"
             >
-              🔒 ASTROPHYSICIST MODE
+              <LockIcon size={12} />
+              ASTROPHYSICIST MODE
             </button>
           )}
         </div>

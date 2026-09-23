@@ -3,10 +3,27 @@ import React from 'react';
 import type { Phase, ElementSymbol } from '../game/types';
 import { ELEMENTS } from '../game/elements';
 import { useGameStore } from '../game/state';
-import { getStarAgeInfo } from '../game/phases';
 import { findLevel } from '../game/levels';
-import { playSpawnTick } from '../audio/synth';
+import { CARBON_IGNITION_MASS, DECAY } from '../game/rules';
+import { getStarClass, formatStarAge } from '../game/stars';
 import { ZoomTooltip } from './ZoomTooltip';
+import { AtomIcon, BookIcon, UndoIcon } from './icons';
+
+const CARBON_BURNING: ElementSymbol[] = ['Ne', 'Mg', 'Si', 'Fe'];
+
+// Short objective label for the banner under the stats pill.
+function objectiveLabel(level: { objectives: Array<{ type: string; element?: ElementSymbol; count?: number }> }): string {
+  return level.objectives.map(obj => {
+    const el = obj.element ?? '';
+    switch (obj.type) {
+      case 'has_element': return (obj.count ?? 1) > 1 ? `Make ${obj.count} ${el}` : `Make ${el}`;
+      case 'has_element_count': return `Hold ${obj.count ?? 1} ${el}`;
+      case 'has_element_on_pentagon': return `${el} on a pentagon`;
+      case 'has_all_elements': return 'All 8 elements at once';
+      default: return '';
+    }
+  }).filter(Boolean).join(' + ');
+}
 
 interface HUDProps {
   phase: Phase;
@@ -87,12 +104,16 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
   const state = useGameStore();
   const showZenMode = useGameStore(s => (s as any).showZenMode);
   const zenClass = showZenMode ? 'opacity-0 pointer-events-none transition-all duration-500' : 'transition-all duration-500';
-  const ageInfo = getStarAgeInfo(state);
-  const compactAge = ageInfo.formatted
-    .replace(' Billion Years', 'B')
-    .replace(' Million Years', 'M')
-    .replace(' Years', 'Y');
   const [showModal, setShowModal] = React.useState(false);
+
+  // Stellar Life runs have a lifetime counted in moves.
+  const star = getStarClass(state.starClass);
+  const lifetime = state.lifetime;
+  const movesLeft = lifetime !== null ? Math.max(0, lifetime - turn) : null;
+  const lifeFraction = lifetime !== null ? Math.min(1, turn / lifetime) : 0;
+  // Astrophysicist runs end when the sphere is full, so the pill counts free faces.
+  const freeFaces = state.astrophysicistMode ? Math.max(0, state.faces.length - state.tiles.size) : null;
+  const lowMassStar = !state.astrophysicistMode && starMass < CARBON_IGNITION_MASS;
 
   const handleCloseGuide = () => {
     setShowModal(false);
@@ -251,23 +272,19 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
           </button>
           {/* Undo: a bare glyph, centered under the menu — no chrome. Single
               step by design (a mercy, not a search tool); near-invisible once
-              spent, back at full presence after the next move. Hidden in the
-              post-collapse epilogue, where forward is the only direction. */}
-          {state.history.length > 0 && !state.endState && !state.endlessMode && (
+              spent, back at full presence after the next move. */}
+          {state.history.length > 0 && !state.endState && (
             <button
               onClick={() => { state.undo(); }}
               disabled={state.lastActionWasUndo}
-              className={`flex items-center justify-center w-9 h-9 transition-all duration-300 select-none animate-fade-in-up ${
+              className={`flex items-center justify-center w-9 h-9 text-white transition-all duration-300 select-none animate-fade-in-up ${
                 state.lastActionWasUndo
                   ? 'opacity-[0.08] cursor-default'
                   : 'opacity-50 hover:opacity-95 active:scale-[0.88] cursor-pointer'
               }`}
               title="Undo last move"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M9 14 4 9l5-5" />
-                <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
-              </svg>
+              <UndoIcon size={16} strokeWidth={2.2} />
             </button>
           )}
         </div>
@@ -275,21 +292,21 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
         {/* Center Section: Core Stats Pill & Campaign objective secondary banner */}
         <div className="justify-self-center flex flex-col items-center justify-center min-w-0 max-w-full pointer-events-auto">
           {/* Main horizontal stats pill */}
-          <div 
+          <div
             onClick={() => setShowModal(true)}
-            className="flex items-center justify-between glass-pill px-3 md:px-4 h-11 rounded-full cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all select-none gap-2 md:gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.35)] border border-white/8 min-w-0 max-w-full"
-            style={{ 
-              borderColor: `${currentThemeColor}30`, 
-              boxShadow: `0 0 16px ${currentThemeColor}08, inset 0 0 10px ${currentThemeColor}05` 
+            className="relative overflow-hidden flex items-center justify-between glass-pill px-3 md:px-4 h-11 rounded-full cursor-pointer hover:bg-white/5 active:scale-[0.98] transition-all select-none gap-2 md:gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.35)] border border-white/8 min-w-0 max-w-full"
+            style={{
+              borderColor: `${currentThemeColor}30`,
+              boxShadow: `0 0 16px ${currentThemeColor}08, inset 0 0 10px ${currentThemeColor}05`
             }}
-            title="Open Stellar Evolution Guide"
+            title={state.astrophysicistMode ? 'Open the fusion guide' : 'Open the stellar evolution guide'}
           >
             {/* Desktop Layout (md:flex hidden with fluid gaps/text on medium-to-large viewports) */}
             <div className="hidden md:flex items-center gap-2.5 lg:gap-4">
               {state.astrophysicistMode ? (
                 <>
                   <div className="flex items-center gap-1.5 lg:gap-2.5">
-                    <span className="text-sm lg:text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>☢</span>
+                    <span className="flex items-center justify-center" style={{ color: currentThemeColor }}><AtomIcon size={15} /></span>
                     <div>
                       <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">CORE STAGE</div>
                       <div className="font-semibold tracking-wide text-[9px] lg:text-[10px] leading-tight mt-0.5 whitespace-nowrap">{astroStats.stage}</div>
@@ -304,51 +321,56 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                   </div>
                 </>
               ) : (
-                <>
-                  <div className="flex items-center gap-1.5 lg:gap-2.5">
-                    <span className="text-sm lg:text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
-                    <div>
-                      <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">PHASE</div>
-                      <div className="font-semibold tracking-wide text-[9px] lg:text-[10px] leading-tight mt-0.5 whitespace-nowrap">{PHASE_LABELS[phase]}</div>
-                    </div>
-                  </div>
-
-                  <div className="h-5 w-px bg-white/15" />
-
+                <div className="flex items-center gap-1.5 lg:gap-2.5">
+                  <span className="text-sm lg:text-base flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>{PHASE_ICONS[phase]}</span>
                   <div>
-                    <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">STAR AGE</div>
-                    <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums font-bold whitespace-nowrap" style={{ color: currentThemeColor }}>{ageInfo.formatted}</div>
+                    <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">{star ? `${star.mass} M☉ · PHASE` : 'PHASE'}</div>
+                    <div className="font-semibold tracking-wide text-[9px] lg:text-[10px] leading-tight mt-0.5 whitespace-nowrap">{PHASE_LABELS[phase]}</div>
                   </div>
-                </>
+                </div>
               )}
 
               <div className="h-5 w-px bg-white/15" />
 
-              <div>
-                <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">
-                  {level ? 'TURN / PAR' : 'TURN'}
+              {freeFaces !== null ? (
+                <div>
+                  <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">SPACE</div>
+                  <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums whitespace-nowrap">
+                    <span className="font-bold" style={{ color: currentThemeColor }}>{freeFaces}</span>
+                    <span className="text-white/60"> {freeFaces === 1 ? 'face' : 'faces'} free</span>
+                  </div>
                 </div>
-                <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums text-white/90 whitespace-nowrap">
-                  {turn}
-                  {level ? (
-                    <>
-                      {' / '}<span className="text-cyan-400 font-bold">{(level as any).parMoves ?? maxTurns}</span>
-                    </>
-                  ) : maxTurns !== null ? (
-                    ` / ${maxTurns}`
-                  ) : ''}
+              ) : movesLeft !== null ? (
+                <div>
+                  <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">LIFETIME</div>
+                  <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums whitespace-nowrap">
+                    <span className="font-bold" style={{ color: currentThemeColor }}>{movesLeft}</span>
+                    <span className="text-white/60"> {movesLeft === 1 ? 'move' : 'moves'} left</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <div className="text-[6.5px] lg:text-[7.5px] tracking-[1px] lg:tracking-[1.5px] text-white/40 leading-none">
+                    {level ? 'TURN / PAR' : 'TURN'}
+                  </div>
+                  <div className="font-mono text-[11px] lg:text-xs mt-0.5 tabular-nums text-white/90 whitespace-nowrap">
+                    {turn}
+                    {level && (
+                      <>
+                        {' / '}<span className="text-cyan-400 font-bold">{level.parMoves}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Mobile/Compact Layout (flex md:hidden) */}
             <div className="flex md:hidden items-center gap-1.5 text-[8.5px] font-mono tracking-wider font-semibold uppercase text-white/80 whitespace-nowrap">
               {state.astrophysicistMode ? (
                 <>
-                  <span className="text-[10px] leading-none flex items-center justify-center translate-y-[-0.5px]" style={{ color: currentThemeColor }}>☢</span>
+                  <span className="flex items-center justify-center" style={{ color: currentThemeColor }}><AtomIcon size={11} /></span>
                   <span className="font-bold tracking-widest text-white">{astroStats.stageShort}</span>
-                  <span className="opacity-25">•</span>
-                  <span className="font-bold" style={{ color: currentThemeColor }}>{astroStats.temp}</span>
                 </>
               ) : (
                 <>
@@ -356,40 +378,51 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                   <span className="font-bold tracking-widest" style={{ color: currentThemeColor }}>
                     {phase === 'main_sequence' ? 'MAIN' : phase === 'red_giant' ? 'GIANT' : phase === 'supergiant' ? 'SUPER' : 'COLLAPSE'}
                   </span>
-                  <span className="opacity-25">•</span>
-                  <span className="font-bold" style={{ color: currentThemeColor }}>{compactAge}</span>
                 </>
               )}
               <span className="opacity-25">•</span>
-              <span className="text-white">
-                T{turn}
-                {level ? (
-                  <>
-                    {' '}<span className="text-cyan-400 font-bold">({(level as any).parMoves ?? maxTurns})</span>
-                  </>
-                ) : maxTurns !== null ? (
-                  `/${maxTurns}`
-                ) : ''}
-              </span>
+              {freeFaces !== null ? (
+                <span className="text-white"><span className="font-bold" style={{ color: currentThemeColor }}>{freeFaces}</span> FREE</span>
+              ) : movesLeft !== null ? (
+                <span className="text-white"><span className="font-bold" style={{ color: currentThemeColor }}>{movesLeft}</span> LEFT</span>
+              ) : (
+                <span className="text-white">
+                  T{turn}
+                  {level && <>{' '}<span className="text-cyan-400 font-bold">(PAR {level.parMoves})</span></>}
+                </span>
+              )}
             </div>
+
+            {/* Remaining lifetime (or free space), as a hairline along the bottom of the pill */}
+            {(lifetime !== null || freeFaces !== null) && (
+              <div className="absolute left-3 right-3 bottom-[3px] h-[2px] rounded-full bg-white/10 overflow-hidden pointer-events-none">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${(freeFaces !== null ? freeFaces / state.faces.length : 1 - lifeFraction) * 100}%`,
+                    backgroundColor: currentThemeColor,
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Campaign Objective Floating Secondary Banner */}
           {level && onOpenObjectives && (
-            <div 
+            <div
               onClick={onOpenObjectives}
               className="glass-pill px-3 py-1 rounded-full text-[7.5px] font-mono tracking-widest text-cyan-300 font-bold uppercase whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.3)] border border-cyan-500/15 hover:bg-white/10 active:scale-[0.96] transition-all cursor-pointer pointer-events-auto mt-1 flex-shrink-0 animate-fade-in-up"
-              title="Click to view detailed scientific scenario objective description"
+              title="Show the objective"
             >
-              Objective: {level.objectives[0].type === 'has_element' ? `Synthesize ${level.objectives[0].element}` : level.title}
+              {objectiveLabel(level)}
             </div>
           )}
         </div>
 
-        {/* Right Section: Score and Best pill (Sandbox mode only) */}
+        {/* Right Section: Score and Best pill (open-ended runs only) */}
         {currentLevelId === null ? (
           <div className="pointer-events-auto flex-shrink-0 flex items-center gap-1.5 xs:gap-2 justify-self-end">
-            <div 
+            <div
               className="flex flex-col items-center justify-center bg-black/40 backdrop-blur-md px-2.5 xs:px-3 h-11 rounded-2xl border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)] font-mono"
               style={{ borderColor: `${currentThemeColor}20` }}
             >
@@ -399,10 +432,10 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
               </div>
             </div>
 
-            <div 
+            <div
               className={`flex flex-col items-center justify-center bg-black/40 backdrop-blur-md px-2.5 xs:px-3 h-11 rounded-2xl border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)] font-mono transition-all duration-300 ${state.wasAutoPlayedThisRun ? 'opacity-50' : ''}`}
               style={{ borderColor: state.wasAutoPlayedThisRun ? '#f59e0b40' : `${currentThemeColor}20` }}
-              title={state.wasAutoPlayedThisRun ? "High score tracking disabled (Autoplayer used this run)" : "Your high score"}
+              title={state.wasAutoPlayedThisRun ? "High score tracking disabled (Autoplayer used this run)" : "Your best score with this star"}
             >
               <div className={`text-[6.5px] tracking-[1px] leading-none ${state.wasAutoPlayedThisRun ? 'text-amber-400 font-semibold' : 'text-white/40'}`}>BEST</div>
               <div className={`text-[11px] xs:text-[12px] font-bold leading-tight mt-0.5 tabular-nums ${state.wasAutoPlayedThisRun ? 'text-amber-500/70 line-through decoration-amber-500' : 'text-cyan-400'}`}>
@@ -416,22 +449,6 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
         )}
       </div>
 
-      {/* In-game Reignite quick-reset — only in the collapse stage, floated under the
-          top bar (absolute, so it never displaces the centered info bar). */}
-      {currentLevelId === null && phase === 'collapse' && (
-        <div className={`absolute left-1/2 -translate-x-1/2 hud-reignite-container pointer-events-none flex justify-center ${zenClass}`}>
-          <button
-            onClick={() => { state.reset(); playSpawnTick(); }}
-            className="pointer-events-auto flex items-center gap-1 glass-pill px-2.5 py-1 rounded-full text-[7.5px] font-mono tracking-[2.5px] uppercase text-white/40 hover:text-white/80 border border-white/8 hover:bg-white/5 active:scale-[0.95] transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.25)] animate-fade-in-up"
-            style={{ borderColor: `${currentThemeColor}20` }}
-            title="Reignite — reset and start a fresh star"
-          >
-            <span className="text-[9px] leading-none translate-y-[-0.5px]">↻</span>
-            Reignite
-          </button>
-        </div>
-      )}
-
       {/* pointer-events-none here: the strip of empty screen around the tray
           must fall through to the canvas so it stays usable as orbit space
           when the star fills the screen. The panel re-enables its own events. */}
@@ -444,7 +461,11 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
 
           {/* Dynamic Instructions placed directly above the Elements Tray */}
           <div className="text-[8px] xs:text-[9px] sm:text-[10px] opacity-35 tracking-[2px] xs:tracking-[4px] font-mono uppercase whitespace-nowrap mb-0.5 select-none">
-            {state.astrophysicistMode ? 'FUSE NUCLEI ALL THE WAY TO IRON-56' : 'DRAG TILES TO FUSE • BUILD YOUR STAR'}
+            {state.astrophysicistMode
+              ? 'FUSE BEFORE THE SPHERE FILLS'
+              : star
+                ? (star.ceiling === 'Fe' ? 'FORGE IRON BEFORE TIME RUNS OUT' : 'BUILD A CARBON–OXYGEN CORE')
+                : 'DRAG TILES TO FUSE'}
           </div>
 
           {/* Elements Tray Wrapper Container with Smart Touch Orbiting handlers */}
@@ -611,13 +632,15 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                     </div>
                   );
                 } else {
+                  // In a star under 8 M☉ the carbon-burning products are out of reach entirely.
+                  const outOfReach = lowMassStar && CARBON_BURNING.includes(sym);
                   return (
-                    <div 
+                    <div
                       key={sym}
-                      className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/10 bg-black/10 opacity-30 select-none cursor-default flex-shrink-0"
-                      title={`Locked Element (Fuse heavier nuclei to discover)`}
+                      className={`relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/10 bg-black/10 select-none cursor-default flex-shrink-0 ${outOfReach ? 'opacity-15' : 'opacity-30'}`}
+                      title={outOfReach ? `Needs a star of ${CARBON_IGNITION_MASS} M☉ or more` : 'Not made yet'}
                     >
-                      <span className="font-mono text-[9px] xs:text-[10px] sm:text-xs text-white/50 font-medium">
+                      <span className={`font-mono text-[9px] xs:text-[10px] sm:text-xs text-white/50 font-medium ${outOfReach ? 'line-through' : ''}`}>
                         {sym}
                       </span>
                     </div>
@@ -634,7 +657,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                 className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] cursor-pointer flex-shrink-0"
                 title={state.astrophysicistMode ? "Open Astrophysicist Codex" : "Open Stellar Codex Journal"}
               >
-                <span className="text-xs xs:text-sm select-none">📔</span>
+                <BookIcon size={15} className="text-white/75" />
               </button>
             </div>
           </div>
@@ -659,58 +682,51 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                 {/* Header */}
                 <div className="flex flex-col gap-1 border-b border-white/5 pb-4 pr-8">
                   <span className="text-[9px] tracking-[2.5px] text-cyan-400 font-bold uppercase font-mono">Astrophysicist Journal</span>
-                  <h2 className="text-lg font-semibold tracking-wide">NUCLEAR FUSION GUIDE</h2>
+                  <h2 className="text-lg font-semibold tracking-wide">FUSION GUIDE</h2>
                   <p className="text-xs text-white/50 leading-relaxed font-normal mt-1">
-                    Fusing isotopes in advanced stellar cores. Follow the nucleosynthesis alpha-process chain all the way to Iron-56:
+                    Fe26's isotope chain, rule for rule. Every move adds a new tile and only fusion makes room: the run ends when the sphere is full{freeFaces !== null ? ` (${freeFaces} ${freeFaces === 1 ? 'face' : 'faces'} free)` : ''}. Reach iron-56 on the way for a supernova.
                   </p>
                 </div>
 
-                 {/* Fusion pathway rules list */}
                 <div className="flex flex-col gap-4 text-xs font-normal max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
                   <div className="bg-white/5 border border-white/5 p-3 rounded-2xl">
-                    <span className="text-[9px] font-mono font-bold text-cyan-400 block mb-1">UNSTABLE ISOTOPES (MULTI-TURN DECAY):</span>
+                    <span className="text-[9px] font-mono font-bold text-cyan-400 block mb-1">UNSTABLE ISOTOPES</span>
                     <p className="text-[11px] leading-relaxed text-white/70">
-                      Unstable elements decay back to their stable precursors after a randomized number of turns. Fusing them quickly is key! Parking an unstable isotope on any of the 12 pentagon faces acts as a powerful magnetic confinement shield, freezing its decay timer completely so it never decays.
+                      Five isotopes decay if you leave them. The badge on the tile counts the moves left. Nickel-56 is the one you want to decay: it becomes iron-56.
                     </p>
-                    <ul className="list-disc list-inside mt-2 text-[10.5px] text-white/60 space-y-1 font-mono">
-                      <li>Be7 → He4 (Unstable)</li>
-                      <li>Be8 → He4 (Unstable)</li>
-                      <li>Ne20 → O16 (Unstable)</li>
-                      <li>Fe52 → Cr48 (Unstable)</li>
-                      <li>Ni56 → Fe56 (Unstable - decays to stable ash!)</li>
+                    <ul className="mt-2 text-[10.5px] text-white/60 space-y-1 font-mono">
+                      {(Object.keys(DECAY) as ElementSymbol[]).map(sym => {
+                        const d = DECAY[sym]!;
+                        return (
+                          <li key={sym} className="flex justify-between gap-3">
+                            <span>{sym} → {d.to}</span>
+                            <span className="text-white/40">{Math.ceil(4 * d.multiplier)}–{Math.ceil(8 * d.multiplier)} moves · {d.points > 0 ? '+' : ''}{d.points}</span>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
 
                   <div className="bg-white/5 border border-white/5 p-3 rounded-2xl flex flex-col gap-2">
-                    <span className="text-[9px] font-mono font-bold text-cyan-400 block">STELLAR CORE BURNING PHASES:</span>
-                    <p className="text-[11px] leading-relaxed text-white/70">
-                      Massive stellar cores contract and heat up, triggering sequential shell burning phases of progressive density and temperature:
-                    </p>
+                    <span className="text-[9px] font-mono font-bold text-cyan-400 block">BURNING STAGES</span>
                     <div className="space-y-2 mt-1">
                       <div className="border-l border-[#ff7f50]/40 pl-2.5">
-                        <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-[#ff7f50]">1. Hydrogen Burning Stage</span><span className="text-[9px] text-white/40">15M - 40M K</span></div>
-                        <p className="text-[10px] text-white/50 mt-0.5 leading-relaxed">Fuses Hydrogen (H) into Helium-4 (He4) using the CNO cycle catalyst.</p>
+                        <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-[#ff7f50]">1. Hydrogen burning</span><span className="text-[9px] text-white/40">15M K</span></div>
+                        <p className="text-[10px] text-white/50 mt-0.5 leading-relaxed">The proton–proton chain: H + H → D, D + H → He3, He3 + He3 → He4.</p>
                       </div>
                       <div className="border-l border-[#fbbf24]/40 pl-2.5">
-                        <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-[#fbbf24]">2. Helium Burning Stage</span><span className="text-[9px] text-white/40">100M - 200M K</span></div>
-                        <p className="text-[10px] text-white/50 mt-0.5 leading-relaxed">Triple-alpha process fuses Helium-4 (He4) into Carbon (C12) and Oxygen (O16).</p>
+                        <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-[#fbbf24]">2. Helium burning</span><span className="text-[9px] text-white/40">100M K</span></div>
+                        <p className="text-[10px] text-white/50 mt-0.5 leading-relaxed">He4 + He4 makes fleeting Be8; catch it with another He4 for carbon, then oxygen.</p>
                       </div>
                       <div className="border-l border-[#fb7185]/40 pl-2.5">
-                        <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-[#fb7185]">3. Carbon & Neon Burning</span><span className="text-[9px] text-white/40">600M - 1.5B K</span></div>
-                        <p className="text-[10px] text-white/50 mt-0.5 leading-relaxed">Fuses Carbon into Neon (Ne20) and Magnesium (Mg24). High temps trigger Neon decay.</p>
+                        <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-[#fb7185]">3. Carbon and neon burning</span><span className="text-[9px] text-white/40">600M K</span></div>
+                        <p className="text-[10px] text-white/50 mt-0.5 leading-relaxed">C12 + C12 → Ne20, and Ne20 + He4 → Mg24. As in Fe26, nothing fuses with Mg24.</p>
                       </div>
                       <div className="border-l border-[#38bdf8]/40 pl-2.5">
-                        <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-[#38bdf8]">4. Oxygen & Silicon Burning</span><span className="text-[9px] text-white/40">1.5B - 4.0B K</span></div>
-                        <p className="text-[10px] text-white/50 mt-0.5 leading-relaxed">Fuses Oxygen into Silicon (Si28), feeding the alpha-process nucleosynthesis chain.</p>
+                        <div className="flex justify-between items-baseline"><span className="text-xs font-bold text-[#38bdf8]">4. Oxygen and silicon burning</span><span className="text-[9px] text-white/40">2B K</span></div>
+                        <p className="text-[10px] text-white/50 mt-0.5 leading-relaxed">O16 + O16 → Si28, then helium captures climb from Si28 all the way to Ni56.</p>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="bg-white/5 border border-white/5 p-3 rounded-2xl">
-                    <span className="text-[9px] font-mono font-bold text-cyan-400 block mb-1">STABLE ASH:</span>
-                    <p className="text-[11px] leading-relaxed text-white/70">
-                      <span className="text-[#57606f] font-bold">Iron-56 (Fe56)</span> is completely stable and immovable (<span className="font-mono">slideDistance: 0</span>). Keep it unslideable to structure your core strategy!
-                    </p>
                   </div>
 
                   <table className="w-full text-left font-mono text-[10.5px] border-collapse text-white/80">
@@ -729,9 +745,9 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                       <tr><td className="py-1.5 text-amber-400">Be8</td><td className="py-1.5">He4 + He4</td><td className="py-1.5 text-right text-amber-400">Unstable</td></tr>
                       <tr><td className="py-1.5 text-cyan-300">C12</td><td className="py-1.5">Be8 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
                       <tr><td className="py-1.5 text-cyan-300">O16</td><td className="py-1.5">C12 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
-                      <tr><td className="py-1.5 text-amber-400">Ne20</td><td className="py-1.5">O16 + He4</td><td className="py-1.5 text-right text-amber-400">Unstable</td></tr>
-                      <tr><td className="py-1.5 text-cyan-300">Mg24</td><td className="py-1.5">Ne20 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
-                      <tr><td className="py-1.5 text-cyan-300">Si28</td><td className="py-1.5">Mg24 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
+                      <tr><td className="py-1.5 text-amber-400">Ne20</td><td className="py-1.5">O16 + He4 · C12 + C12</td><td className="py-1.5 text-right text-amber-400">Unstable</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">Mg24</td><td className="py-1.5">Ne20 + He4</td><td className="py-1.5 text-right text-white/45">Dead end</td></tr>
+                      <tr><td className="py-1.5 text-cyan-300">Si28</td><td className="py-1.5">O16 + O16</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
                       <tr><td className="py-1.5 text-cyan-300">S32</td><td className="py-1.5">Si28 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
                       <tr><td className="py-1.5 text-cyan-300">Ar36</td><td className="py-1.5">S32 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
                       <tr><td className="py-1.5 text-cyan-300">Ca40</td><td className="py-1.5">Ar36 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
@@ -739,7 +755,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                       <tr><td className="py-1.5 text-cyan-300">Cr48</td><td className="py-1.5">Ti44 + He4</td><td className="py-1.5 text-right text-emerald-400">Stable</td></tr>
                       <tr><td className="py-1.5 text-amber-400">Fe52</td><td className="py-1.5">Cr48 + He4</td><td className="py-1.5 text-right text-amber-400">Unstable</td></tr>
                       <tr><td className="py-1.5 text-amber-400">Ni56</td><td className="py-1.5">Fe52 + He4</td><td className="py-1.5 text-right text-amber-400">Unstable</td></tr>
-                      <tr><td className="py-1.5 text-purple-400 font-bold">Fe56</td><td className="py-1.5 font-bold">Ni56 Decay</td><td className="py-1.5 text-right text-purple-400 font-bold">Stable Ash</td></tr>
+                      <tr><td className="py-1.5 text-purple-400 font-bold">Fe56</td><td className="py-1.5 font-bold">Ni56 decay</td><td className="py-1.5 text-right text-purple-400 font-bold">Immovable</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -749,88 +765,60 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                 {/* Header */}
                 <div className="flex flex-col gap-1 border-b border-white/5 pb-4 pr-8">
                   <span className="text-[9px] tracking-[2.5px] text-cyan-400 font-bold uppercase font-mono">Stellar Physics Journal</span>
-                  <h2 className="text-lg font-semibold tracking-wide">STELLAR LIFE STAGE GUIDE</h2>
+                  <h2 className="text-lg font-semibold tracking-wide">
+                    {star ? `${star.name} · ${star.mass} M☉` : `${starMass.toFixed(1)} M☉ star`}
+                  </h2>
                   <p className="text-xs text-white/50 leading-relaxed font-normal mt-1">
-                    A star's lifespan is governed entirely by core nuclear fusion. More massive stars burn through their fuel exponentially faster:
+                    {star
+                      ? `Heavier stars burn hotter and die sooner. This one has ${star.lifetime} moves before its core runs out of fuel${movesLeft !== null ? `, and ${movesLeft} are left` : ''}.`
+                      : 'Heavier stars burn hotter and die sooner, and mass decides how they end.'}
                   </p>
-                  <div className="bg-white/5 border border-white/5 p-2 rounded-xl text-xs font-semibold text-cyan-300 font-mono mt-1 text-center">
-                    This {starMass.toFixed(1)} Solar Mass Star's Lifespan Model
-                  </div>
+                  {star && lifetime !== null && (
+                    <div className="bg-white/5 border border-white/5 p-2 rounded-xl text-[11px] text-cyan-300 font-mono mt-1 text-center">
+                      Age {formatStarAge(star.mass, lifeFraction)}
+                    </div>
+                  )}
                 </div>
 
                 {/* Timeline stages list */}
-                <div className="flex flex-col gap-6 relative pl-5 border-l border-white/10 ml-2 text-sm">
-                  {/* 1. Main Sequence */}
-                  <div className={`relative ${phase === 'main_sequence' ? 'text-cyan-400 font-bold' : 'text-white/60'}`}>
-                    {/* Active indicator dot */}
-                    <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
-                      phase === 'main_sequence' 
-                        ? 'bg-cyan-400 animate-pulse shadow-[0_0_12px_#22d3ee]' 
-                        : 'bg-white/20'
-                    }`} />
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="text-base font-semibold">1. Main Sequence</span>
-                      <span className="font-mono text-xs text-white/40">{ageMS_start.toFixed(1)} to {ageMS_end.toFixed(1)} {unit}</span>
-                    </div>
-                    <p className="text-xs text-white/45 leading-relaxed font-normal">
-                      Hydrogen core fusion sustains stable gravitational equilibrium. This is the longest and most stable phase of a star's life.
-                      <span className="block mt-1 text-[10px] text-cyan-400/80 font-mono">Unlocks: H, He</span>
-                    </p>
-                  </div>
-
-                  {/* 2. Red Giant */}
-                  <div className={`relative ${phase === 'red_giant' ? 'text-amber-400 font-bold' : 'text-white/60'}`}>
-                    {/* Active indicator dot */}
-                    <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
-                      phase === 'red_giant' 
-                        ? 'bg-amber-400 animate-pulse shadow-[0_0_12px_#fbbf24]' 
-                        : 'bg-white/20'
-                    }`} />
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="text-base font-semibold">2. Red Giant</span>
-                      <span className="font-mono text-xs text-white/40">{ageRG_start.toFixed(1)} to {ageRG_end.toFixed(1)} {unit}</span>
-                    </div>
-                    <p className="text-xs text-white/45 leading-relaxed font-normal">
-                      Helium core shrinks & heats up, causing the outer hydrogen layers to expand. Fuses Helium into Carbon and Oxygen.
-                      <span className="block mt-1 text-[10px] text-amber-400/80 font-mono">Trigger: Accumulate 8 Helium tiles | Unlocks: C, O</span>
-                    </p>
-                  </div>
-
-                  {/* 3. Supergiant */}
-                  <div className={`relative ${phase === 'supergiant' ? 'text-red-400 font-bold' : 'text-white/60'}`}>
-                    {/* Active indicator dot */}
-                    <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
-                      phase === 'supergiant' 
-                        ? 'bg-red-400 animate-pulse shadow-[0_0_12px_#f87171]' 
-                        : 'bg-white/20'
-                    }`} />
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="text-base font-semibold">3. Supergiant</span>
-                      <span className="font-mono text-xs text-white/40">{ageSG_start.toFixed(1)} to {ageSG_end.toFixed(1)} {unit}</span>
-                    </div>
-                    <p className="text-xs text-white/45 leading-relaxed font-normal">
-                      Advanced core-shell fusion begins. The star burns Carbon, Oxygen, Neon, Magnesium, and Silicon in concentric layers like an onion.
-                      <span className="block mt-1 text-[10px] text-red-400/80 font-mono">Trigger: Star Mass ≥ 8 & 4 Carbon tiles | Unlocks: Ne, Mg, Si</span>
-                    </p>
-                  </div>
-
-                  {/* 4. Core Collapse */}
-                  <div className={`relative ${phase === 'collapse' ? 'text-purple-400 font-bold' : 'text-white/60'}`}>
-                    {/* Active indicator dot */}
-                    <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${
-                      phase === 'collapse' 
-                        ? 'bg-purple-400 animate-pulse shadow-[0_0_12px_#c084fc]' 
-                        : 'bg-white/20'
-                    }`} />
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="text-base font-semibold">4. Core Collapse</span>
-                      <span className="font-mono text-xs text-white/40 font-bold">Above {ageCollapse.toFixed(1)} {unit}</span>
-                    </div>
-                    <p className="text-xs text-white/45 leading-relaxed font-normal">
-                      Silicon fuses into Iron. Since Iron fusion consumes energy instead of releasing it, the star collapses under extreme gravity, triggering a violent Supernova!
-                      <span className="block mt-1 text-[10px] text-purple-400/80 font-mono">Trigger: Create 1 Iron tile | Target: Core Collapse</span>
-                    </p>
-                  </div>
+                <div className="flex flex-col gap-5 relative pl-5 border-l border-white/10 ml-2 text-sm">
+                  {([
+                    {
+                      key: 'main_sequence', title: '1. Main sequence', active: 'text-cyan-400', dot: 'bg-cyan-400 shadow-[0_0_12px_#22d3ee]', tag: 'text-cyan-400/80',
+                      body: 'Hydrogen fuses into helium. The longest, calmest part of a star’s life.',
+                      trigger: 'From the start',
+                    },
+                    {
+                      key: 'red_giant', title: '2. Red giant', active: 'text-amber-400', dot: 'bg-amber-400 shadow-[0_0_12px_#fbbf24]', tag: 'text-amber-400/80',
+                      body: 'The helium core contracts and ignites: three helium in a triangle make carbon, and carbon plus helium makes oxygen.',
+                      trigger: 'Once 8 nuclei are heavier than hydrogen',
+                    },
+                    {
+                      key: 'supergiant', title: '3. Supergiant', active: 'text-red-400', dot: 'bg-red-400 shadow-[0_0_12px_#f87171]', tag: 'text-red-400/80',
+                      body: lowMassStar
+                        ? `Stars under ${CARBON_IGNITION_MASS} M☉ never get hot enough to burn carbon. This one ends as a carbon–oxygen white dwarf.`
+                        : 'Neon, magnesium and silicon burn in shells like an onion. Hydrogen rains twice as fast.',
+                      trigger: `Stars of ${CARBON_IGNITION_MASS} M☉ or more, once 4 nuclei are carbon or heavier`,
+                    },
+                    {
+                      key: 'collapse', title: '4. Core collapse', active: 'text-purple-400', dot: 'bg-purple-400 shadow-[0_0_12px_#c084fc]', tag: 'text-purple-400/80',
+                      body: 'Silicon fuses into iron, which cannot release energy. The core collapses in a supernova.',
+                      trigger: 'Forge iron (silicon + silicon)',
+                    },
+                  ] as const).map(stage => {
+                    const isActive = phase === stage.key;
+                    const unreachable = lowMassStar && (stage.key === 'supergiant' || stage.key === 'collapse');
+                    return (
+                      <div key={stage.key} className={`relative ${isActive ? `${stage.active} font-bold` : 'text-white/60'} ${unreachable ? 'opacity-45' : ''}`}>
+                        <div className={`absolute -left-[26px] top-1 w-3 h-3 rounded-full border border-[#0f0f15] transition-all ${isActive ? `${stage.dot} animate-pulse` : 'bg-white/20'}`} />
+                        <div className="text-base font-semibold mb-1">{stage.title}</div>
+                        <p className="text-xs text-white/45 leading-relaxed font-normal">
+                          {stage.body}
+                          <span className={`block mt-1 text-[10px] font-mono ${stage.tag}`}>{stage.trigger}</span>
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             )}

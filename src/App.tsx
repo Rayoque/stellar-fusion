@@ -2,7 +2,9 @@
 import React, { useEffect } from 'react';
 import { Scene } from './three/Scene';
 import { useGameStore } from './game/state';
-import { initAudio, startAmbientDrone, playSpawnTick, updateAmbientDrone, resumeAmbientDrone, createSilentWavUrl, playSupernova, playShellShed, playCollapseCrack, duckAmbientDrone } from './audio/synth';
+import { initAudio, startAmbientDrone, playSpawnTick, updateAmbientDrone, resumeAmbientDrone, createSilentWavUrl, playSupernova, playShellShed, playCollapseCrack, duckAmbientDrone, hapticCollapse } from './audio/synth';
+import { StarPicker } from './ui/StarPicker';
+import type { StarClassId } from './game/types';
 import { HUD } from './ui/HUD';
 import { EndScreen } from './ui/EndScreen';
 import { StartScreen } from './ui/StartScreen';
@@ -68,6 +70,7 @@ export default function App() {
 
   // UI state variables
   const [showStart, setShowStart] = React.useState(true);
+  const [showStarPicker, setShowStarPicker] = React.useState(false);
   const [showCampaign, setShowCampaign] = React.useState(false);
   const [showCodex, setShowCodex] = React.useState(false);
   const [codexInitialElement, setCodexInitialElement] = React.useState<ElementSymbol | null>(null);
@@ -158,7 +161,7 @@ export default function App() {
     const gentle = endState === 'white_dwarf' || endState === 'failed_collapse';
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    // Seismic-charge choreography, in sandbox AND campaign (same physics):
+    // Seismic-charge choreography, in Stellar Life AND campaign (same physics):
     // detonation crack → the drone drops out (vacuum) while the core
     // collapses → at +700ms the WHOMM, flash, ring, and ejecta land together.
     if (violent) {
@@ -166,17 +169,21 @@ export default function App() {
       duckAmbientDrone(0.7);
       timers.push(setTimeout(() => {
         playSupernova();
+        hapticCollapse(true);
         setFlashOn(true);
       }, 700));
       timers.push(setTimeout(() => setFlashOn(false), 880));
     } else if (gentle) {
       duckAmbientDrone(0.3);
-      timers.push(setTimeout(() => playShellShed(), 300));
+      timers.push(setTimeout(() => {
+        playShellShed();
+        hapticCollapse(false);
+      }, 300));
     }
 
-    // The end card waits for the ceremony (sandbox only; campaign has its own overlay).
+    // The end card waits for the ceremony (open-ended runs only; campaign has its own overlay).
     if (currentLevelId === null) {
-      const delay = violent ? 3800 : gentle ? 2900 : 500; // 'jammed' is quick
+      const delay = violent ? 3800 : gentle ? 2900 : 500; // 'jammed' / 'core_full' are quick
       timers.push(setTimeout(() => setEndScreenVisible(true), delay));
     }
 
@@ -280,14 +287,31 @@ export default function App() {
     };
   }, []);
 
+  // Stellar Life starts from the star picker.
   const handleStart = () => {
-    // Resume a saved standard/endless game if one exists; otherwise fresh.
-    if (!useGameStore.getState().loadSavedGame(false)) {
-      newGame();
-    }
+    setShowStarPicker(true);
+  };
+
+  const handlePickStar = (id: StarClassId) => {
+    useGameStore.getState().clearSavedGame(false);
+    newGame(undefined, undefined, false, id);
+    setShowStarPicker(false);
     setShowStart(false);
-    // Play a subtle spawn tick on start
     setTimeout(() => playSpawnTick(), 120);
+  };
+
+  const handleResumeStar = () => {
+    if (!useGameStore.getState().loadSavedGame(false)) return;
+    setShowStarPicker(false);
+    setShowStart(false);
+    setTimeout(() => playSpawnTick(), 120);
+  };
+
+  const handleChooseStar = () => {
+    newGame();
+    setPaused(false);
+    setShowStart(true);
+    setShowStarPicker(true);
   };
 
   const handleStartAstro = () => {
@@ -300,10 +324,10 @@ export default function App() {
   };
 
   const handlePlayAgain = () => {
-    // EndScreen only shows for open-ended modes; restart in the SAME mode + fresh save.
-    const isAstro = useGameStore.getState().astrophysicistMode;
-    useGameStore.getState().clearSavedGame(isAstro);
-    newGame(undefined, undefined, isAstro);
+    // EndScreen only shows for open-ended modes; restart the SAME star / mode with a fresh save.
+    const { astrophysicistMode, starClass } = useGameStore.getState();
+    useGameStore.getState().clearSavedGame(astrophysicistMode);
+    newGame(undefined, undefined, astrophysicistMode, starClass ?? undefined);
     setShowStart(false);
   };
 
@@ -370,14 +394,8 @@ export default function App() {
 
       if (key === 'r') {
         if (!showStart) {
-          if (currentLevelId !== null) {
-            newGame(undefined, currentLevelId);
-          } else {
-            // Respect astrophysicist mode on hotkey reload, and wipe its save.
-            const isAstro = useGameStore.getState().astrophysicistMode;
-            useGameStore.getState().clearSavedGame(isAstro);
-            newGame(undefined, undefined, isAstro);
-          }
+          // Same level, same star, or same mode — reset() knows which.
+          useGameStore.getState().reset();
           playSpawnTick();
         }
       }
@@ -456,11 +474,18 @@ export default function App() {
   if (showStart) {
     return (
       <>
-        <StartScreen 
-          onStart={handleStart} 
-          onOpenCampaign={() => setShowCampaign(true)} 
+        <StartScreen
+          onStart={handleStart}
+          onOpenCampaign={() => setShowCampaign(true)}
           onStartAstro={handleStartAstro}
         />
+        {showStarPicker && (
+          <StarPicker
+            onPick={handlePickStar}
+            onResume={handleResumeStar}
+            onClose={() => setShowStarPicker(false)}
+          />
+        )}
         {showCampaign && (
           <CampaignSelector
             onClose={() => { setShowCampaign(false); window.scrollTo(0, 0); }}
@@ -530,6 +555,7 @@ export default function App() {
           highScore={highScore}
           astrophysicistMode={astrophysicistMode}
           onPlayAgain={handlePlayAgain}
+          onChooseStar={handleChooseStar}
           onMainMenu={handleMainMenu}
         />
       )}
@@ -640,25 +666,18 @@ export default function App() {
               </div>
 
               <h2 className="text-xl sm:text-2xl font-light tracking-wide mb-4 uppercase text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70">
-                Nucleation Site Catalyst
+                Pentagons are catalysts
               </h2>
 
-              <p className="text-white/60 text-xs sm:text-sm leading-relaxed mb-6 font-light font-normal text-center max-w-xs">
-                Your star's topology contains 12 pentagonal faces. Under extreme stellar compression, pentagons act as catalytic <span className="text-cyan-400 font-bold">nucleation sites</span>.
+              <p className="text-white/65 text-xs sm:text-sm leading-relaxed mb-6 font-light text-center max-w-xs">
+                A lone <span className="text-[#ff6b6b] font-bold">hydrogen</span> that stops on one of the 12 pentagons fuses into <span className="text-[#feca57] font-bold">helium</span> by itself, a stand-in for the CNO cycle that burns hydrogen in heavier stars.
               </p>
-
-              <div className="bg-black/45 border border-cyan-500/10 rounded-2xl p-4 mb-6 text-left max-w-xs">
-                <span className="text-[8.5px] font-mono font-bold text-cyan-400 tracking-wider block mb-1 uppercase">PHYSICS INSIGHT:</span>
-                <p className="text-[10.5px] leading-relaxed text-white/75 font-light">
-                  A single <span className="text-[#ff6b6b] font-bold">Hydrogen (H)</span> tile landing on a pentagon will immediately undergo self-fusion into <span className="text-[#feca57] font-bold">Helium (He)</span>—no secondary H tile is required!
-                </p>
-              </div>
 
               <button
                 onClick={dismissNucleationTutorial}
                 className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-full font-bold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase shadow-[0_4px_16px_rgba(6,182,212,0.25)] cursor-pointer"
               >
-                HARNESS CATALYST
+                Got it
               </button>
             </div>
           </div>
@@ -676,9 +695,7 @@ export default function App() {
             onClick={dismissSystemToast}
             title="Dismiss warning"
           >
-            <span className="text-[10px] text-amber-500 animate-pulse">⚠️</span>
             <span>{systemToast}</span>
-            <span className="text-[10px] text-amber-500 animate-pulse">⚠️</span>
           </div>
         </div>
       )}

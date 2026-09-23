@@ -4,6 +4,7 @@ import { ELEMENTS } from '../game/elements';
 import type { ElementSymbol } from '../game/types';
 import { useGameStore } from '../game/state';
 import { BohrModel } from './BohrModel';
+import { BookIcon } from './icons';
 
 interface CodexProps {
   onClose: () => void;
@@ -221,7 +222,7 @@ export function Codex({ onClose, initialElement }: CodexProps) {
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center text-white/30 p-6">
-                <span className="text-2xl mb-2 font-light">📔</span>
+                <BookIcon size={26} className="mb-2 text-white/30" />
                 <p className="text-xs max-w-[200px] leading-relaxed">
                   Select an element on the left to read its astrophysical journal log.
                 </p>

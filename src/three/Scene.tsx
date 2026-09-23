@@ -1,11 +1,34 @@
 // src/three/Scene.tsx
-import React from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import React, { useRef } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { Background } from './Background';
 import { Sphere } from './Sphere';
 import { Controls } from './Controls';
 import { EndStateEffect } from './EndStateEffect';
+
+function Lighting() {
+  const pointLightRef = useRef<any>(null);
+
+  useFrame((state) => {
+    const elapsed = state.clock.getElapsedTime();
+    if (pointLightRef.current) {
+      // Gentle solar flare flickering
+      pointLightRef.current.intensity = 2.0 + Math.sin(elapsed * 6.0) * 0.18 + Math.cos(elapsed * 12.0) * 0.06;
+      
+      // Orbit the key light slowly to create moving specular reflections on the glossy physical tiles
+      pointLightRef.current.position.x = 8.0 + Math.sin(elapsed * 0.25) * 2.0;
+      pointLightRef.current.position.z = 8.0 + Math.cos(elapsed * 0.25) * 2.0;
+    }
+  });
+
+  return (
+    <>
+      <ambientLight intensity={0.85} />
+      <pointLight ref={pointLightRef} position={[8, 8, 8]} intensity={2.0} color="#fff8e7" />
+      <pointLight position={[-6, -4, -6]} intensity={0.65} color="#a0c4ff" />
+    </>
+  );
+}
 
 export function Scene() {
   return (
@@ -17,9 +40,7 @@ export function Scene() {
     >
       <fog attach="fog" args={['#050508', 8.0, 60.0]} />
       <Background />
-      <ambientLight intensity={0.8} />
-      <pointLight position={[8, 8, 8]} intensity={2.0} color="#fff8e7" />
-      <pointLight position={[-6, -4, -6]} intensity={0.6} color="#a0c4ff" />
+      <Lighting />
 
       <React.Suspense fallback={null}>
         <Sphere />

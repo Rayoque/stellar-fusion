@@ -120,8 +120,16 @@ export function Sphere() {
 
     // Volumetric counter-rotating layers to create a deep, boiling gas/convection effect
     if (innerRef.current) {
-      innerRef.current.rotation.y += delta * 0.015;
-      innerRef.current.rotation.x += delta * 0.005;
+      innerRef.current.rotation.y += delta * 0.022;
+      innerRef.current.rotation.x += delta * 0.008;
+
+      // Dynamic physical scale pulsing for the living fusion core
+      if (endState && phase === 'collapse') {
+        innerRef.current.scale.set(1.0, 1.0, 1.0);
+      } else {
+        const corePulse = 1.0 + Math.sin(elapsed * 2.5) * 0.012 + Math.cos(elapsed * 4.0) * 0.006;
+        innerRef.current.scale.set(corePulse, corePulse, corePulse);
+      }
 
       // Premium core emissive intensity pulsing to represent advanced fusion state
       if (innerRef.current.material) {
@@ -140,7 +148,7 @@ export function Sphere() {
           } else if (phase === 'collapse') {
             mat.emissiveIntensity = 0.4 + Math.sin(elapsed * 6.0) * 0.20;  // Highly unstable pre-collapse flicker
           } else {
-            mat.emissiveIntensity = 0.65;
+            mat.emissiveIntensity = 0.65 + Math.sin(elapsed * 1.2) * 0.05; // Gentle pulse in main sequence
           }
         }
       }
@@ -148,8 +156,8 @@ export function Sphere() {
 
     if (showRealtimeGraphics) {
       if (middleRef.current) {
-        middleRef.current.rotation.y -= delta * 0.028;
-        middleRef.current.rotation.z += delta * 0.01;
+        middleRef.current.rotation.y -= delta * 0.040;
+        middleRef.current.rotation.z += delta * 0.018;
 
         // Additive atmosphere layer 1 convection pulsing
         if (phase === 'red_giant') {
@@ -159,12 +167,13 @@ export function Sphere() {
           const s = 0.90 * (1.0 + Math.sin(elapsed * 4.5) * 0.04);
           middleRef.current.scale.set(s, s, s);
         } else {
-          middleRef.current.scale.set(0.90, 0.90, 0.90);
+          const s = 0.90 * (1.0 + Math.sin(elapsed * 0.8) * 0.006);
+          middleRef.current.scale.set(s, s, s);
         }
       }
       if (outerRef.current) {
-        outerRef.current.rotation.y += delta * 0.045;
-        outerRef.current.rotation.x -= delta * 0.012;
+        outerRef.current.rotation.y += delta * 0.060;
+        outerRef.current.rotation.x -= delta * 0.020;
 
         // Additive atmosphere layer 2 convection pulsing
         if (phase === 'red_giant') {
@@ -174,7 +183,8 @@ export function Sphere() {
           const s = 0.918 * (1.0 + Math.cos(elapsed * 4.5) * 0.05);
           outerRef.current.scale.set(s, s, s);
         } else {
-          outerRef.current.scale.set(0.918, 0.918, 0.918);
+          const s = 0.918 * (1.0 + Math.cos(elapsed * 0.8) * 0.008);
+          outerRef.current.scale.set(s, s, s);
         }
       }
     }

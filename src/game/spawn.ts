@@ -7,45 +7,44 @@ import { LEVELS } from './levels';
 // This is a per-slot weight: a pentagon is ~30% as likely to be picked as a hexagon.
 const PENTAGON_SPAWN_WEIGHT = 0.3;
 
+// Fe26 spawns a deuteron instead of a proton one time in ten.
+const ASTRO_DEUTERON_CHANCE = 0.1;
+
+function rainDisabledForLevel(state: GameState): boolean {
+  if (state.currentLevelId === null) return false;
+  if (state.currentLevelId === 9999) return state.editorLevelMetadata?.disableSpawns ?? true;
+  const level = LEVELS.find(l => l.id === state.currentLevelId)
+    || state.customScenarios?.find(l => l.id === state.currentLevelId);
+  return !!level?.disableSpawns;
+}
+
 /**
  * Spawn hydrogen(s) after every committed move.
  * Rewards efficient play: even non-merging drags cost a new H.
  * In collapse phase, no new fuel (hSpawnRate = 0).
  *
- * Hydrogen can rain onto pentagons (nucleation sites) too, but at a lower chance.
- * When it does, it immediately becomes helium (the same self-fusion the player gets
- * by dragging H onto a pentagon) — but silently, since this isn't a player action.
+ * Standard rules: hydrogen can rain onto pentagons (nucleation sites) too, at a
+ * lower chance, and immediately becomes helium there — the same self-fusion the
+ * player gets by dragging H onto a pentagon, but silent.
+ * Astrophysicist Mode follows Fe26: one nucleus per move on a uniformly random
+ * empty face, a deuteron 10% of the time, and pentagons are ordinary faces.
  */
 export function spawnHydrogen(state: GameState): void {
-  if (state.currentLevelId !== null) {
-    let disableSpawns = false;
-    if (state.currentLevelId === 9999) {
-      const raw = localStorage.getItem('stellar_editor_draft');
-      if (raw) {
-        disableSpawns = JSON.parse(raw).metadata.disableSpawns ?? true;
-      }
-    } else {
-      const level = LEVELS.find(l => l.id === state.currentLevelId) || (state as any).customScenarios?.find((l: any) => l.id === state.currentLevelId);
-      if (level && level.disableSpawns) {
-        disableSpawns = true;
-      }
-    }
-    if (disableSpawns) return;
-  }
+  if (rainDisabledForLevel(state)) return;
 
-  const phaseRule = currentPhaseRule(state);
-  const rate = state.astrophysicistMode ? 1 : phaseRule.hSpawnRate;
-
+  const rate = state.astrophysicistMode ? 1 : currentPhaseRule(state).hSpawnRate;
   if (rate <= 0) return;
 
-  // Both hexagons and pentagons are valid landing slots now (pentagons weighted lower).
-  const emptyFaces = state.faces.filter(
-    f => (f.shape === 'hexagon' || f.shape === 'pentagon') && !state.tiles.has(f.id)
-  );
+  // Obstacle faces (anomalies, wormholes, CME gates) never receive rain.
+  const emptyFaces = state.faces.filter(f => !state.tiles.has(f.id) && !state.obstacles?.has(f.id));
   if (emptyFaces.length === 0) return;
 
-  // H self-fuses to helium on a pentagon; the output isotope is mode-dependent.
-  const heliumOnPentagon: ElementSymbol = state.astrophysicistMode ? 'He4' : 'He';
+  if (state.astrophysicistMode) {
+    const target = emptyFaces[Math.floor(Math.random() * emptyFaces.length)];
+    const element: ElementSymbol = Math.random() < ASTRO_DEUTERON_CHANCE ? 'D' : 'H';
+    state.tiles.set(target.id, { faceId: target.id, element, spawnedAtTurn: state.turn, spawnReason: 'spawn' });
+    return;
+  }
 
   const lastFaceId = state.lastMoveFaceId;
   const lastFace = lastFaceId !== null && lastFaceId !== undefined ? state.faces[lastFaceId] : null;
@@ -81,12 +80,10 @@ export function spawnHydrogen(state: GameState): void {
     }
 
     const target = emptyFaces[targetIdx];
-    const isPentagon = target.shape === 'pentagon';
-
     state.tiles.set(target.id, {
       faceId: target.id,
       // On a pentagon the hydrogen instantly self-fuses to helium (silent — not a player move).
-      element: isPentagon ? heliumOnPentagon : 'H',
+      element: target.shape === 'pentagon' ? 'He' : 'H',
       spawnedAtTurn: state.turn,
       spawnReason: 'spawn',
     });

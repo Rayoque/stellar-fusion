@@ -1,5 +1,7 @@
 // src/ui/AstroFe56Overlay.tsx
 import React from 'react';
+import { AtomIcon } from './icons';
+import { useGameStore } from '../game/state';
 
 interface AstroFe56OverlayProps {
   onContinue: () => void;
@@ -8,6 +10,9 @@ interface AstroFe56OverlayProps {
 export function AstroFe56Overlay({ onContinue }: AstroFe56OverlayProps) {
   const accentColor = '#00d2d3'; // Hot neon cyan for advanced astrophysics!
   const shadowGlow = 'rgba(0, 210, 211, 0.12)';
+  const turn = useGameStore(s => s.turn);
+  const lifetime = useGameStore(s => s.lifetime);
+  const movesLeft = lifetime !== null ? Math.max(0, lifetime - turn) : null;
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md select-none pointer-events-auto">
@@ -21,23 +26,25 @@ export function AstroFe56Overlay({ onContinue }: AstroFe56OverlayProps) {
         }}
       >
         <div className="relative z-10">
-          <div 
-            className="uppercase tracking-[4px] text-[8.5px] sm:text-[9.5px] mb-2 font-mono font-bold"
+          <div
+            className="uppercase tracking-[4px] text-[8.5px] sm:text-[9.5px] mb-2 font-mono font-bold flex items-center justify-center gap-2"
             style={{ color: accentColor }}
           >
-            ☢ ASTROPHYSICS ACHIEVEMENT ☢
+            <AtomIcon size={12} />
+            Iron-56 at move {turn}
           </div>
-          
+
           <h1 className="text-2xl sm:text-3xl font-light tracking-wide mb-3 text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70">
             STABLE CORE SYNTHESIZED
           </h1>
-          
-          <div className="text-white/50 mb-8 text-xs sm:text-[13px] leading-relaxed max-w-[280px] sm:max-w-sm mx-auto font-light space-y-3">
+
+          <div className="text-white/55 mb-8 text-xs sm:text-[13px] leading-relaxed max-w-[280px] sm:max-w-sm mx-auto font-light space-y-3">
             <p>
-              Congratulations, Astrophysicist! You have successfully completed the nucleosynthesis pathway by fusing all the way to <strong>Iron-56 (Fe56)</strong>.
+              Nickel-56 decayed into iron-56, the end of the chain, just as in Fe26.
             </p>
             <p>
-              Iron-56 represents the thermodynamic peak of nuclear binding energy per nucleon. Beyond this limit, fusion consumes energy rather than releasing it. You have established a completely stable, immovable iron ash core.
+              Nothing fuses with iron: fusing past it would cost energy instead of releasing it.
+              {movesLeft !== null && movesLeft > 0 && ` Keep fusing for points. ${movesLeft} moves of fuel remain before the core collapses.`}
             </p>
           </div>
 

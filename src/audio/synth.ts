@@ -9,6 +9,8 @@ let bgVolume = Number(localStorage.getItem('stellar_bg_volume') ?? '50');
 let effectsVolume = Number(localStorage.getItem('stellar_effects_volume') ?? '80');
 let currentBaseGain = 0.06;
 
+let hapticsEnabled = localStorage.getItem('stellar_haptics') !== 'false';
+
 let capacitorHaptics: any = null;
 if (typeof window !== 'undefined' && (window as any).Capacitor && (window as any).Capacitor.Plugins) {
   capacitorHaptics = (window as any).Capacitor.Plugins.Haptics;
@@ -28,56 +30,76 @@ export function initAudio(): void {
 
 /**
  * Universal Haptics Bridge
- * Triggers native iOS haptics if running inside Capacitor, otherwise falls back to HTML5 Vibration API.
+ * Native haptics when running inside Capacitor (@capacitor/haptics — its enums are
+ * uppercase strings), otherwise the Vibration API (Android browsers; iOS Safari has
+ * none, so the web build stays silent there). Independent of the sound toggles.
  */
-export function triggerHaptic(type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error'): void {
+type HapticKind = 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error';
+
+const VIBRATION_PATTERNS: Record<HapticKind, number | number[]> = {
+  light: 12,
+  medium: 28,
+  heavy: 55,
+  success: [30, 30, 30],
+  warning: [45, 35, 45],
+  error: [90, 50, 90, 50, 140],
+};
+
+export function triggerHaptic(type: HapticKind, vibrateMs?: number | number[]): void {
+  if (!hapticsEnabled) return;
   try {
     if (capacitorHaptics) {
-      switch (type) {
-        case 'light':
-          capacitorHaptics.impact({ style: 'light' });
-          break;
-        case 'medium':
-          capacitorHaptics.impact({ style: 'medium' });
-          break;
-        case 'heavy':
-          capacitorHaptics.impact({ style: 'heavy' });
-          break;
-        case 'success':
-          capacitorHaptics.notification({ type: 'success' });
-          break;
-        case 'warning':
-          capacitorHaptics.notification({ type: 'warning' });
-          break;
-        case 'error':
-          capacitorHaptics.notification({ type: 'error' });
-          break;
+      if (type === 'light' || type === 'medium' || type === 'heavy') {
+        capacitorHaptics.impact({ style: type.toUpperCase() });
+      } else {
+        capacitorHaptics.notification({ type: type.toUpperCase() });
       }
     } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      switch (type) {
-        case 'light':
-          navigator.vibrate(15);
-          break;
-        case 'medium':
-          navigator.vibrate(35);
-          break;
-        case 'heavy':
-          navigator.vibrate(65);
-          break;
-        case 'success':
-          navigator.vibrate([40, 30, 40]);
-          break;
-        case 'warning':
-          navigator.vibrate([60, 40, 60]);
-          break;
-        case 'error':
-          navigator.vibrate([100, 50, 100, 50, 150]);
-          break;
-      }
+      navigator.vibrate(vibrateMs ?? VIBRATION_PATTERNS[type]);
     }
   } catch (err) {
     // Fail silently on unsupported configurations
   }
+}
+
+// Nuclear mass number of a tile: the heavier the nucleus, the heavier it feels.
+function massNumber(symbol: ElementSymbol): number {
+  const standard: Partial<Record<ElementSymbol, number>> = { H: 1, D: 2, He: 4, C: 12, O: 16, Ne: 20, Mg: 24, Si: 28, Fe: 56 };
+  if (standard[symbol] !== undefined) return standard[symbol]!;
+  const digits = symbol.match(/\d+$/);
+  return digits ? parseInt(digits[0], 10) : 1;
+}
+
+/** A fusion lands: weight scales with the product's mass, iron hits hardest. */
+export function hapticFusion(product: ElementSymbol): void {
+  const a = massNumber(product);
+  const kind: HapticKind = a < 10 ? 'light' : a < 40 ? 'medium' : 'heavy';
+  triggerHaptic(kind, Math.round(8 + a * 0.9));
+}
+
+/** A tile sets off: sluggish heavy nuclei give a firmer push than light ones. */
+export function hapticSlide(symbol: ElementSymbol): void {
+  const slow = (ELEMENTS[symbol]?.slideDistance ?? 4) <= 2;
+  triggerHaptic(slow ? 'medium' : 'light', slow ? 18 : 8);
+}
+
+export function hapticBlocked(): void {
+  triggerHaptic('warning');
+}
+
+/** The death of the star: a collapse rumbles, a shed envelope sighs. */
+export function hapticCollapse(violent: boolean): void {
+  triggerHaptic(violent ? 'error' : 'medium', violent ? [70, 40, 120, 40, 200] : 40);
+}
+
+export function isHapticsEnabled(): boolean {
+  return hapticsEnabled;
+}
+
+export function setHapticsEnabled(enabled: boolean): void {
+  hapticsEnabled = enabled;
+  localStorage.setItem('stellar_haptics', String(enabled));
+  if (enabled) triggerHaptic('light');
 }
 
 /**
@@ -132,8 +154,6 @@ export function playSlide(symbol: ElementSymbol, steps: number): void {
   osc.start(now);
   modOsc.stop(now + duration + 0.05);
   osc.stop(now + duration + 0.05);
-
-  triggerHaptic(element.slideDistance <= 2 ? 'medium' : 'light');
 }
 
 /**
@@ -179,8 +199,6 @@ export function playMerge(parent: ElementSymbol, child: ElementSymbol): void {
     osc.start(noteTime);
     osc.stop(noteTime + 0.6);
   });
-
-  triggerHaptic('success');
 }
 
 /**
@@ -250,8 +268,6 @@ export function playBlocked(): void {
 
   osc.start(now);
   osc.stop(now + 0.25);
-
-  triggerHaptic('warning');
 }
 
 /**
@@ -283,8 +299,6 @@ export function playCollapseCrack(): void {
   hp.connect(g);
   g.connect(audioCtx.destination);
   crack.start(now);
-
-  triggerHaptic('light');
 }
 
 /**
@@ -359,8 +373,6 @@ export function playSupernova(): void {
   nf.connect(ng);
   ng.connect(audioCtx.destination);
   noise.start(now);
-
-  triggerHaptic('error');
 }
 
 /**
@@ -399,8 +411,6 @@ export function playShellShed(): void {
     osc.start(now);
     osc.stop(now + 2.8);
   });
-
-  triggerHaptic('medium');
 }
 
 let ambientOsc1: OscillatorNode | null = null;
@@ -686,7 +696,8 @@ export function setEffectsVolume(vol: number): void {
 
 export function playHeliumLaugh(): void {
   if (!effectsSoundEnabled) return;
-  const audio = new Audio('/hehehe.mp3');
+  // BASE_URL keeps the asset path valid when the site is served from a subfolder.
+  const audio = new Audio(`${import.meta.env.BASE_URL}hehehe.mp3`);
   audio.volume = 0.495;
   audio.play().catch(() => {});
 }

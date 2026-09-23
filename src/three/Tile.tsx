@@ -29,6 +29,7 @@ export function Tile({ face, tile }: TileProps) {
   const activeSlide = useGameStore(s => s.activeSlide);
   const isAstro = useGameStore(s => s.astrophysicistMode);
   const obstacle = useGameStore(s => s.obstacles?.get(face.id));
+  const showRealtimeGraphics = useGameStore(s => s.showRealtimeGraphics);
 
   const isSelected = face.id === selectedFaceId;
   const isTarget = face.id === dragTargetId;
@@ -48,7 +49,7 @@ export function Tile({ face, tile }: TileProps) {
     const positions: number[] = [];
     const center = face.center;
 
-    const shrinkFactor = 0.94;
+    const shrinkFactor = 0.915;
     const shrunkVerts = verts.map(v => lerpVec3(center, v, shrinkFactor));
 
     // Create a simple fan from the center (works well for convex pentagons/hexagons)
@@ -424,18 +425,33 @@ export function Tile({ face, tile }: TileProps) {
       <group ref={tileContentGroupRef}>
         {element && (
           <mesh geometry={geometry} userData={{ faceId: face.id }}>
-            <meshLambertMaterial 
-              color={color} 
-              flatShading 
-              side={THREE.DoubleSide}
-              transparent={false}
-              depthWrite={true}
-            />
-            <Edges 
-              scale={1} 
-              threshold={15} 
-              color={tile && tile.decayTurns !== undefined ? "#10ac84" : (isSelected ? "#38bdf8" : "black")} 
-            />
+            {showRealtimeGraphics ? (
+              <meshStandardMaterial 
+                color={color} 
+                roughness={0.5}
+                metalness={0.1}
+                emissive={color}
+                emissiveIntensity={isSelected ? 0.4 : 0.05}
+                side={THREE.DoubleSide}
+                transparent={false}
+                depthWrite={true}
+              />
+            ) : (
+              <meshLambertMaterial 
+                color={color} 
+                flatShading 
+                side={THREE.DoubleSide}
+                transparent={false}
+                depthWrite={true}
+              />
+            )}
+            {(isSelected || (tile && tile.decayTurns !== undefined)) && (
+              <Edges 
+                scale={1} 
+                threshold={15} 
+                color={tile && tile.decayTurns !== undefined ? "#10ac84" : "#38bdf8"} 
+              />
+            )}
             {tile && tile.decayTurns !== undefined && (
               <Edges 
                 scale={1.015} 
@@ -446,8 +462,9 @@ export function Tile({ face, tile }: TileProps) {
           </mesh>
         )}
 
-        {/* Pentagon indicator (always visible, rendered on top of elements using renderOrder) */}
-        {face.shape === 'pentagon' && pentagonGeometry && !isMergeTarget && (
+        {/* Pentagon catalyst indicator, rendered on top of elements using renderOrder.
+            Not in Astrophysicist Mode: Fe26 has no catalysts, so pentagons are ordinary faces. */}
+        {face.shape === 'pentagon' && pentagonGeometry && !isMergeTarget && !isAstro && (
           <mesh ref={pentagonRef} geometry={pentagonGeometry} renderOrder={2}>
             <meshBasicMaterial
               color={isAstro ? "#67e8f9" : "#38bdf8"} // Confinement field cyan (brighter in astro to stand out from the neon grid)

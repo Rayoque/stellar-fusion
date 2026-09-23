@@ -2,7 +2,32 @@
 import React from 'react';
 import { useGameStore } from '../game/state';
 import type { ElementSymbol, LevelObjective, Level } from '../game/types';
+import type { SolveResult } from '../game/solver';
+import { CARBON_IGNITION_MASS } from '../game/rules';
 import { playSpawnTick } from '../audio/synth';
+
+// The current draft as a playable Level (what "Test Scenario" would launch).
+function draftLevel(): Level {
+  const s = useGameStore.getState();
+  const meta = s.editorLevelMetadata;
+  return {
+    id: 9999,
+    title: meta.title,
+    description: meta.description,
+    author: meta.author,
+    starMass: meta.starMass,
+    maxTurns: meta.maxTurns,
+    parMoves: meta.parMoves,
+    initialTiles: Array.from(s.tiles.values()).map(t => ({ faceId: t.faceId, element: t.element })),
+    objectives: meta.objectives,
+    campaign: 'custom',
+    disableSpawns: meta.disableSpawns,
+    obstacles: Array.from(s.obstacles.values()),
+  };
+}
+
+let solverWorker: Worker | null = null;
+let solveRequestId = 0;
 
 export function ScenarioEditor() {
   const isEditorMode = useGameStore(s => s.isEditorMode);
@@ -22,6 +47,35 @@ export function ScenarioEditor() {
   // Drawer state: the panel slides away so the sphere is paintable on small
   // screens. Tap outside closes it; a floating tab brings it back.
   const [panelOpen, setPanelOpen] = React.useState(true);
+
+  // Solver: fewest moves, how many optimal lines, how many opening moves work.
+  const [solving, setSolving] = React.useState(false);
+  const [solveResult, setSolveResult] = React.useState<SolveResult | null>(null);
+  const tiles = useGameStore(s => s.tiles);
+  const obstacles = useGameStore(s => s.obstacles);
+  React.useEffect(() => {
+    // Any edit invalidates the last answer.
+    setSolveResult(null);
+  }, [tiles, obstacles, metadata]);
+
+  const handleSolve = () => {
+    if (!solverWorker) {
+      solverWorker = new Worker(new URL('../game/solver.worker.ts', import.meta.url), { type: 'module' });
+    }
+    const id = ++solveRequestId;
+    setSolving(true);
+    setSolveResult(null);
+    solverWorker.onmessage = (event: MessageEvent<{ id: number; result: SolveResult }>) => {
+      if (event.data.id !== solveRequestId) return; // a newer request superseded this one
+      setSolving(false);
+      setSolveResult(event.data.result);
+    };
+    solverWorker.postMessage({ id, level: draftLevel() });
+  };
+
+  const usesHeavyBurning = metadata.objectives.some(o =>
+    o.type === 'has_all_elements' || (o.element !== undefined && ['Ne', 'Mg', 'Si', 'Fe'].includes(o.element))
+  );
 
   if (!isEditorMode) return null;
 
@@ -161,7 +215,57 @@ export function ScenarioEditor() {
         >
           Save / Publish
         </button>
+        <button
+          onClick={handleSolve}
+          disabled={solving}
+          className="flex-1 py-2 bg-white/10 hover:bg-white/15 text-white font-bold tracking-wider text-[10px] uppercase rounded-xl transition-all active:scale-[0.97] cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+          title="Find the fewest moves that solve this scenario"
+        >
+          {solving ? 'Solving…' : 'Solve'}
+        </button>
       </div>
+
+      {/* Solver verdict */}
+      {(solveResult || (usesHeavyBurning && metadata.starMass < CARBON_IGNITION_MASS)) && (
+        <div className="px-4 py-3 border-b border-white/5 text-[10.5px] leading-relaxed flex flex-col gap-2 flex-shrink-0">
+          {usesHeavyBurning && metadata.starMass < CARBON_IGNITION_MASS && (
+            <div className="text-amber-300/80">
+              Stars under {CARBON_IGNITION_MASS} M☉ can't make neon or anything heavier. Raise the star mass.
+            </div>
+          )}
+          {solveResult?.status === 'solved' && (
+            <>
+              <div className="text-white/80">
+                Solvable in <span className="text-cyan-300 font-bold">{solveResult.optimal}</span> {solveResult.optimal === 1 ? 'move' : 'moves'}.{' '}
+                {solveResult.solutions} optimal {solveResult.solutions === 1 ? 'line' : 'lines'};{' '}
+                {solveResult.openingMovesThatWork} of {solveResult.openingMoves} first moves can reach one.
+              </div>
+              {!metadata.disableSpawns && (
+                <div className="text-white/40">Solved without hydrogen rain, so par is a lower bound here.</div>
+              )}
+              {metadata.parMoves !== solveResult.optimal && (
+                <button
+                  onClick={() => updateEditorMetadata({
+                    parMoves: solveResult.optimal!,
+                    maxTurns: Math.max(metadata.maxTurns, solveResult.optimal!),
+                  })}
+                  className="self-start px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 text-[9px] font-mono font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Set par to {solveResult.optimal}
+                </button>
+              )}
+            </>
+          )}
+          {solveResult?.status === 'unsolvable' && (
+            <div className="text-red-300/85">No solution within the move limit ({metadata.maxTurns}).</div>
+          )}
+          {solveResult?.status === 'too_big' && (
+            <div className="text-amber-300/80">
+              Too many positions to search (stopped at {solveResult.searchedDepth} moves). Try fewer tiles or a lower move limit.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="px-4 pt-2 border-b border-white/5 flex gap-4 text-[10px] font-mono font-bold tracking-wider uppercase flex-shrink-0">
@@ -460,7 +564,7 @@ export function ScenarioEditor() {
         <div className="text-[8px] text-white/35 text-center mt-2 leading-tight flex flex-col gap-1">
           <div>Select brush above, then hide this panel and tap faces on the 3D sphere.</div>
           <div className="text-amber-500/70 font-semibold uppercase tracking-wider text-[7px] leading-tight mt-0.5">
-            ⚠️ Environmental factors (CME, Anomaly, Wormhole) are in active development and may exhibit unexpected behavior.
+            Obstacles (CME, anomaly, wormhole) are experimental and may behave unexpectedly.
           </div>
         </div>
       </div>

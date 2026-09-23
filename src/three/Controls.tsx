@@ -9,6 +9,26 @@ import { SCORE_VALUES } from '../game/rules';
 import { setCameraPos } from './cameraState';
 import { playSpawnTick } from '../audio/synth';
 
+// Sphere scale per phase (mirrors Sphere.tsx's phaseScale).
+function phaseSphereScale(phase: string): number {
+  return phase === 'red_giant' ? 1.3 : phase === 'supergiant' ? 1.6 : phase === 'collapse' ? 0.45 : 1.0;
+}
+
+const DEFAULT_CAMERA_DISTANCE = 5.5;
+const SURFACE_RADIUS = 1.05; // tile labels and pentagon fields sit just above the unit sphere
+
+// Half of the narrower field of view: on a portrait phone that's the horizontal one.
+function narrowHalfFov(camera: THREE.Camera, aspect: number): number {
+  const halfV = THREE.MathUtils.degToRad(((camera as THREE.PerspectiveCamera).fov ?? 48) / 2);
+  return Math.min(halfV, Math.atan(Math.tan(halfV) * aspect));
+}
+
+// Distance at which a sphere of this scale fills ~95% of the narrow dimension,
+// never closer than the default framing.
+function fittedDistance(scale: number, halfFov: number): number {
+  return Math.max(DEFAULT_CAMERA_DISTANCE, (SURFACE_RADIUS * scale) / Math.sin(halfFov * 0.95));
+}
+
 function getElementMass(element: string): number {
   const standardMasses: Record<string, number> = {
     H: 1,
@@ -73,6 +93,11 @@ export function Controls() {
 
   // Idle state auto-rotation tracker
   const lastInteractionTime = useRef<number>(performance.now());
+
+  // Phase framing: when the star grows (red giant, supergiant) the camera eases
+  // back so the whole sphere stays on screen; a new star eases it home again.
+  const framedScale = useRef<number>(1);
+  const fitTarget = useRef<number | null>(null);
 
   useEffect(() => {
     const onInteraction = () => {
@@ -451,24 +476,38 @@ export function Controls() {
       }
     }
 
-    // 4. Pinch/scroll manual zoom threshold detection & filling ratio calculation
-    const hasManuallyZoomed = useGameStore.getState().hasManuallyZoomed;
-    const setManuallyZoomed = useGameStore.getState().setManuallyZoomed;
-    const phase = useGameStore.getState().phase;
-    const isSphereTooBig = useGameStore.getState().isSphereTooBig;
-    
+    // 4. Phase framing, manual zoom detection, and the "sphere overflows" flag
+    const { hasManuallyZoomed, setManuallyZoomed, phase, isSphereTooBig, endState } = useGameStore.getState();
+    const halfFov = narrowHalfFov(camera, size.width / size.height);
+    const sphereScale = phaseSphereScale(phase);
+
+    // The end-of-run collapse is a ceremony, not a reframing moment.
+    if (!endState && sphereScale !== framedScale.current) {
+      const fitted = fittedDistance(sphereScale, halfFov);
+      fitTarget.current = sphereScale > framedScale.current
+        ? Math.max(camera.position.length(), fitted) // growing: only ever pull back
+        : fitted;                                    // new star: come home
+      framedScale.current = sphereScale;
+    }
+    if (fitTarget.current !== null && !activeSlide) {
+      const current = camera.position.length();
+      const next = THREE.MathUtils.lerp(current, fitTarget.current, 1 - Math.exp(-2.5 * delta));
+      camera.position.setLength(next);
+      if (controlsRef.current) controlsRef.current.update();
+      if (Math.abs(next - fitTarget.current) < 0.01) fitTarget.current = null;
+    }
+
     const dist = camera.position.length();
 
-    if (!hasManuallyZoomed) {
-      if (Math.abs(dist - 5.5) > 0.4) {
+    if (!hasManuallyZoomed && fitTarget.current === null) {
+      if (Math.abs(dist - fittedDistance(sphereScale, halfFov)) > 0.4) {
         setManuallyZoomed();
       }
     }
 
-    // Dynamic filling ratio (Sphere Scale / Camera Distance)
-    const sphereScale = phase === 'red_giant' ? 1.3 : phase === 'supergiant' ? 1.6 : phase === 'collapse' ? 0.45 : 1.0;
-    const ratio = sphereScale / dist;
-    const tooBig = ratio >= 0.23;
+    // Overflowing = the sphere's angular radius exceeds the narrow half-FOV.
+    const angularRadius = Math.asin(Math.min(1, (SURFACE_RADIUS * sphereScale) / dist));
+    const tooBig = angularRadius > halfFov * 1.02;
 
     if (tooBig !== isSphereTooBig) {
       useGameStore.setState({ isSphereTooBig: tooBig });

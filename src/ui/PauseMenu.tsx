@@ -8,8 +8,10 @@ import {
   setBgVolume, 
   isEffectsSoundEnabled, 
   setEffectsSoundEnabled, 
-  getEffectsVolume, 
-  setEffectsVolume 
+  getEffectsVolume,
+  setEffectsVolume,
+  isHapticsEnabled,
+  setHapticsEnabled,
 } from '../audio/synth';
 import { APP_VERSION } from '../version';
 
@@ -31,6 +33,7 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCodex, onOpenCampaign }:
   const [effectsSound, setEffectsSound] = useState(isEffectsSoundEnabled());
   const [bgVolume, setBgVolumeState] = useState(getBgVolume());
   const [effectsVolume, setEffectsVolumeState] = useState(getEffectsVolume());
+  const [haptics, setHaptics] = useState(isHapticsEnabled());
 
   const handleToggleBgSound = () => {
     const nextVal = !bgSound;
@@ -109,44 +112,45 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCodex, onOpenCampaign }:
             {/* Expanded Visual Guide Panel */}
             {showGuide && (
               <div className="bg-[#0b0b0e]/95 border border-white/5 rounded-2xl p-4 text-left space-y-3.5 animate-fade-in-up mt-3 font-sans shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
-                {/* 1. Navigate/Steer */}
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-xs">
-                    🌐
+                {[
+                  {
+                    title: 'Slide',
+                    body: 'Drag a tile. It slides across the sphere until it hits something or runs out of range. Heavier nuclei travel less far. Drag empty space to turn the star.',
+                  },
+                  useGameStore.getState().astrophysicistMode
+                    ? {
+                        title: 'Fuse',
+                        body: 'Slide a nucleus into a partner: H + H makes D, D + H makes He3, He3 + He3 makes He4, and He4 climbs the ladder toward nickel-56. Pentagons are ordinary faces here.',
+                      }
+                    : {
+                        title: 'Fuse',
+                        body: 'Slide a tile into a partner: H + H makes He, three He in a triangle make C, and each extra He climbs C → O → Ne → Mg → Si. Si + Si makes Fe. A lone H that stops on a pentagon becomes He.',
+                      },
+                  useGameStore.getState().currentLevelId !== null
+                    ? {
+                        title: 'Solve',
+                        body: 'Meet the objective within the move limit. Par is the fewest moves the puzzle can be solved in.',
+                      }
+                    : useGameStore.getState().astrophysicistMode
+                      ? {
+                          title: 'Keep room',
+                          body: 'Every move adds a new tile, and only fusion makes room. The run ends when the sphere is full. Unstable isotopes decay if you leave them.',
+                        }
+                      : {
+                          title: 'Live and die',
+                          body: 'Every move costs your star one move of life and rains new hydrogen. Forge iron before time runs out and the core collapses in a supernova.',
+                        },
+                ].map((step, i) => (
+                  <div key={step.title} className={`flex gap-3 ${i > 0 ? 'border-t border-white/5 pt-3.5' : ''}`}>
+                    <div className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-white/5 border border-white/10 text-[11px] font-mono text-cyan-300">
+                      {i + 1}
+                    </div>
+                    <div>
+                      <h4 className="text-[10px] font-bold tracking-wider text-cyan-400 font-mono uppercase">{step.title}</h4>
+                      <p className="text-[10px] text-white/55 leading-relaxed mt-0.5 font-light">{step.body}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-[10px] font-bold tracking-wider text-cyan-400 font-mono uppercase">1. NAVIGATE STAR</h4>
-                    <p className="text-[10px] text-white/50 leading-relaxed mt-0.5 font-light">
-                      Drag background to rotate, or press <span className="text-white font-mono bg-white/10 px-1 py-0.5 rounded font-bold">W A S D</span> / Arrow keys on desktop to steer with satisfying physics.
-                    </p>
-                  </div>
-                </div>
-
-                {/* 2. Fuse Tiles */}
-                <div className="flex gap-3 border-t border-white/5 pt-3.5">
-                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-xs">
-                    🔥
-                  </div>
-                  <div>
-                    <h4 className="text-[10px] font-bold tracking-wider text-cyan-400 font-mono uppercase">2. FUSE TILES</h4>
-                    <p className="text-[10px] text-white/50 leading-relaxed mt-0.5 font-light">
-                      Drag / Swipe matching tiles into neighboring positions to fuse them together into higher-tier configurations.
-                    </p>
-                  </div>
-                </div>
-
-                {/* 3. Ignite Star */}
-                <div className="flex gap-3 border-t border-white/5 pt-3.5">
-                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-xs">
-                    ⭐
-                  </div>
-                  <div>
-                    <h4 className="text-[10px] font-bold tracking-wider text-cyan-400 font-mono uppercase">3. STELLAR IGNITION</h4>
-                    <p className="text-[10px] text-white/50 leading-relaxed mt-0.5 font-light">
-                      Grow your star through successive fusion cycles to reach its final stage of growth and ignite the core collapse.
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
             )}
 
@@ -283,6 +287,26 @@ export function PauseMenu({ onResume, onMainMenu, onOpenCodex, onOpenCampaign }:
                       <span className="text-[9px] text-white/60 font-mono w-6 text-right">{effectsVolume}%</span>
                     </div>
                   )}
+                </div>
+
+                {/* Haptics Toggle */}
+                <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                  <div className="pr-4">
+                    <div className="text-xs font-semibold text-white/90">Haptics</div>
+                    <div className="text-[10px] text-white/40 mt-1 leading-normal">Heavier nuclei hit harder. Needs a device that supports vibration.</div>
+                  </div>
+                  <button
+                    onClick={() => { setHaptics(!haptics); setHapticsEnabled(!haptics); }}
+                    className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      haptics ? 'bg-cyan-500' : 'bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        haptics ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
             )}

@@ -1,39 +1,80 @@
 // src/game/state.ts
 import { create } from 'zustand';
-import type { GameState, EndState, Phase, ElementSymbol, Tile, ObstacleInstance, Level } from './types';
+import type { GameState, Phase, ElementSymbol, Tile, ObstacleInstance, Level, MoveSnapshot, StarClassId, BotId, AutoRunRecord } from './types';
 import { generateTruncatedIcosahedron } from '../geometry/truncatedIcosahedron';
 import { ELEMENTS } from './elements';
-import { currentPhaseRule, updatePhase } from './phases';
-import { spawnHydrogen } from './spawn';
-import { checkEndState } from './endgame';
-import { detectMerge, applyMerge, DECAY_POINTS } from './rules';
+import { countElements } from './rules';
+import { commitMove, cloneForMove } from './engine';
 import { executeSlide } from '../geometry/slide';
-import { playMerge, playBlocked, playHeliumLaugh, playSuccess, playSlide, playSpawnTick } from '../audio/synth';
+import { playMerge, playBlocked, playHeliumLaugh, playSuccess, playSlide, hapticFusion, hapticBlocked, hapticSlide } from '../audio/synth';
 import { LEVELS, findLevel } from './levels';
+import { getStarClass, recordEndingSeen, bestScoreKey, type StarClass } from './stars';
 
-function submitScoreToGameCenter(score: number, isAstro: boolean): void {
+// Leaderboards exist per star class (different lifetimes) plus one for Astrophysicist Mode.
+function leaderboardId(state: Pick<GameState, 'astrophysicistMode' | 'starClass'>): string | null {
+  if (state.astrophysicistMode) return 'stellar_fusion_astro_leaderboard';
+  if (state.starClass) return `stellar_fusion_${state.starClass}_leaderboard`;
+  return null;
+}
+
+function submitScoreToGameCenter(score: number, board: string): void {
   try {
     if (typeof window !== 'undefined' && (window as any).Capacitor) {
       const GameServices = (window as any).Capacitor.Plugins.GameServices;
       if (GameServices) {
-        const leaderboardId = isAstro ? 'stellar_fusion_astro_leaderboard' : 'stellar_fusion_standard_leaderboard';
-        GameServices.submitScore({ leaderboardId, score }).catch(() => {});
+        GameServices.submitScore({ leaderboardId: board, score }).catch(() => {});
       }
     }
   } catch (err) {}
 }
 
+// localStorage key for the personal best of the current open-ended run, if it keeps one.
+function bestKeyFor(state: Pick<GameState, 'astrophysicistMode' | 'starClass' | 'currentLevelId'>): string | null {
+  if (state.currentLevelId !== null) return null;
+  if (state.astrophysicistMode) return 'stellar_high_score_astro';
+  return state.starClass ? bestScoreKey(state.starClass) : null;
+}
+
+function readBest(key: string | null): number {
+  if (!key) return 0;
+  try {
+    return parseInt(localStorage.getItem(key) || '0', 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function snapshotOf(s: GameState): MoveSnapshot {
+  const tiles = new Map<number, Tile>();
+  for (const [id, t] of s.tiles) tiles.set(id, { ...t });
+  const obstacles = new Map<number, ObstacleInstance>();
+  for (const [id, o] of s.obstacles) obstacles.set(id, { ...o });
+  return {
+    tiles,
+    obstacles,
+    turn: s.turn,
+    phase: s.phase,
+    phaseTransitions: { ...s.phaseTransitions },
+    elementCounts: { ...s.elementCounts },
+    levelObjectiveMet: s.levelObjectiveMet,
+    levelFailed: s.levelFailed,
+    endState: s.endState,
+    endReason: s.endReason,
+    score: s.score,
+    hasPlayedHeliumLaugh: s.hasPlayedHeliumLaugh,
+    lastMoveFaceId: s.lastMoveFaceId,
+  };
+}
+
 interface GameActions {
-  newGame: (mass?: number, levelId?: number, isAstro?: boolean) => void;
+  newGame: (mass?: number, levelId?: number, isAstro?: boolean, starClass?: StarClassId) => void;
   startDrag: (faceId: number) => void;
   endDrag: (faceId: number, dragWorld: { x: number; y: number; z: number }) => void;
   setDragTargetId: (id: number | null) => void;
-  updatePhaseIfNeeded: () => void;
   reset: () => void;
   setPaused: (paused: boolean) => void;
   setShowRealtimeGraphics: (show: boolean) => void;
   dismissToast: () => void;
-  continueEndless: () => void;
   undo: () => void;
   dismissNucleationTutorial: () => void;
   resetNucleationTutorial: () => void;
@@ -43,6 +84,11 @@ interface GameActions {
   clearSavedGame: (isAstro: boolean) => void;
   setAutoPlay: (on: boolean) => void;
   setAutoPlaySpeed: (speed: number) => void;
+  setAutoPlayBot: (bot: BotId) => void;
+  setAutoPlayTurbo: (on: boolean) => void;
+  setAutoPlayLoop: (on: boolean) => void;
+  logAutoRun: (record: AutoRunRecord) => void;
+  clearAutoRunLog: () => void;
   setAutoRotateTarget: (faceId: number | null) => void;
   toggleZenMode: () => void;
   dismissSystemToast: () => void;
@@ -70,6 +116,10 @@ const initialElementCounts = (): Record<ElementSymbol, number> => ({
 // players carrying an older save, so the mode must be re-earned. High scores and
 // audio settings are intentionally preserved.
 const STORAGE_VERSION = '2';
+// Rules version 3 (v0.13): Stellar Life replaced the old endless sandbox, so its
+// saves can't be resumed; campaign pars were re-derived from the solver, so old
+// "perfect" marks no longer mean optimal. Campaign progress is kept.
+const RULES_VERSION = '3';
 (function migrateStorage() {
   try {
     if (localStorage.getItem('stellar_storage_version') !== STORAGE_VERSION) {
@@ -77,30 +127,66 @@ const STORAGE_VERSION = '2';
       localStorage.removeItem('stellar_unlocked_elements');
       localStorage.setItem('stellar_storage_version', STORAGE_VERSION);
     }
+    if (localStorage.getItem('stellar_rules_version') !== RULES_VERSION) {
+      localStorage.removeItem('stellar_save_standard');
+      // Astrophysicist rules changed too (Fe26 parity).
+      localStorage.removeItem('stellar_save_astro');
+      localStorage.removeItem('stellar_perfect_levels');
+      localStorage.setItem('stellar_rules_version', RULES_VERSION);
+    }
   } catch {
     // localStorage unavailable (e.g. private mode); nothing to migrate
   }
 })();
 
-// --- Open-ended game persistence (Endless/standard + Astrophysicist) ---
+// --- Open-ended game persistence (Stellar Life + Astrophysicist) ---
 // Campaign levels are NOT persisted. Geometry is deterministic, so a save only
 // needs tiles + scalar state; faces are regenerated on load.
 interface SavedGame {
   starMass: number;
+  starClass: StarClassId | null;
+  lifetime: number | null;
   tiles: [number, Tile][];
   turn: number;
   phase: Phase;
   elementCounts: Record<ElementSymbol, number>;
   score: number;
   phaseTransitions: GameState['phaseTransitions'];
-  endlessMode: boolean;
   astrophysicistMode: boolean;
   hasPlayedHeliumLaugh: boolean;
   hasSeenFe56Splash: boolean;
   wasAutoPlayedThisRun?: boolean;
 }
 
-const saveKey = (isAstro: boolean) => (isAstro ? 'stellar_save_astro' : 'stellar_save_standard');
+// Auto-player preferences survive reloads (debug builds only ever read them).
+function readDebugPref(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function writeDebugPref(key: string, value: string): void {
+  try { localStorage.setItem(key, value); } catch { /* storage unavailable */ }
+}
+const BOT_IDS: BotId[] = ['greedy', 'planner', 'patient', 'random', 'solver'];
+const savedBot = readDebugPref('stellar_debug_bot') as BotId | null;
+
+// Turbo moves skip the slide animation, so their fusion sounds are thinned out
+// to one every so often instead of a machine-gun rattle.
+let lastTurboSoundAt = 0;
+
+const saveKey = (isAstro: boolean) => (isAstro ? 'stellar_save_astro' : 'stellar_save_life');
+
+// The saved Stellar Life run, if any — the star picker offers to resume it.
+export function peekSavedLife(): { starClass: StarClass; movesLeft: number } | null {
+  try {
+    const raw = localStorage.getItem(saveKey(false));
+    if (!raw) return null;
+    const data = JSON.parse(raw) as SavedGame;
+    const star = getStarClass(data.starClass);
+    if (!star || data.lifetime === null || !Array.isArray(data.tiles) || data.tiles.length === 0) return null;
+    return { starClass: star, movesLeft: Math.max(0, data.lifetime - data.turn) };
+  } catch {
+    return null;
+  }
+}
 
 export const useGameStore = create<GameStore>((set, get) => ({
   // Initial empty state — populated by newGame()
@@ -152,11 +238,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   })(),
 
+  starClass: null,
+  lifetime: null,
+  unlockedStarThisRun: null,
+
   selectedFaceId: null,
   dragTargetId: null,
   isAnimating: false,
   endState: null,
-  endlessMode: false,
+  endReason: null,
+  supernovaBonus: 0,
   astrophysicistMode: false,
   isPaused: false,
   showRealtimeGraphics: true,
@@ -181,6 +272,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   showFe56Splash: false,
   autoPlay: false,
   autoPlaySpeed: 1,
+  autoPlayBot: savedBot && BOT_IDS.includes(savedBot) ? savedBot : 'greedy',
+  autoPlayTurbo: readDebugPref('stellar_debug_turbo') === 'true',
+  autoPlayLoop: readDebugPref('stellar_debug_loop') === 'true',
+  autoPlayNote: null,
+  autoRunLog: [],
   autoRotateTargetFaceId: null,
   wasAutoPlayedThisRun: false,
   systemToast: null,
@@ -195,13 +291,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ systemToast: null });
   },
 
-  newGame: (mass, levelId, isAstro) => {
+  newGame: (mass, levelId, isAstro, starClassId) => {
     const faces = generateTruncatedIcosahedron();
-    let starMass = mass ?? (1 + Math.random() * 29); // 1–30 M☉
     const initialTiles = new Map<number, Tile>();
     const initialObstacles = new Map<number, ObstacleInstance>();
     let currentLevelId: number | null = null;
     const isAstroMode = isAstro ?? false;
+
+    // Stellar Life is the default open-ended run: a chosen star with a lifetime.
+    const star = !isAstroMode && levelId === undefined ? (getStarClass(starClassId) ?? getStarClass('sunlike')!) : null;
+    let starMass = mass ?? star?.mass ?? 1;
 
     if (isAstroMode) {
       // Astrophysicist mode: always start with 5 hydrogens on hexagons
@@ -268,26 +367,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    // Dynamic initial element counting to support standard elements + custom isotopes
-    const initialCounts = {} as Record<ElementSymbol, number>;
-    for (const t of initialTiles.values()) {
-      if (!initialCounts[t.element]) {
-        initialCounts[t.element] = 0;
-      }
-      initialCounts[t.element]++;
-    }
-
-    const lsKey = isAstroMode ? 'stellar_high_score_astro' : 'stellar_high_score';
-    const highScore = parseInt(localStorage.getItem(lsKey) || '0', 10);
+    const highScore = readBest(bestKeyFor({ astrophysicistMode: isAstroMode, starClass: star?.id ?? null, currentLevelId }));
 
     set({
       starMass,
+      starClass: star?.id ?? null,
+      lifetime: star?.lifetime ?? null,
+      unlockedStarThisRun: null,
       faces,
       tiles: initialTiles,
       obstacles: initialObstacles,
       turn: 0,
       phase: 'main_sequence',
-      elementCounts: initialCounts,
+      elementCounts: countElements(initialTiles),
       score: 0,
       highScore,
       phaseTransitions: {
@@ -303,7 +395,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       dragTargetId: null,
       isAnimating: false,
       endState: null,
-      endlessMode: false,
+      endReason: null,
+      supernovaBonus: 0,
       astrophysicistMode: isAstroMode,
       activeSlide: undefined,
       lastMerge: undefined,
@@ -343,453 +436,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     // Capture the run this move belongs to. If newGame/loadSavedGame replaces
-    // the run while we're awaiting an animation below, the mutated `state`
-    // snapshot would clobber the fresh game — so re-check after every await.
+    // the run while we're awaiting the slide animation, abort instead of
+    // committing stale state over the fresh game.
     const runGen = state.runGeneration;
 
     set({ isAnimating: true, selectedFaceId: null, dragTargetId: null });
 
     try {
-      let levelObjectiveMet = false;
-      let levelFailed = false;
-      let activeToastElement: ElementSymbol | null = null;
-      // Execute slide
-      const slideResult = executeSlide(fromFaceId, dragWorld as any, state);
-      
-      let moved = slideResult.path.length > 1;
-      if (slideResult.stoppedReason === 'merge') {
-        if (slideResult.path.length === 1) {
-          // If we didn't slide through any empty spaces, we only count as moved if a merge is actually valid
-          const tempMergeRule = detectMerge(fromFaceId, state);
-          if (tempMergeRule) {
-            moved = true;
-          }
-        } else {
-          moved = true;
-        }
-      }
-      console.log('Slide result:', slideResult, 'moved:', moved);
+      const slide = executeSlide(fromFaceId, dragWorld as any, state);
 
-      if (moved) {
-        const tile = state.tiles.get(fromFaceId)!;
-        const duration = (slideResult.path.length - 1) * 180;
-        
-        // Play slide sound (synesthetic pitch mapped)
-        playSlide(tile.element, slideResult.path.length - 1);
-        
-        // Save pre-move snapshot to history stack
-        const snapshot = {
-          tiles: new Map(state.tiles),
-          turn: state.turn,
-          phase: state.phase,
-          elementCounts: { ...state.elementCounts },
-          levelObjectiveMet: state.levelObjectiveMet,
-          levelFailed: state.levelFailed,
-          endState: state.endState,
-          hasPlayedHeliumLaugh: state.hasPlayedHeliumLaugh,
-          endlessMode: state.endlessMode,
-          score: state.score,
-        };
-        const nextHistory = [...state.history, snapshot];
-        
-        // Remove tile from original position for animation
-        state.tiles.delete(fromFaceId);
-        
-        const landedId = slideResult.path[slideResult.path.length - 1];
-        const isPentagon = state.faces[landedId]?.shape === 'pentagon';
-        const willSelfFuse = tile.element === 'H' && isPentagon;
-        const willMerge = slideResult.stoppedReason === 'merge' || willSelfFuse;
-
-        set({
-          isAnimating: true,
-          selectedFaceId: null,
-          dragTargetId: null,
-          dragOffset3D: null,
-          tiles: new Map(state.tiles),
-          history: nextHistory,
-          activeSlide: {
-            element: tile.element,
-            path: slideResult.path,
-            startTime: performance.now(),
-            duration,
-            isMerge: willMerge
-          }
-        });
-
-        // Wait for slide animation
-        await new Promise(r => setTimeout(r, duration));
-
-        // Run was replaced mid-animation (reset, retry, mode switch) — abort
-        // before committing anything from the dead run.
-        if (get().runGeneration !== runGen) return;
-
-        // Place tile at destination and handle merge detection
-        let mergeRule = null;
-        let mergeLandedId = landedId;
-        const isMerge = slideResult.stoppedReason === 'merge';
-
-        if (isMerge) {
-          // If stopped due to a merge, the swiped tile travels into the target face.
-          // To detect the merge correctly without overwriting the target tile,
-          // we temporarily place the swiped tile at the preceding face.
-          const beforeFaceId = slideResult.path[slideResult.path.length - 2];
-          state.tiles.set(beforeFaceId, { ...tile, faceId: beforeFaceId });
-          
-          mergeRule = detectMerge(beforeFaceId, state, landedId);
-          mergeLandedId = beforeFaceId;
-          
-          if (!mergeRule) {
-            // Safety fallback: if no merge rule was actually detected, leave the tile at beforeFaceId
-            console.warn('Merge reason stopped, but no merge rule was detected.');
-          }
-        } else {
-          // Normal landing
-          state.tiles.set(landedId, { ...tile, faceId: landedId, spawnReason: 'slide' });
-          const isPentagon = state.faces[landedId]?.shape === 'pentagon';
-          if (tile.element === 'H' && isPentagon) {
-            mergeRule = detectMerge(landedId, state);
-          } else {
-            mergeRule = null;
-          }
-          mergeLandedId = landedId;
-        }
-
-        console.log('Merge rule detected:', mergeRule);
-        const isNucleation = mergeRule !== null && mergeRule.requiresPentagon === true;
-
-        if (mergeRule) {
-          const parentElement = tile.element;
-          applyMerge(mergeRule, mergeLandedId, state, isMerge ? landedId : undefined);
-          playMerge(parentElement, mergeRule.output);
-          // Eslint-clean, snappy instant merges just like 2048: no artificial lag or delays!
-
-          // Trigger Astrophysicist Mode Iron-56 Synthesis Congratulations Overlay
-          if (state.astrophysicistMode && mergeRule.output === 'Fe56' && !state.hasSeenFe56Splash) {
-            state.levelObjectiveMet = true;
-            state.showFe56Splash = true;
-            state.hasSeenFe56Splash = true;
-            playSuccess();
-          }
-        }
-
-        // Vaporize tiles sitting on active CMEs (pre-turn check)
-        if (state.obstacles) {
-          for (const [faceId, obs] of state.obstacles.entries()) {
-            if (obs.type === 'cme' && obs.state === 'active') {
-              state.tiles.delete(faceId);
-            }
-          }
-        }
-
-        // Increment turn
-        state.turn += 1;
-
-        // Gravitational Anomaly Repulsion: Push adjacent tiles 1 step away into empty neighbors
-        if (state.obstacles) {
-          const pushedTiles = new Map<number, number>();
-          for (const [faceId, obs] of state.obstacles.entries()) {
-            if (obs.type !== 'gravity') continue;
-            const A = state.faces[faceId];
-            if (!A) continue;
-            for (const B_id of A.neighbors) {
-              if (state.tiles.has(B_id)) {
-                const B = state.faces[B_id];
-                let bestC_id = -1;
-                let minDot = Infinity;
-                for (const C_id of B.neighbors) {
-                  if (C_id === faceId) continue;
-                  const C = state.faces[C_id];
-                  const dotVal = A.center.x * C.center.x + A.center.y * C.center.y + A.center.z * C.center.z;
-                  if (dotVal < minDot) {
-                    minDot = dotVal;
-                    bestC_id = C_id;
-                  }
-                }
-                if (bestC_id !== -1) {
-                  const hasTile = state.tiles.has(bestC_id);
-                  const hasGravity = state.obstacles.get(bestC_id)?.type === 'gravity';
-                  if (!hasTile && !hasGravity) {
-                    pushedTiles.set(B_id, bestC_id);
-                  }
-                }
-              }
-            }
-          }
-          if (pushedTiles.size > 0) {
-            const nextTiles = new Map(state.tiles);
-            for (const [fromId, toId] of pushedTiles.entries()) {
-              const tileVal = nextTiles.get(fromId);
-              if (tileVal) {
-                nextTiles.delete(fromId);
-                nextTiles.set(toId, { ...tileVal, faceId: toId, spawnReason: 'slide' });
-              }
-            }
-            state.tiles = nextTiles;
-          }
-        }
-
-        // Cycle CME phases: inactive -> warning -> active -> inactive
-        if (state.obstacles) {
-          const nextObstacles = new Map(state.obstacles);
-          for (const [faceId, obs] of nextObstacles.entries()) {
-            if (obs.type === 'cme') {
-              let nextState: 'inactive' | 'warning' | 'active' = 'inactive';
-              if (obs.state === 'inactive') nextState = 'warning';
-              else if (obs.state === 'warning') nextState = 'active';
-              else nextState = 'inactive';
-              nextObstacles.set(faceId, { ...obs, state: nextState });
-            }
-          }
-          state.obstacles = nextObstacles;
-
-          // Vaporize tiles sitting on newly active CMEs (post-turn check)
-          for (const [faceId, obs] of state.obstacles.entries()) {
-            if (obs.type === 'cme' && obs.state === 'active') {
-              state.tiles.delete(faceId);
-            }
-          }
-        }
-
-        // Astrophysicist Mode: Decay Stage
-        if (state.astrophysicistMode) {
-          for (const tile of state.tiles.values()) {
-            if (tile.decayTurns !== undefined) {
-              // Confinement Shield: Freeze decay countdown if tile sits on a pentagon nucleation site!
-              const face = state.faces[tile.faceId];
-              if (face && face.shape === 'pentagon') {
-                continue; // Skip decrementing, decay timer is shielded/frozen!
-              }
-
-              tile.decayTurns -= 1;
-              if (tile.decayTurns <= 0) {
-                let decayed = false;
-                let nextElement: ElementSymbol = tile.element;
-                if (tile.element === 'Be7') {
-                  nextElement = 'He4';
-                  decayed = true;
-                } else if (tile.element === 'Be8') {
-                  nextElement = 'He4';
-                  decayed = true;
-                } else if (tile.element === 'Ne20') {
-                  nextElement = 'O16';
-                  decayed = true;
-                } else if (tile.element === 'Fe52') {
-                  nextElement = 'Cr48';
-                  decayed = true;
-                } else if (tile.element === 'Ni56') {
-                  nextElement = 'Fe56';
-                  decayed = true;
-                }
-
-                if (decayed) {
-                  state.score = (state.score || 0) + (DECAY_POINTS[tile.element] ?? 0);
-                  tile.element = nextElement;
-                  tile.spawnedAtTurn = state.turn; // mark as transformed on this turn
-                  tile.spawnReason = 'slide';      // trigger animation
-                  tile.decayTurns = undefined;     // stable output
-
-                  // Fe56 only ever arises from Ni56 decay (the alpha ladder
-                  // tops out at Ni56), so the synthesis congratulations must
-                  // fire HERE — the merge-output check can never reach it.
-                  if (nextElement === 'Fe56' && !state.hasSeenFe56Splash) {
-                    state.showFe56Splash = true;
-                    state.hasSeenFe56Splash = true;
-                    playSuccess();
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // Record last move face ID and spawn hydrogen(s)
-        state.lastMoveFaceId = landedId;
-        spawnHydrogen(state);
-
-        // Recount elementCounts dynamically to support standard mode + astrophysicist mode custom isotopes
-        const newCounts = {} as Record<ElementSymbol, number>;
-        for (const t of state.tiles.values()) {
-          if (!newCounts[t.element]) {
-            newCounts[t.element] = 0;
-          }
-          newCounts[t.element]++;
-        }
-        state.elementCounts = newCounts;
-
-        // Check high score
-        if (!state.wasAutoPlayedThisRun && state.score > state.highScore) {
-          state.highScore = state.score;
-          const lsKey = state.astrophysicistMode ? 'stellar_high_score_astro' : 'stellar_high_score';
-          localStorage.setItem(lsKey, state.highScore.toString());
-          submitScoreToGameCenter(state.score, state.astrophysicistMode);
-        }
-
-        // Update phase
-        updatePhase(state);
-
-        // Helium "HeHeHe" Easter Egg trigger: requires >= 26 Helium (80% of 32 faces),
-        // plays only once per game, has a 60% chance to trigger each turn,
-        // and plays with a 1-second delay for suspense!
-        if (newCounts.He >= 26 && !state.hasPlayedHeliumLaugh) {
-          if (Math.random() < 0.60) {
-            state.hasPlayedHeliumLaugh = true;
-            set({ hasPlayedHeliumLaugh: true });
-            setTimeout(() => {
-              playHeliumLaugh();
-            }, 1000);
-          }
-        }
-
-        // Check and unlock new elements in Codex
-        const currentUnlocked = get().unlockedElements;
-        const nextUnlocked = [...currentUnlocked];
-        activeToastElement = null;
-        let changedUnlocked = false;
-
-        for (const sym of Object.keys(newCounts) as ElementSymbol[]) {
-          if (newCounts[sym] > 0 && !nextUnlocked.includes(sym)) {
-            nextUnlocked.push(sym);
-            activeToastElement = sym; // trigger toast notification
-            changedUnlocked = true;
-          }
-        }
-
-        if (changedUnlocked) {
-          localStorage.setItem('stellar_unlocked_elements', JSON.stringify(nextUnlocked));
-          set({ unlockedElements: nextUnlocked });
-        }
-
-        // Check Campaign Scenario Objectives
-        levelObjectiveMet = false;
-        levelFailed = false;
-
-        if (state.currentLevelId !== null) {
-          const level = findLevel(state.currentLevelId, get().customScenarios, get().editorLevelMetadata);
-          if (level) {
-            let allObjectivesMet = true;
-            for (const obj of level.objectives) {
-              if (obj.type === 'has_element') {
-                if ((state.elementCounts[obj.element!] || 0) < (obj.count || 1)) {
-                  allObjectivesMet = false;
-                }
-              } else if (obj.type === 'has_element_on_pentagon') {
-                const met = Array.from(state.tiles.values()).some(t => {
-                  const face = state.faces[t.faceId];
-                  return t.element === obj.element && face && face.shape === 'pentagon';
-                });
-                if (!met) allObjectivesMet = false;
-              } else if (obj.type === 'has_element_count') {
-                if ((state.elementCounts[obj.element!] || 0) < (obj.count || 1)) {
-                  allObjectivesMet = false;
-                }
-              } else if (obj.type === 'has_all_elements') {
-                const required: ElementSymbol[] = ['H', 'He', 'C', 'O', 'Ne', 'Mg', 'Si', 'Fe'];
-                const allPresent = required.every(el => (state.elementCounts[el] || 0) > 0);
-                if (!allPresent) allObjectivesMet = false;
-              }
-            }
-
-            if (allObjectivesMet) {
-              levelObjectiveMet = true;
-
-              // Only built-in campaign levels count toward progression —
-              // custom scenarios and editor playtests must not inflate the
-              // completion count that gates Astrophysicist Mode.
-              const isCampaignLevel = LEVELS.some(l => l.id === level.id);
-
-              const currentCompleted = get().completedLevels;
-              let nextCompleted = currentCompleted;
-              if (isCampaignLevel && !currentCompleted.includes(level.id)) {
-                nextCompleted = [...currentCompleted, level.id];
-                localStorage.setItem('stellar_completed_levels', JSON.stringify(nextCompleted));
-              }
-
-              const currentPerfect = get().perfectLevels || [];
-              let nextPerfect = currentPerfect;
-              if (isCampaignLevel && state.turn <= (level as any).parMoves && !currentPerfect.includes(level.id)) {
-                nextPerfect = [...currentPerfect, level.id];
-                localStorage.setItem('stellar_perfect_levels', JSON.stringify(nextPerfect));
-              }
-
-              set({ completedLevels: nextCompleted, perfectLevels: nextPerfect });
-
-              if (!state.levelObjectiveMet) {
-                playSuccess();
-              }
-            } else if (state.turn >= level.maxTurns) {
-              levelFailed = true;
-            }
-          }
-        }
-
-        // Check end state (standard jammed or collapse)
-        const end = checkEndState(state);
-        if (end) {
-          // If in campaign mode and objectives aren't met, a jammed board means failure
-          if (state.currentLevelId !== null && !levelObjectiveMet) {
-            levelFailed = true;
-          }
-          const triggerTutorial = isNucleation && !state.hasSeenNucleationTutorial;
-          if (triggerTutorial) {
-            localStorage.setItem('stellar_seen_nucleation', 'true');
-          }
-          set({ 
-            endState: end, 
-            levelObjectiveMet,
-            levelFailed,
-            isAnimating: false, 
-            activeSlide: undefined, 
-            tiles: new Map(state.tiles),
-            showNucleationTutorial: triggerTutorial,
-            hasSeenNucleationTutorial: triggerTutorial ? true : state.hasSeenNucleationTutorial,
-            score: state.score,
-            highScore: state.highScore,
-            phase: state.phase,
-            turn: state.turn,
-            elementCounts: { ...state.elementCounts },
-          });
-          // True end-of-run: clear the saved game so re-entering starts fresh.
-          // Standard collapses/jams here; Astrophysicist only reaches an end via
-          // 'jammed' (no legal moves), which is its intended full-stop reset point.
-          get().clearSavedGame(state.astrophysicistMode);
-          return;
-        }
-
-        // Snappy, lag-free settle delay: exactly 40ms to clear mobile pointer events while maintaining instant response
-        const settleDelay = 40;
-        await new Promise(r => setTimeout(r, settleDelay));
-
-        if (get().runGeneration !== runGen) return;
-
-        const triggerTutorial = isNucleation && !state.hasSeenNucleationTutorial;
-        if (triggerTutorial) {
-          localStorage.setItem('stellar_seen_nucleation', 'true');
-        }
-
-        set({
-          tiles: new Map(state.tiles), // trigger reactivity
-          turn: state.turn,
-          phase: state.phase,
-          elementCounts: { ...state.elementCounts },
-          levelObjectiveMet,
-          levelFailed,
-          activeToastElement,
-          isAnimating: false,
-          activeSlide: undefined,
-          lastMerge: state.lastMerge,
-          showNucleationTutorial: triggerTutorial,
-          hasSeenNucleationTutorial: triggerTutorial ? true : state.hasSeenNucleationTutorial,
-          score: state.score,
-          highScore: state.highScore,
-          lastActionWasUndo: false,
-        });
-        // Persist the in-progress open-ended game after each committed move.
-        get().saveCurrentGame();
-      } else {
-        // Play blocked audio cue
+      if (slide.path.length <= 1) {
+        // Nowhere to go: blocked cue and a short shake.
         playBlocked();
-
-        // Trigger blocked visual shake
+        hapticBlocked();
         set({
           blockedFaceId: fromFaceId,
           blockedTime: performance.now(),
@@ -798,16 +457,199 @@ export const useGameStore = create<GameStore>((set, get) => ({
           dragOffset3D: null,
           isAnimating: false,
         });
-
-        // Reset after 350ms so shake terminates cleanly
-        setTimeout(() => {
-          set({ blockedFaceId: null });
-        }, 350);
+        setTimeout(() => set({ blockedFaceId: null }), 350);
         return;
       }
+
+      const tile = state.tiles.get(fromFaceId)!;
+      // Turbo (auto-player only): the move lands instantly, without its slide.
+      const turbo = state.autoPlay && state.autoPlayTurbo;
+      const duration = turbo ? 0 : (slide.path.length - 1) * 180;
+      if (!turbo) {
+        playSlide(tile.element, slide.path.length - 1);
+        hapticSlide(tile.element);
+      }
+
+      // Single-step undo keeps just the position before this move.
+      const history = [snapshotOf(state)];
+
+      // Lift the tile off the board while the slide animates.
+      const lifted = new Map(state.tiles);
+      lifted.delete(fromFaceId);
+      const landedId = slide.path[slide.path.length - 1];
+      const willSelfFuse = tile.element === 'H' && !state.astrophysicistMode && state.faces[landedId]?.shape === 'pentagon';
+      if (turbo) {
+        set({ history, dragOffset3D: null });
+      } else {
+        set({
+          tiles: lifted,
+          history,
+          dragOffset3D: null,
+          activeSlide: {
+            element: tile.element,
+            path: slide.path,
+            startTime: performance.now(),
+            duration,
+            isMerge: slide.stoppedReason === 'merge' || willSelfFuse,
+          },
+        });
+
+        await new Promise(r => setTimeout(r, duration));
+        if (get().runGeneration !== runGen) return;
+      }
+
+      // Resolve the move on a copy of the pre-move state, then publish it.
+      const level = state.currentLevelId !== null
+        ? findLevel(state.currentLevelId, state.customScenarios, state.editorLevelMetadata) ?? null
+        : null;
+      const work = cloneForMove(state);
+      const outcome = commitMove(work, fromFaceId, slide, { level });
+
+      if (outcome.mergeRule) {
+        const now = performance.now();
+        if (!turbo) {
+          playMerge(outcome.mover, outcome.mergeRule.output);
+          hapticFusion(outcome.mergeRule.output);
+        } else if (now - lastTurboSoundAt > 140) {
+          lastTurboSoundAt = now;
+          playMerge(outcome.mover, outcome.mergeRule.output);
+        }
+      }
+
+      // Fe56 only ever arises from Ni56 decay (Fe26's rule), so the synthesis
+      // celebration keys off decays.
+      let showFe56Splash = false;
+      let hasSeenFe56Splash = state.hasSeenFe56Splash;
+      if (work.astrophysicistMode && !hasSeenFe56Splash && outcome.decays.some(d => d.to === 'Fe56')) {
+        showFe56Splash = true;
+        hasSeenFe56Splash = true;
+        playSuccess();
+      }
+
+      // Personal best for runs that keep one.
+      let highScore = state.highScore;
+      const bestKey = bestKeyFor(work);
+      if (bestKey && !state.wasAutoPlayedThisRun && work.score > highScore) {
+        highScore = work.score;
+        try {
+          localStorage.setItem(bestKey, String(highScore));
+        } catch {
+          // storage unavailable
+        }
+        const board = leaderboardId(work);
+        if (board) submitScoreToGameCenter(highScore, board);
+      }
+
+      // Helium "HeHeHe" Easter Egg trigger: requires >= 26 Helium (80% of 32 faces),
+      // plays only once per game, has a 60% chance to trigger each turn,
+      // and plays with a 1-second delay for suspense!
+      let hasPlayedHeliumLaugh = state.hasPlayedHeliumLaugh;
+      if ((work.elementCounts.He || 0) >= 26 && !hasPlayedHeliumLaugh && Math.random() < 0.60) {
+        hasPlayedHeliumLaugh = true;
+        setTimeout(() => playHeliumLaugh(), 1000);
+      }
+
+      // Codex discoveries
+      let activeToastElement: ElementSymbol | null = null;
+      const unlocked = get().unlockedElements;
+      const newlyFound = (Object.keys(work.elementCounts) as ElementSymbol[])
+        .filter(sym => work.elementCounts[sym] > 0 && !unlocked.includes(sym));
+      if (newlyFound.length > 0) {
+        const nextUnlocked = [...unlocked, ...newlyFound];
+        activeToastElement = newlyFound[newlyFound.length - 1];
+        try {
+          localStorage.setItem('stellar_unlocked_elements', JSON.stringify(nextUnlocked));
+        } catch {
+          // storage unavailable
+        }
+        set({ unlockedElements: nextUnlocked });
+      }
+
+      // Campaign bookkeeping. Only built-in levels count toward progression —
+      // custom scenarios, editor playtests and auto-played solves must not
+      // inflate the completion count that gates Astrophysicist Mode.
+      if (level && outcome.objectiveMet) {
+        const isCampaignLevel = LEVELS.some(l => l.id === level.id) && !state.wasAutoPlayedThisRun;
+        const completed = get().completedLevels;
+        const perfect = get().perfectLevels || [];
+        let nextCompleted = completed;
+        let nextPerfect = perfect;
+        if (isCampaignLevel && !completed.includes(level.id)) {
+          nextCompleted = [...completed, level.id];
+          localStorage.setItem('stellar_completed_levels', JSON.stringify(nextCompleted));
+        }
+        if (isCampaignLevel && work.turn <= level.parMoves && !perfect.includes(level.id)) {
+          nextPerfect = [...perfect, level.id];
+          localStorage.setItem('stellar_perfect_levels', JSON.stringify(nextPerfect));
+        }
+        set({ completedLevels: nextCompleted, perfectLevels: nextPerfect });
+        if (!state.levelObjectiveMet) playSuccess();
+      }
+
+      // The pentagon tutorial waits for a calm moment: never on top of a level
+      // result or the end of the run (it shows at the next self-fusion instead).
+      const triggerTutorial = outcome.isNucleation
+        && !state.hasSeenNucleationTutorial
+        && !outcome.objectiveMet
+        && !outcome.levelFailed
+        && !outcome.end;
+      if (triggerTutorial) {
+        localStorage.setItem('stellar_seen_nucleation', 'true');
+      }
+
+      const published = {
+        tiles: work.tiles,
+        obstacles: work.obstacles,
+        turn: work.turn,
+        phase: work.phase,
+        phaseTransitions: work.phaseTransitions,
+        elementCounts: work.elementCounts,
+        score: work.score,
+        highScore,
+        lastMerge: work.lastMerge,
+        lastMoveFaceId: work.lastMoveFaceId,
+        levelObjectiveMet: outcome.objectiveMet,
+        levelFailed: outcome.levelFailed,
+        activeToastElement,
+        showNucleationTutorial: triggerTutorial,
+        hasSeenNucleationTutorial: triggerTutorial ? true : state.hasSeenNucleationTutorial,
+        showFe56Splash,
+        hasSeenFe56Splash,
+        hasPlayedHeliumLaugh,
+        lastActionWasUndo: false,
+      };
+
+      if (outcome.end) {
+        set({
+          ...published,
+          endState: outcome.end,
+          endReason: outcome.endReason,
+          supernovaBonus: outcome.supernovaBonus,
+          isAnimating: false,
+          activeSlide: undefined,
+        });
+        // A finished Stellar Life run records the ending, which may unlock a heavier star.
+        if (work.starClass && outcome.end !== 'jammed' && !state.wasAutoPlayedThisRun) {
+          const unlockedStar = recordEndingSeen(outcome.end);
+          if (unlockedStar) set({ unlockedStarThisRun: unlockedStar.id });
+        }
+        // True end-of-run: clear the saved game so re-entering starts fresh.
+        get().clearSavedGame(work.astrophysicistMode);
+        return;
+      }
+
+      // Snappy settle delay: 40ms clears mobile pointer events without feeling laggy.
+      if (!turbo) {
+        await new Promise(r => setTimeout(r, 40));
+        if (get().runGeneration !== runGen) return;
+      }
+
+      set({ ...published, isAnimating: false, activeSlide: undefined });
+      // Persist the in-progress open-ended game after each committed move.
+      get().saveCurrentGame();
     } catch (e) {
       console.error('Error in endDrag:', e);
-      set({ isAnimating: false, selectedFaceId: null, dragTargetId: null, dragOffset3D: null });
+      set({ isAnimating: false, selectedFaceId: null, dragTargetId: null, dragOffset3D: null, activeSlide: undefined });
     }
   },
 
@@ -815,45 +657,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ dragTargetId: id });
   },
 
-  updatePhaseIfNeeded: () => {
-    const state = get();
-    const changed = updatePhase(state);
-    if (changed) {
-      set({ phase: state.phase });
-    }
-  },
-
   reset: () => {
-    const { astrophysicistMode, currentLevelId } = get();
+    const { astrophysicistMode, currentLevelId, starClass } = get();
     if (currentLevelId !== null) {
-      // Campaign reset behavior unchanged.
-      get().newGame();
+      get().newGame(undefined, currentLevelId);
       return;
     }
-    // Open-ended modes: wipe the saved game and start fresh in the SAME mode.
+    // Open-ended modes: wipe the saved game and start fresh with the same star / mode.
     get().clearSavedGame(astrophysicistMode);
-    get().newGame(undefined, undefined, astrophysicistMode);
+    get().newGame(undefined, undefined, astrophysicistMode, starClass ?? undefined);
   },
 
   saveCurrentGame: () => {
     const s = get();
-    // Only persist live, open-ended runs. Skip:
-    //  - campaign levels (not persisted)
-    //  - an empty board
-    //  - a finished run (endState set) — cleared at end-of-run, must stay cleared
-    //  - the post-collapse degeneracy phase (endlessMode): the star has already
-    //    collapsed and no hydrogen spawns, so anything past that is moot. High score
-    //    still tracks, but leaving and returning gives a fresh Endless sandbox.
-    if (s.currentLevelId !== null || s.tiles.size === 0 || s.endState !== null || s.endlessMode) return;
+    // Only persist live, open-ended runs. Skip campaign levels, an empty board,
+    // and a finished run (cleared at end-of-run, must stay cleared).
+    if (s.currentLevelId !== null || s.tiles.size === 0 || s.endState !== null) return;
+    if (!s.astrophysicistMode && !s.starClass) return;
     const data: SavedGame = {
       starMass: s.starMass,
+      starClass: s.starClass,
+      lifetime: s.lifetime,
       tiles: Array.from(s.tiles.entries()),
       turn: s.turn,
       phase: s.phase,
       elementCounts: s.elementCounts,
       score: s.score,
       phaseTransitions: s.phaseTransitions,
-      endlessMode: s.endlessMode,
       astrophysicistMode: s.astrophysicistMode,
       hasPlayedHeliumLaugh: s.hasPlayedHeliumLaugh,
       hasSeenFe56Splash: s.hasSeenFe56Splash,
@@ -890,16 +720,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return false;
     }
     if (!data || !Array.isArray(data.tiles) || data.tiles.length === 0) return false;
+    if (!isAstro && (!getStarClass(data.starClass) || data.lifetime == null)) return false;
 
     const faces = generateTruncatedIcosahedron();
     const tiles = new Map<number, Tile>(data.tiles);
-    const lsKey = isAstro ? 'stellar_high_score_astro' : 'stellar_high_score';
-    const highScore = parseInt(localStorage.getItem(lsKey) || '0', 10);
+    const highScore = readBest(bestKeyFor({ astrophysicistMode: isAstro, starClass: data.starClass, currentLevelId: null }));
 
     set({
       starMass: data.starMass,
+      starClass: isAstro ? null : data.starClass,
+      lifetime: isAstro ? null : (data.lifetime ?? null),
+      unlockedStarThisRun: null,
       faces,
       tiles,
+      obstacles: new Map(),
       turn: data.turn,
       phase: data.phase,
       elementCounts: data.elementCounts,
@@ -913,7 +747,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       dragTargetId: null,
       isAnimating: false,
       endState: null,
-      endlessMode: data.endlessMode,
+      endReason: null,
+      supernovaBonus: 0,
       astrophysicistMode: data.astrophysicistMode,
       activeSlide: undefined,
       lastMerge: undefined,
@@ -940,55 +775,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setShowRealtimeGraphics: (show) => {
     set({ showRealtimeGraphics: show });
   },
-  continueEndless: () => {
-    const state = get();
-    if (!state.endState) return;
-
-    let nextTiles = new Map(state.tiles);
-
-    if (state.endState) {
-      const faceIds = Array.from(nextTiles.keys());
-      faceIds.sort((a, b) => {
-        const tA = nextTiles.get(a);
-        const tB = nextTiles.get(b);
-        const elA = tA ? ELEMENTS[tA.element].atomicNumber : 99;
-        const elB = tB ? ELEMENTS[tB.element].atomicNumber : 99;
-        return elA - elB;
-      });
-
-      // Shed 4 lightest tiles to free up board space
-      const toRemove = faceIds.slice(0, 4);
-      for (const id of toRemove) {
-        nextTiles.delete(id);
-      }
-    }
-
-    // Recount elementCounts to keep HUD and phase in sync immediately!
-    const newCounts: Record<ElementSymbol, number> = {
-      H: 0, He: 0, C: 0, O: 0, Ne: 0, Mg: 0, Si: 0, Fe: 0,
-      D: 0, He3: 0, He4: 0, Be7: 0, Be8: 0, C12: 0, O16: 0, Ne20: 0, Mg24: 0, Si28: 0, S32: 0, Ar36: 0, Ca40: 0, Ti44: 0, Cr48: 0, Fe52: 0, Ni56: 0, Fe56: 0
-    };
-    for (const t of nextTiles.values()) {
-      newCounts[t.element]++;
-    }
-
-    // Update phase rules with new counts
-    const tempState = { ...state, tiles: nextTiles, elementCounts: newCounts };
-    updatePhase(tempState);
-
-    set({
-      endState: null,
-      endlessMode: true,
-      isAnimating: false,
-      activeSlide: undefined,
-      tiles: nextTiles,
-      elementCounts: newCounts,
-      phase: tempState.phase
-    });
-    // Past the collapse (degeneracy phase) we intentionally do NOT persist — drop any
-    // existing save so quitting and returning starts a fresh Endless sandbox.
-    get().clearSavedGame(false);
-  },
 
   undo: () => {
     const state = get();
@@ -996,27 +782,30 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // One step of mercy, not a search tool: a second undo needs a move between.
     if (state.lastActionWasUndo) return;
 
-    const nextHistory = [...state.history];
-    const snapshot = nextHistory.pop()!;
-
+    // Restore copies so the kept snapshot can never be touched by later moves.
+    const snapshot = snapshotOf({ ...state, ...state.history[state.history.length - 1] } as GameState);
     set({
       tiles: snapshot.tiles,
+      obstacles: snapshot.obstacles,
       turn: snapshot.turn,
       phase: snapshot.phase,
+      phaseTransitions: snapshot.phaseTransitions,
       elementCounts: snapshot.elementCounts,
       levelObjectiveMet: snapshot.levelObjectiveMet,
       levelFailed: snapshot.levelFailed,
       endState: snapshot.endState,
-      hasPlayedHeliumLaugh: (snapshot as any).hasPlayedHeliumLaugh ?? false,
-      endlessMode: (snapshot as any).endlessMode ?? false,
-      score: (snapshot as any).score ?? 0,
-      history: nextHistory,
+      endReason: snapshot.endReason,
+      supernovaBonus: 0,
+      hasPlayedHeliumLaugh: snapshot.hasPlayedHeliumLaugh,
+      lastMoveFaceId: snapshot.lastMoveFaceId,
+      score: snapshot.score,
       selectedFaceId: null,
       dragTargetId: null,
       dragOffset3D: null,
       activeSlide: undefined,
       lastActionWasUndo: true,
     });
+    get().saveCurrentGame();
   },
 
   dismissNucleationTutorial: () => {
@@ -1043,6 +832,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   setAutoPlaySpeed: (speed) => {
     set({ autoPlaySpeed: speed });
+  },
+  setAutoPlayBot: (bot) => {
+    writeDebugPref('stellar_debug_bot', bot);
+    set({ autoPlayBot: bot, autoPlayNote: null });
+  },
+  setAutoPlayTurbo: (on) => {
+    writeDebugPref('stellar_debug_turbo', String(on));
+    set({ autoPlayTurbo: on, autoRotateTargetFaceId: null });
+  },
+  setAutoPlayLoop: (on) => {
+    writeDebugPref('stellar_debug_loop', String(on));
+    set({ autoPlayLoop: on });
+  },
+  logAutoRun: (record) => {
+    const log = get().autoRunLog;
+    if (log.some(r => r.run === record.run)) return;
+    set({ autoRunLog: [record, ...log].slice(0, 8) });
+  },
+  clearAutoRunLog: () => {
+    set({ autoRunLog: [] });
   },
   setAutoRotateTarget: (faceId) => {
     set({ autoRotateTargetFaceId: faceId });

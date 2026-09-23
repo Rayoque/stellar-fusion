@@ -1,6 +1,5 @@
 // src/game/rules.ts
-import type { ElementSymbol, GameState, Face } from './types';
-import { ELEMENTS } from './elements';
+import type { ElementSymbol, GameState } from './types';
 
 export type MergePattern = 'pair' | 'triangle' | 'pair_alpha';
 
@@ -35,186 +34,122 @@ export const MERGE_RULES: MergeRule[] = [
   { inputs: ['Si', 'Si'], output: 'Fe', pattern: 'pair' },
 ];
 
+const TRIPLE_ALPHA = MERGE_RULES.find(r => r.pattern === 'triangle')!;
+const PENTAGON_SELF_FUSION = MERGE_RULES.find(r => r.requiresPentagon)!;
+
+// Astrophysicist Mode — Fe26's fusion table, verbatim (dimit.me/Fe26, js/game_manager.js).
+// Note what is NOT here: nothing fuses with Mg24. Fe26 leaves it a dead end on purpose.
 export const ASTRO_MERGE_RULES: MergeRule[] = [
-  // H + H -> D
   { inputs: ['H', 'H'], output: 'D', pattern: 'pair' },
-  // D + H -> He3
   { inputs: ['D', 'H'], output: 'He3', pattern: 'pair' },
-  // He3 + He3 -> He4
   { inputs: ['He3', 'He3'], output: 'He4', pattern: 'pair' },
-  // He4 + He3 -> Be7
   { inputs: ['He4', 'He3'], output: 'Be7', pattern: 'pair' },
-  // He4 + He4 -> Be8
   { inputs: ['He4', 'He4'], output: 'Be8', pattern: 'pair' },
-  // Be8 + He4 -> C12
   { inputs: ['Be8', 'He4'], output: 'C12', pattern: 'pair' },
-  // C12 + He4 -> O16
   { inputs: ['C12', 'He4'], output: 'O16', pattern: 'pair' },
-  // O16 + He4 -> Ne20
   { inputs: ['O16', 'He4'], output: 'Ne20', pattern: 'pair' },
-  // Ne20 + He4 -> Mg24
   { inputs: ['Ne20', 'He4'], output: 'Mg24', pattern: 'pair' },
-  // Mg24 + He4 -> Si28
-  { inputs: ['Mg24', 'He4'], output: 'Si28', pattern: 'pair' },
-  // Si28 + He4 -> S32
   { inputs: ['Si28', 'He4'], output: 'S32', pattern: 'pair' },
-  // S32 + He4 -> Ar36
   { inputs: ['S32', 'He4'], output: 'Ar36', pattern: 'pair' },
-  // Ar36 + He4 -> Ca40
   { inputs: ['Ar36', 'He4'], output: 'Ca40', pattern: 'pair' },
-  // Ca40 + He4 -> Ti44
   { inputs: ['Ca40', 'He4'], output: 'Ti44', pattern: 'pair' },
-  // Ti44 + He4 -> Cr48
   { inputs: ['Ti44', 'He4'], output: 'Cr48', pattern: 'pair' },
-  // Cr48 + He4 -> Fe52
   { inputs: ['Cr48', 'He4'], output: 'Fe52', pattern: 'pair' },
-  // Fe52 + He4 -> Ni56
   { inputs: ['Fe52', 'He4'], output: 'Ni56', pattern: 'pair' },
-  // O16 + O16 -> Si28
   { inputs: ['O16', 'O16'], output: 'Si28', pattern: 'pair' },
-  // C12 + C12 -> Ne20
-  { inputs: ['C12', 'C12'], output: 'Ne20', pattern: 'pair' }
+  { inputs: ['C12', 'C12'], output: 'Ne20', pattern: 'pair' },
 ];
 
-/**
- * Check if two elements have a potential pair or pair_alpha merge rule.
- */
-export function canMerge(elementA: ElementSymbol, elementB: ElementSymbol, isAstro: boolean = false): boolean {
-  const rules = isAstro ? ASTRO_MERGE_RULES : MERGE_RULES;
-  for (const rule of rules) {
-    if (rule.pattern === 'pair' || rule.pattern === 'pair_alpha') {
-      if (rule.inputs.length !== 2) continue;
-      const [a, b] = rule.inputs;
-      if ((a === elementA && b === elementB) || (a === elementB && b === elementA)) {
-        return true;
-      }
-    }
-  }
-  return false;
+// Stars lighter than ~8 M☉ never get hot enough to ignite carbon: their cores stop
+// at carbon and oxygen and they end as white dwarfs.
+export const CARBON_IGNITION_MASS = 8;
+const CARBON_BURNING_PRODUCTS: ElementSymbol[] = ['Ne', 'Mg', 'Si', 'Fe'];
+
+export function canCoreMake(
+  output: ElementSymbol,
+  state: Pick<GameState, 'starMass' | 'astrophysicistMode'>
+): boolean {
+  if (state.astrophysicistMode) return true;
+  return state.starMass >= CARBON_IGNITION_MASS || !CARBON_BURNING_PRODUCTS.includes(output);
 }
 
+function findPairRule(a: ElementSymbol, b: ElementSymbol, isAstro: boolean): MergeRule | undefined {
+  const rules = isAstro ? ASTRO_MERGE_RULES : MERGE_RULES;
+  return rules.find(r => {
+    if (r.requiresPentagon || r.inputs.length !== 2) return false;
+    const [x, y] = r.inputs;
+    return (x === a && y === b) || (x === b && y === a);
+  });
+}
 
 /**
- * Detect and return applicable merge rule after a tile lands.
- * Order matters: triangle first (for He), then pair/pair_alpha, then pentagon H shortcut.
+ * Product of fusing a mover into a target by a two-body rule, or null if they
+ * don't fuse (or this star's core is too cool to make the product).
+ * The helium triangle is handled separately — see detectMerge.
+ */
+export function pairFusionOutput(
+  a: ElementSymbol,
+  b: ElementSymbol,
+  state: Pick<GameState, 'starMass' | 'astrophysicistMode'>
+): ElementSymbol | null {
+  const rule = findPairRule(a, b, state.astrophysicistMode);
+  if (!rule || !canCoreMake(rule.output, state)) return null;
+  return rule.output;
+}
+
+/**
+ * The rule that fires when a tile comes to rest.
+ * - With a target (the slide ran into a partner): pair/alpha fusion, or the helium
+ *   triangle when a third He touches both.
+ * - Without one: a lone hydrogen resting on a pentagon self-fuses (standard rules
+ *   only — Fe26 has no such shortcut).
+ * `viaPortal` means the mover reached the target through a wormhole, so the two
+ * faces need not be adjacent.
  */
 export function detectMerge(
   landedFaceId: number,
   state: GameState,
-  targetFaceId?: number
+  targetFaceId?: number,
+  viaPortal = false
 ): MergeRule | null {
-  if (state.astrophysicistMode) {
-    if (targetFaceId === undefined) {
-      const landedTile = state.tiles.get(landedFaceId);
-      if (landedTile && landedTile.element === 'H' && state.faces[landedFaceId]?.shape === 'pentagon') {
-        // CNO catalyst self-fusion: Hydrogen on pentagon instantly fuses to Helium-4!
-        return { inputs: ['H'], output: 'He4', pattern: 'pair', requiresPentagon: true };
-      }
-      return null;
-    }
-    const landedTile = state.tiles.get(landedFaceId);
-    const targetTile = state.tiles.get(targetFaceId);
-    if (!landedTile || !targetTile) return null;
+  const landedTile = state.tiles.get(landedFaceId);
+  const landedFace = state.faces[landedFaceId];
+  if (!landedTile || !landedFace) return null;
+  const landed = landedTile.element;
 
-    const landedElement = landedTile.element;
-    const targetElement = targetTile.element;
-
-    for (const rule of ASTRO_MERGE_RULES) {
-      const [a, b] = rule.inputs;
-      if ((a === landedElement && b === targetElement) || (a === targetElement && b === landedElement)) {
-        return rule;
-      }
+  if (targetFaceId === undefined) {
+    if (!state.astrophysicistMode && landed === 'H' && landedFace.shape === 'pentagon') {
+      return PENTAGON_SELF_FUSION;
     }
     return null;
   }
 
-  const landedTile = state.tiles.get(landedFaceId);
-  if (!landedTile) return null;
+  const targetTile = state.tiles.get(targetFaceId);
+  const targetFace = state.faces[targetFaceId];
+  if (!targetTile || !targetFace) return null;
+  const adjacent = landedFace.neighbors.includes(targetFaceId);
+  if (!adjacent && !viaPortal) return null;
 
-  const landedElement = landedTile.element;
-  const landedFace = state.faces[landedFaceId];
-  if (!landedFace) return null;
-
-  // Resolve the actual ending/destination face where the merged output tile will be formed.
-  // This is crucial for checking if the ending element is actually on a nucleation site.
-  const finalDestFaceId = targetFaceId !== undefined ? targetFaceId : landedFaceId;
-  const finalDestFace = state.faces[finalDestFaceId];
-  const isFinalDestPentagon = finalDestFace?.shape === 'pentagon';
-
-  // Get target element if targetFaceId is provided
-  const targetTile = targetFaceId !== undefined ? state.tiles.get(targetFaceId) : undefined;
-  const targetElement = targetTile?.element;
-
-  // 1. Pentagon CNO shortcut: H landing on an empty pentagon self-fuses immediately!
-  // This takes absolute precedence to preserve its behavior as a quantum self-fusion shortcut,
-  // but only applies to a lone Hydrogen landing (no target merge tile on the face).
-  if (landedElement === 'H' && isFinalDestPentagon && targetFaceId === undefined) {
-    const pentagonRule = MERGE_RULES.find(r => r.requiresPentagon && r.inputs[0] === 'H');
-    if (pentagonRule) return pentagonRule;
+  if (!state.astrophysicistMode && landed === 'He' && targetTile.element === 'He') {
+    return findThirdHelium(state, landedFaceId, targetFaceId) !== undefined ? TRIPLE_ALPHA : null;
   }
 
-  // 2. Triangle (triple-alpha): only relevant for He landing
-  if (landedElement === 'He') {
-    const heNeighbors = landedFace.neighbors.filter(nid => {
-      const t = state.tiles.get(nid);
-      return t && t.element === 'He';
-    });
+  const rule = findPairRule(landed, targetTile.element, state.astrophysicistMode);
+  return rule && canCoreMake(rule.output, state) ? rule : null;
+}
 
-    if (targetFaceId !== undefined && targetElement === 'He') {
-      // If targetFaceId is specified, it must be part of the triangle!
-      if (heNeighbors.includes(targetFaceId)) {
-        for (const otherNeighbor of heNeighbors) {
-          if (otherNeighbor !== targetFaceId) {
-            const otherFace: Face = state.faces[otherNeighbor];
-            if (otherFace && otherFace.neighbors.includes(targetFaceId)) {
-              return MERGE_RULES.find(r => r.pattern === 'triangle' && r.inputs[0] === 'He') || null;
-            }
-          }
-        }
-      }
-    } else if (targetFaceId === undefined) {
-      // Check for any pair of He neighbors that are also adjacent to each other
-      for (let i = 0; i < heNeighbors.length; i++) {
-        for (let j = i + 1; j < heNeighbors.length; j++) {
-          const n1 = heNeighbors[i];
-          const n2 = heNeighbors[j];
-          const n1Face = state.faces[n1];
-          if (n1Face.neighbors.includes(n2)) {
-            // Found a triangle of He
-            return MERGE_RULES.find(r => r.pattern === 'triangle' && r.inputs[0] === 'He') || null;
-          }
-        }
-      }
-    }
-  }
-
-  // 3. Pair or pair_alpha: same element neighbor with matching rule
-  for (const rule of MERGE_RULES) {
-    if (rule.pattern === 'pair' || rule.pattern === 'pair_alpha') {
-      if (rule.inputs.length !== 2) continue;
-      const [a, b] = rule.inputs;
-      if (a !== landedElement && b !== landedElement) continue;
-
-      const other = a === landedElement ? b : a;
-
-      if (targetFaceId !== undefined) {
-        // Strict matching: only merge with the target face's element if adjacent
-        if (other === targetElement && landedFace.neighbors.includes(targetFaceId)) {
-          return rule;
-        }
-      } else {
-        // Fallback: scan all neighbors
-        for (const nid of landedFace.neighbors) {
-          const neighborTile = state.tiles.get(nid);
-          if (neighborTile && neighborTile.element === other) {
-            return rule;
-          }
-        }
-      }
-    }
-  }
-
-  return null;
+// The third helium of a triple-alpha: touching the target, and the mover too when
+// the two are adjacent (through a wormhole only the target side can be checked).
+function findThirdHelium(state: GameState, moverFaceId: number, targetFaceId: number): number | undefined {
+  const moverFace = state.faces[moverFaceId];
+  const targetFace = state.faces[targetFaceId];
+  const adjacent = moverFace.neighbors.includes(targetFaceId);
+  return targetFace.neighbors.find(n =>
+    n !== moverFaceId &&
+    n !== targetFaceId &&
+    state.tiles.get(n)?.element === 'He' &&
+    (!adjacent || moverFace.neighbors.includes(n))
+  );
 }
 
 export const SCORE_VALUES: Record<ElementSymbol, number> = {
@@ -248,129 +183,74 @@ export const SCORE_VALUES: Record<ElementSymbol, number> = {
   Fe56: 56   // winning element, worth full mass
 };
 
-// Astrophysicist Mode — score change when an isotope decays (Fe26).
-// Most decays forfeit the points the isotope earned; Ni56 -> Fe56 is rewarded.
-export const DECAY_POINTS: Partial<Record<ElementSymbol, number>> = {
-  Be7: -3,
-  Be8: -4,
-  Ne20: -10,
-  Fe52: -26,
-  Ni56: 56,
+// Astrophysicist Mode — Fe26's decay table: what each unstable isotope becomes,
+// the score change when it does, and its lifetime multiplier m (Fe26 draws the
+// number of moves uniformly from ceil(4m) to ceil(8m)).
+export const DECAY: Partial<Record<ElementSymbol, { to: ElementSymbol; multiplier: number; points: number }>> = {
+  Be7:  { to: 'He4',  multiplier: 3,   points: -3 },
+  Be8:  { to: 'He4',  multiplier: 1,   points: -4 },
+  Ne20: { to: 'O16',  multiplier: 2.5, points: -10 },
+  Fe52: { to: 'Cr48', multiplier: 2,   points: -26 },
+  Ni56: { to: 'Fe56', multiplier: 1.5, points: 56 },
 };
 
 export function getDecayTurns(element: ElementSymbol): number | undefined {
-  if (element === 'Be7') return 12 + Math.floor(Math.random() * 11); // 12 to 22
-  if (element === 'Be8') return 3 + Math.floor(Math.random() * 4);   // 3 to 6
-  if (element === 'Ne20') return 5 + Math.floor(Math.random() * 6);  // 5 to 10
-  if (element === 'Fe52') return 4 + Math.floor(Math.random() * 5);  // 4 to 8
-  if (element === 'Ni56') return 3 + Math.floor(Math.random() * 3);  // 3 to 5
-  return undefined;
+  const decay = DECAY[element];
+  if (!decay) return undefined;
+  const min = Math.ceil(4 * decay.multiplier);
+  const max = Math.ceil(8 * decay.multiplier);
+  return min + Math.floor(Math.random() * (max - min + 1));
 }
 
 /**
- * Apply a merge rule: remove inputs, place output, update counts.
- * Assumes the rule was validated by detectMerge.
+ * Apply a merge rule: remove inputs, place output, update counts and score.
+ * `targetFaceId` is the partner the mover slid into (absent for the pentagon
+ * self-fusion); the product forms there.
  */
 export function applyMerge(
   rule: MergeRule,
   landedFaceId: number,
   state: GameState,
-  overrideOutputFaceId?: number
+  targetFaceId?: number
 ): void {
-  const landedFace = state.faces[landedFaceId];
-  if (!landedFace) return;
+  if (!state.faces[landedFaceId]) return;
 
-  // Collect tiles to remove (for pair/triangle)
-  const toRemove: number[] = [];
-
-  if (rule.pattern === 'triangle') {
-    // For triple-alpha, remove the three He (landed + two neighbors in triangle)
-    toRemove.push(landedFaceId);
-    if (overrideOutputFaceId !== undefined) {
-      toRemove.push(overrideOutputFaceId);
-      const destFace = state.faces[overrideOutputFaceId];
-      if (destFace) {
-        const thirdHeId = landedFace.neighbors.find(nid => 
-          nid !== overrideOutputFaceId &&
-          destFace.neighbors.includes(nid) &&
-          state.tiles.get(nid)?.element === 'He'
-        );
-        if (thirdHeId !== undefined) {
-          toRemove.push(thirdHeId);
-        }
-      }
-    } else {
-      // Find the two other He in the triangle
-      const heNeighbors = landedFace.neighbors.filter(nid => {
-        const t = state.tiles.get(nid);
-        return t?.element === 'He';
-      });
-      for (let i = 0; i < heNeighbors.length && toRemove.length < 3; i++) {
-        for (let j = i + 1; j < heNeighbors.length && toRemove.length < 3; j++) {
-          if (state.faces[heNeighbors[i]].neighbors.includes(heNeighbors[j])) {
-            if (!toRemove.includes(heNeighbors[i])) toRemove.push(heNeighbors[i]);
-            if (!toRemove.includes(heNeighbors[j])) toRemove.push(heNeighbors[j]);
-          }
-        }
-      }
-    }
-  } else if (rule.pattern === 'pair' && rule.requiresPentagon) {
-    // Self-fuse on pentagon: only remove the single H
-    toRemove.push(landedFaceId);
-  } else if (rule.pattern === 'pair' || rule.pattern === 'pair_alpha') {
-    toRemove.push(landedFaceId);
-    if (overrideOutputFaceId !== undefined) {
-      toRemove.push(overrideOutputFaceId);
-    } else {
-      const [inputA, inputB] = rule.inputs;
-      const currentTile = state.tiles.get(landedFaceId);
-      const currentElement = currentTile ? currentTile.element : inputA;
-      const otherInput = inputA === currentElement ? inputB : inputA;
-
-      for (const nid of landedFace.neighbors) {
-        const nt = state.tiles.get(nid);
-        if (nt && nt.element === otherInput) {
-          toRemove.push(nid);
-          break;
-        }
-      }
+  const toRemove: number[] = [landedFaceId];
+  if (targetFaceId !== undefined) {
+    toRemove.push(targetFaceId);
+    if (rule.pattern === 'triangle') {
+      const third = findThirdHelium(state, landedFaceId, targetFaceId);
+      if (third !== undefined) toRemove.push(third);
     }
   }
 
-  // Remove input tiles
   for (const fid of toRemove) {
     state.tiles.delete(fid);
   }
 
-  // Place output tile on landed face or overridden face
-  const outputFaceId = overrideOutputFaceId !== undefined ? overrideOutputFaceId : landedFaceId;
-  const decayTurns = getDecayTurns(rule.output);
+  const outputFaceId = targetFaceId ?? landedFaceId;
   state.tiles.set(outputFaceId, {
     faceId: outputFaceId,
     element: rule.output,
     spawnedAtTurn: state.turn,
     spawnReason: 'merge',
-    decayTurns,
+    decayTurns: getDecayTurns(rule.output),
   });
 
-  // Add score
-  const points = SCORE_VALUES[rule.output] || 0;
-  state.score = (state.score || 0) + points;
+  state.score = (state.score || 0) + (SCORE_VALUES[rule.output] || 0);
+  state.elementCounts = countElements(state.tiles);
 
-  // Update counts (dynamic recount to support both standard elements and custom isotopes)
-  const newCounts = {} as Record<ElementSymbol, number>;
-  for (const tile of state.tiles.values()) {
-    if (!newCounts[tile.element]) {
-      newCounts[tile.element] = 0;
-    }
-    newCounts[tile.element]++;
-  }
-  state.elementCounts = newCounts;
-
-  // Record last merge for potential animation hooks
   state.lastMerge = {
     fromFaceIds: toRemove,
     toFaceId: outputFaceId,
     output: rule.output,
   };
+}
+
+export function countElements(tiles: Map<number, { element: ElementSymbol }>): Record<ElementSymbol, number> {
+  const counts = {} as Record<ElementSymbol, number>;
+  for (const tile of tiles.values()) {
+    counts[tile.element] = (counts[tile.element] || 0) + 1;
+  }
+  return counts;
 }
