@@ -1,0 +1,6 @@
+{
+  "setup": "npm ci",
+  "verify": "npm run build && npm run verify:levels",
+  "simulate": "npm run simulate 50",
+  "dev": "npm run dev"
+}
