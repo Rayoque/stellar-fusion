@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../game/state';
 import { Text } from '@react-three/drei';
 import { ELEMENTS } from '../game/elements';
+import { TILE_FONT_URL } from './fonts';
 
 export interface BlobMeshProps {
   position: THREE.Vector3;
@@ -104,19 +105,22 @@ export function BlobMesh({ position, color, opacity, scaleFactor, symbol, time }
       
       {/* Dynamic screen-up billboarded text */}
       {symbol && (
-        <Text
-          ref={textRef}
-          position={textPos}
-          fontSize={0.24}
-          color="#ffffff"
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.012}
-          outlineColor="#000000"
-          renderOrder={1}
-        >
-          {symbol}
-        </Text>
+        <React.Suspense fallback={null}>
+          <Text
+            ref={textRef}
+            font={TILE_FONT_URL}
+            position={textPos}
+            fontSize={0.24}
+            color="#ffffff"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.012}
+            outlineColor="#000000"
+            renderOrder={1}
+          >
+            {symbol}
+          </Text>
+        </React.Suspense>
       )}
     </group>
   );

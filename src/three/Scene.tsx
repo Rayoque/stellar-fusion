@@ -42,9 +42,7 @@ export function Scene() {
       <Background />
       <Lighting />
 
-      <React.Suspense fallback={null}>
-        <Sphere />
-      </React.Suspense>
+      <Sphere />
       {/* Lives at the root, NOT inside the sphere group: the star collapses
           beneath the ejecta, which blows outward from where the surface was. */}
       <EndStateEffect />

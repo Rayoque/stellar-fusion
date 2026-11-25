@@ -13,11 +13,13 @@
     "simulate": "node scripts/run.mjs scripts/simulate.ts"
   },
   "dependencies": {
+    "@fontsource/outfit": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
+    "@react-three/drei": "10.7.7",
+    "@react-three/fiber": "9.6.1",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "three": "0.175.0",
-    "@react-three/fiber": "9.6.1",
-    "@react-three/drei": "10.7.7",
     "zustand": "5.0.13"
   },
   "devDependencies": {

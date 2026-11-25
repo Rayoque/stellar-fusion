@@ -7,6 +7,7 @@ import { lerpVec3 } from '../utils/math';
 import type { Face, Tile as TileType } from '../game/types';
 import { ELEMENTS } from '../game/elements';
 import { useGameStore } from '../game/state';
+import { TILE_FONT_URL } from './fonts';
 
 interface TileProps {
   face: Face;
@@ -483,36 +484,42 @@ export function Tile({ face, tile }: TileProps) {
 
         {/* Element symbol */}
         {element && !isMergeTarget && (
-          <Text
-            ref={textRef}
-            position={[face.center.x * 1.04, face.center.y * 1.04, face.center.z * 1.04]}
-            fontSize={0.25}
-            color="#ffffff"
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.01}
-            outlineColor="#000000"
-            renderOrder={1}
-          >
-            {element.symbol}
-          </Text>
+          <React.Suspense fallback={null}>
+            <Text
+              ref={textRef}
+              font={TILE_FONT_URL}
+              position={[face.center.x * 1.04, face.center.y * 1.04, face.center.z * 1.04]}
+              fontSize={0.25}
+              color="#ffffff"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.01}
+              outlineColor="#000000"
+              renderOrder={1}
+            >
+              {element.symbol}
+            </Text>
+          </React.Suspense>
         )}
 
         {/* Decay countdown badge */}
         {element && tile && tile.decayTurns !== undefined && !isMergeTarget && (
-          <Text
-            ref={decayTextRef}
-            position={[face.center.x * 1.045, face.center.y * 1.045, face.center.z * 1.045]}
-            fontSize={0.11}
-            color="#2ecc71"
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.008}
-            outlineColor="#000000"
-            renderOrder={2}
-          >
-            {tile.decayTurns.toString()}
-          </Text>
+          <React.Suspense fallback={null}>
+            <Text
+              ref={decayTextRef}
+              font={TILE_FONT_URL}
+              position={[face.center.x * 1.045, face.center.y * 1.045, face.center.z * 1.045]}
+              fontSize={0.11}
+              color="#2ecc71"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.008}
+              outlineColor="#000000"
+              renderOrder={2}
+            >
+              {tile.decayTurns.toString()}
+            </Text>
+          </React.Suspense>
         )}
       </group>
 
@@ -595,19 +602,22 @@ export function Tile({ face, tile }: TileProps) {
             />
           </mesh>
           <Edges scale={1.02} threshold={15} color="#22d3ee" />
-          <Text
-            ref={wormholeTextRef}
-            position={[0, 0, 0.01]}
-            fontSize={0.14}
-            color="#ffffff"
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.006}
-            outlineColor="#000000"
-            renderOrder={3}
-          >
-            {obstacle.targetFaceId === undefined ? '?' : (face.id < obstacle.targetFaceId ? 'A' : 'B')}
-          </Text>
+          <React.Suspense fallback={null}>
+            <Text
+              ref={wormholeTextRef}
+              font={TILE_FONT_URL}
+              position={[0, 0, 0.01]}
+              fontSize={0.14}
+              color="#ffffff"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.006}
+              outlineColor="#000000"
+              renderOrder={3}
+            >
+              {obstacle.targetFaceId === undefined ? '?' : (face.id < obstacle.targetFaceId ? 'A' : 'B')}
+            </Text>
+          </React.Suspense>
         </group>
       )}
 
