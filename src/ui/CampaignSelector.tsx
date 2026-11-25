@@ -1,6 +1,6 @@
 // src/ui/CampaignSelector.tsx
 import React from 'react';
-import { LEVELS, type Level, formatScenarioNumber } from '../game/levels';
+import { LEVELS, findLevel, formatScenarioNumber } from '../game/levels';
 import { useGameStore } from '../game/state';
 import { LockIcon } from './icons';
 
@@ -32,28 +32,13 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
   });
 
   const [activeHintIdx, setActiveHintIdx] = React.useState<number | null>(null);
+  const [confirmingReset, setConfirmingReset] = React.useState(false);
+  const resetConfirmTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const selectedLevel = LEVELS.find(l => l.id === selectedLevelId) || customScenarios.find(l => l.id === selectedLevelId) || LEVELS[0];
+  const selectedLevel = findLevel(selectedLevelId, customScenarios) ?? LEVELS[0];
 
   React.useEffect(() => {
     setActiveHintIdx(null);
-  }, [selectedLevelId]);
-
-  // Swipe states
-  const [translateX, setTranslateX] = React.useState(0);
-  const [isDragging, setIsDragging] = React.useState(false);
-  const dragStart = React.useRef<number>(0);
-  const currentTranslateX = React.useRef<number>(0);
-  const maxReveal = 140; // width of the reset button
-
-  // Long press / click-and-hold states
-  const [holdProgress, setHoldProgress] = React.useState(0);
-  const holdTimer = React.useRef<any>(null);
-  const progressInterval = React.useRef<any>(null);
-
-  // Snap back swipe when level selection changes
-  React.useEffect(() => {
-    setTranslateX(0);
   }, [selectedLevelId]);
 
   // Reset selectedLevelId to first scenario in active campaign if out of bounds
@@ -78,91 +63,33 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
     }
   }, [activeCampaign]);
 
-  // Clean up timers on unmount
   React.useEffect(() => {
     return () => {
-      if (holdTimer.current) clearTimeout(holdTimer.current);
-      if (progressInterval.current) clearInterval(progressInterval.current);
+      if (resetConfirmTimer.current) clearTimeout(resetConfirmTimer.current);
     };
   }, []);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    setIsDragging(true);
-    dragStart.current = e.clientX;
-    currentTranslateX.current = translateX;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  const handleRequestReset = () => {
+    if (resetConfirmTimer.current) clearTimeout(resetConfirmTimer.current);
+    setConfirmingReset(true);
+    resetConfirmTimer.current = setTimeout(() => {
+      setConfirmingReset(false);
+    }, 4000);
   };
 
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const diff = e.clientX - dragStart.current;
-    let target = currentTranslateX.current + diff;
-    // Clamp between -maxReveal and 0
-    target = Math.max(Math.min(target, 0), -maxReveal);
-    setTranslateX(target);
+  const handleConfirmReset = () => {
+    if (resetConfirmTimer.current) clearTimeout(resetConfirmTimer.current);
+    localStorage.setItem('stellar_completed_levels', '[]');
+    localStorage.setItem('stellar_perfect_levels', '[]');
+    useGameStore.setState({ completedLevels: [], perfectLevels: [] });
+    setConfirmingReset(false);
+    setActiveCampaign('nursery');
+    setSelectedLevelId(1);
   };
 
-  const handlePointerUp = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    setIsDragging(false);
-    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-
-    const diff = e.clientX - dragStart.current;
-    
-    // If movement is tiny, trigger regular launch tap/click
-    if (Math.abs(diff) < 5) {
-      onSelectLevel(selectedLevel.id);
-      return;
-    }
-
-    // Snap threshold
-    if (translateX < -60) {
-      setTranslateX(-maxReveal);
-    } else {
-      setTranslateX(0);
-    }
-  };
-
-  const startResetHold = () => {
-    if (holdTimer.current) clearTimeout(holdTimer.current);
-    if (progressInterval.current) clearInterval(progressInterval.current);
-
-    setHoldProgress(0);
-    const startTime = Date.now();
-
-    progressInterval.current = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const pct = Math.min((elapsed / 1000) * 100, 100);
-      setHoldProgress(pct);
-    }, 20);
-
-    holdTimer.current = setTimeout(() => {
-      clearInterval(progressInterval.current);
-      clearTimeout(holdTimer.current);
-      progressInterval.current = null;
-      holdTimer.current = null;
-
-      // Reset campaign checkmarks
-      localStorage.setItem('stellar_completed_levels', '[]');
-      useGameStore.setState({ completedLevels: [] });
-
-      setHoldProgress(0);
-      setTranslateX(0);
-      setActiveCampaign('nursery');
-      setSelectedLevelId(1);
-    }, 1000);
-  };
-
-  const cancelResetHold = () => {
-    if (holdTimer.current) {
-      clearTimeout(holdTimer.current);
-      holdTimer.current = null;
-    }
-    if (progressInterval.current) {
-      clearInterval(progressInterval.current);
-      progressInterval.current = null;
-    }
-    setHoldProgress(0);
+  const handleCancelReset = () => {
+    if (resetConfirmTimer.current) clearTimeout(resetConfirmTimer.current);
+    setConfirmingReset(false);
   };
 
   const filteredLevels = LEVELS.filter(l => {
@@ -468,45 +395,46 @@ export function CampaignSelector({ onClose, onSelectLevel }: CampaignSelectorPro
               </div>
             </div>
 
-            {/* Swipeable Ignition + Reset Campaign Dock */}
-            <div className="flex-shrink-0 border-t border-white/5 mt-4 pt-4 relative">
-              <div className="relative w-full h-[52px] rounded-full overflow-hidden bg-black/45 border border-white/5 select-none">
-                {/* Background Red Reset Campaign Button */}
-                <button
-                  onPointerDown={startResetHold}
-                  onPointerUp={cancelResetHold}
-                  onPointerLeave={cancelResetHold}
-                  className="absolute right-0 top-0 bottom-0 w-[140px] bg-red-700 hover:bg-red-600 text-white font-bold text-[10px] tracking-[1.5px] uppercase rounded-full flex flex-col items-center justify-center cursor-pointer select-none transition-all z-0 overflow-hidden pr-3"
-                  style={{
-                    boxShadow: 'inset 0 0 12px rgba(239, 68, 68, 0.4)'
-                  }}
-                  title="Click and hold for 1 second to completely reset all campaign checkmarks"
-                >
-                  <span className="relative z-10 leading-none">Hold 1s</span>
-                  <span className="relative z-10 text-[7px] text-white/70 tracking-[1px] mt-1 leading-none">To Reset Map</span>
-                  
-                  {/* Dynamic hold-progress filling bar */}
-                  <div 
-                    className="absolute left-0 top-0 bottom-0 bg-red-500/40 pointer-events-none transition-all"
-                    style={{ width: `${holdProgress}%` }}
-                  />
-                </button>
+            {/* Launch Ignition + Explicit Safe Reset Progress */}
+            <div className="flex-shrink-0 border-t border-white/5 mt-4 pt-4 flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={() => onSelectLevel(selectedLevel.id)}
+                className="w-full h-[52px] bg-white hover:bg-white/95 text-black rounded-full font-bold text-xs tracking-[2px] uppercase flex items-center justify-center cursor-pointer select-none transition-all active:scale-[0.98] shadow-[0_4px_16px_rgba(255,255,255,0.12)]"
+              >
+                LAUNCH IGNITION
+              </button>
 
-                {/* Foreground White Launch Ignition Button (Swipeable) */}
-                <div
-                  onPointerDown={handlePointerDown}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  className="absolute inset-0 bg-white hover:bg-white/95 text-black rounded-full font-bold flex items-center justify-center cursor-grab active:cursor-grabbing select-none transition-transform duration-100 ease-out z-10 shadow-[0_4px_16px_rgba(255,255,255,0.12)]"
-                  style={{
-                    transform: `translate3d(${translateX}px, 0, 0)`,
-                  }}
-                >
-                  <span className="text-xs tracking-[2px] uppercase select-none pointer-events-none">
-                    LAUNCH IGNITION
-                  </span>
+              {completedLevels.length > 0 && (
+                <div className="flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-wider">
+                  {!confirmingReset ? (
+                    <button
+                      type="button"
+                      onClick={handleRequestReset}
+                      className="text-white/35 hover:text-red-400 transition-colors cursor-pointer py-1 px-2"
+                    >
+                      Reset Progress
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2 animate-fade-in-up">
+                      <button
+                        type="button"
+                        onClick={handleConfirmReset}
+                        className="px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-300 hover:bg-red-500/30 font-bold cursor-pointer transition-all"
+                      >
+                        Confirm Reset
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelReset}
+                        className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white cursor-pointer transition-all"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           </div>
           

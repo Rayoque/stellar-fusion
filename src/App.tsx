@@ -339,16 +339,17 @@ export default function App() {
     newGame();
   };
 
-  const handleLaunchLevel = (levelId: number) => {
+  const handleLaunchLevel = (levelId: number, opts?: { skipBriefing?: boolean }) => {
     setShowStatusOverlay(false); // Instantly hide stale overlay
     newGame(undefined, levelId);
     setShowCampaign(false);
     setShowStart(false);
     const completed = useGameStore.getState().completedLevels;
-    if (!completed.includes(levelId)) {
+    if (!opts?.skipBriefing && !completed.includes(levelId)) {
       setObjectiveIsBriefing(true);
       setShowObjectiveLevelId(levelId);
     } else {
+      setObjectiveIsBriefing(false);
       setShowObjectiveLevelId(null);
     }
     setTimeout(() => playSpawnTick(), 120);
@@ -358,13 +359,8 @@ export default function App() {
     if (currentLevelId !== null) {
       setShowStatusOverlay(false); // Instantly hide stale overlay
       newGame(undefined, currentLevelId);
-      const completed = useGameStore.getState().completedLevels;
-      if (!completed.includes(currentLevelId)) {
-        setObjectiveIsBriefing(true);
-        setShowObjectiveLevelId(currentLevelId);
-      } else {
-        setShowObjectiveLevelId(null);
-      }
+      setObjectiveIsBriefing(false);
+      setShowObjectiveLevelId(null);
     }
   };
 
@@ -471,254 +467,251 @@ export default function App() {
     prevEditorModeRef.current = isEditorMode;
   }, [isEditorMode, isTestingCustomScenario]);
 
-  if (showStart) {
-    return (
-      <>
-        <StartScreen
-          onStart={handleStart}
-          onOpenCampaign={() => setShowCampaign(true)}
-          onStartAstro={handleStartAstro}
-        />
-        {showStarPicker && (
-          <StarPicker
-            onPick={handlePickStar}
-            onResume={handleResumeStar}
-            onClose={() => setShowStarPicker(false)}
-          />
-        )}
-        {showCampaign && (
-          <CampaignSelector
-            onClose={() => { setShowCampaign(false); window.scrollTo(0, 0); }}
-            onSelectLevel={handleLaunchLevel}
-          />
-        )}
-        {debugOpen && (
-          <DebugPanel
-            onClose={() => setDebugOpen(false)}
-            onJumpAstro={() => { handleStartAstro(); setDebugOpen(false); }}
-            onJumpLevel={(id) => { handleLaunchLevel(id); setDebugOpen(false); }}
-          />
-        )}
-      </>
-    );
-  }
-
   return (
     <div className="relative w-full h-screen h-[100dvh] overflow-hidden bg-[#050508] text-white font-sans select-none antialiased">
-      <Scene />
-      <TouchIndicator />
-      <AutoPlayerDriver />
+      <Scene showSphere={!showStart} />
+      {showStart ? (
+        <>
+          <StartScreen
+            onStart={handleStart}
+            onQuickStartLevel1={() => handleLaunchLevel(1, { skipBriefing: true })}
+            onOpenCampaign={() => setShowCampaign(true)}
+            onStartAstro={handleStartAstro}
+          />
+          {showStarPicker && (
+            <StarPicker
+              onPick={handlePickStar}
+              onResume={handleResumeStar}
+              onClose={() => setShowStarPicker(false)}
+            />
+          )}
+          {showCampaign && (
+            <CampaignSelector
+              onClose={() => { setShowCampaign(false); window.scrollTo(0, 0); }}
+              onSelectLevel={handleLaunchLevel}
+            />
+          )}
+        </>
+      ) : (
+        <>
+          <TouchIndicator />
+          <AutoPlayerDriver />
 
-      {!isEditorMode && (
-        <HUD
-          phase={phase}
-          starMass={starMass}
-          turn={turn}
-          elementCounts={elementCounts}
-          onOpenMenu={() => setPaused(true)}
-          onOpenCodex={() => setShowCodex(true)}
-          onOpenObjectives={currentLevelId !== null ? () => { setObjectiveIsBriefing(false); setShowObjectiveLevelId(currentLevelId); } : undefined}
-          showZoomHint={shouldShowZoomTooltip}
-        />
-      )}
+          {!isEditorMode && (
+            <HUD
+              phase={phase}
+              starMass={starMass}
+              turn={turn}
+              elementCounts={elementCounts}
+              onOpenMenu={() => setPaused(true)}
+              onOpenCodex={(el) => {
+                setCodexInitialElement(el ?? null);
+                setShowCodex(true);
+              }}
+              onOpenObjectives={currentLevelId !== null ? () => { setObjectiveIsBriefing(false); setShowObjectiveLevelId(currentLevelId); } : undefined}
+              showZoomHint={shouldShowZoomTooltip}
+            />
+          )}
 
-      {isEditorMode && <ScenarioEditor />}
+          {isEditorMode && <ScenarioEditor />}
 
-      {isTestingCustomScenario && (
-        <div className="fixed right-4 z-[100] top-[calc(1.4rem+env(safe-area-inset-top,0px))]">
-          <button
-            onClick={() => {
-              const setEditorMode = useGameStore.getState().setEditorMode;
-              setEditorMode(true);
-            }}
-            className="glass-pill px-4 sm:px-6 py-2 sm:py-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold font-mono tracking-[1.5px] sm:tracking-[2px] text-[8.5px] sm:text-[10px] uppercase shadow-[0_0_24px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95 transition-all"
-          >
-            Return to Editor
-          </button>
-        </div>
-      )}
-
-      {/* Supernova white-out: a beat of pure light at the instant of collapse */}
-      <div
-        className={`fixed inset-0 z-[60] pointer-events-none bg-white transition-opacity ease-out ${
-          flashOn ? 'opacity-90 duration-100' : 'opacity-0 duration-[900ms]'
-        }`}
-      />
-
-      {/* Standard Sandbox End Screen — arrives after the ceremony, not instead of it */}
-      {endScreenVisible && endState && currentLevelId === null && (
-        <EndScreen
-          endState={endState}
-          starMass={starMass}
-          elementCounts={elementCounts}
-          score={score}
-          highScore={highScore}
-          astrophysicistMode={astrophysicistMode}
-          onPlayAgain={handlePlayAgain}
-          onChooseStar={handleChooseStar}
-          onMainMenu={handleMainMenu}
-        />
-      )}
-
-      {/* Pause Menu Overlay */}
-      {isPaused && (
-        <PauseMenu
-          onResume={() => setPaused(false)}
-          onMainMenu={handleMainMenu}
-          onOpenCodex={() => setShowCodex(true)}
-          onOpenCampaign={currentLevelId !== null ? () => setShowCampaign(true) : undefined}
-        />
-      )}
-
-      {/* Campaign Scenarios Level Selector Modal */}
-      {showCampaign && (
-        <CampaignSelector
-          onClose={() => { setShowCampaign(false); window.scrollTo(0, 0); }}
-          onSelectLevel={handleLaunchLevel}
-        />
-      )}
-
-      {/* Stellar Codex Journal Modal */}
-      {showCodex && (
-        <Codex
-          initialElement={codexInitialElement}
-          onClose={() => { setShowCodex(false); setCodexInitialElement(null); window.scrollTo(0, 0); }}
-        />
-      )}
-
-      {/* Scenario Briefing Objective Pop-up (translucent, lets player see star in background!) */}
-      {showObjectiveLevelId !== null && (
-        <CampaignObjectiveOverlay
-          levelId={showObjectiveLevelId}
-          onStart={() => {
-            const wasBriefing = objectiveIsBriefing;
-            setShowObjectiveLevelId(null);
-            setObjectiveIsBriefing(false);
-            if (wasBriefing) playSpawnTick();
-          }}
-        />
-      )}
-
-      {/* Campaign Success & Defeat Overlay Screens (delayed for best user experience) */}
-      {currentLevelId !== null && showStatusOverlay && (
-        <CampaignStatusOverlay
-          levelId={currentLevelId}
-          status={levelObjectiveMet ? 'win' : 'fail'}
-          onNextLevel={isTestingCustomScenario ? undefined : (currentLevelId < LEVELS.length ? handleNextLevel : undefined)}
-          onRetry={handleRetryLevel}
-          onBackToCampaign={
-            isTestingCustomScenario
-              ? () => {
-                  setShowStatusOverlay(false);
+          {isTestingCustomScenario && (
+            <div className="fixed right-4 z-[100] top-[calc(1.4rem+env(safe-area-inset-top,0px))]">
+              <button
+                onClick={() => {
                   const setEditorMode = useGameStore.getState().setEditorMode;
                   setEditorMode(true);
-                }
-              : () => {
-                  setShowStatusOverlay(false); // Instantly hide stale overlay
-                  newGame();
-                  setShowStart(true);
-                  setShowCampaign(true);
-                }
-          }
-        />
-      )}
-
-      {/* Astrophysicist Mode Iron-56 Synthesis Congratulations Overlay */}
-      {showAstroOverlay && (
-        <AstroFe56Overlay
-          onContinue={() => {
-            useGameStore.setState({ 
-              showFe56Splash: false,
-              levelObjectiveMet: false
-            });
-          }}
-        />
-      )}
-
-      {/* Nucleation / Pentagon Self-Fusion Catalyst Tutorial Modal (Intuitively freezes active play once after action completes) */}
-      {delayedShowNucleation && (
-        <div className="fixed inset-0 z-[100] bg-black/35 flex justify-center items-center p-4 animate-fade-in-up">
-          <div 
-            className="border border-cyan-500/20 p-6 sm:p-8 rounded-[32px] max-w-md w-full text-center shadow-[0_16px_48px_rgba(6,182,212,0.15)] relative overflow-hidden isolate"
-            style={{
-              background: 'radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.12), transparent 50%), radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.08), transparent 50%), rgba(15, 15, 19, 0.96)',
-            }}
-          >
-            <div className="relative z-10 flex flex-col items-center">
-              {/* Glowing Pentagon Catalyst SVG - Bigger, double-outline exactly matching the in-game tiles! */}
-              <div className="mb-5 flex items-center justify-center select-none">
-                <svg width="84" height="84" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-[0_0_12px_rgba(34,211,238,0.7)] animate-pulse">
-                  <polygon 
-                    points="32,8 54,23 46,49 18,49 10,23" 
-                    fill="rgba(6, 182, 212, 0.12)" 
-                    stroke="#22d3ee" 
-                    strokeWidth="3" 
-                    strokeLinejoin="round"
-                  />
-                  <polygon 
-                    points="32,13 49,25 43,45 21,45 15,25" 
-                    fill="none" 
-                    stroke="rgba(34, 211, 238, 0.4)" 
-                    strokeWidth="1.2" 
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-
-              <h2 className="text-xl sm:text-2xl font-light tracking-wide mb-4 uppercase text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70">
-                Pentagons are catalysts
-              </h2>
-
-              <p className="text-white/65 text-xs sm:text-sm leading-relaxed mb-6 font-light text-center max-w-xs">
-                A lone <span className="text-[#ff6b6b] font-bold">hydrogen</span> that stops on one of the 12 pentagons fuses into <span className="text-[#feca57] font-bold">helium</span> by itself, a stand-in for the CNO cycle that burns hydrogen in heavier stars.
-              </p>
-
-              <button
-                onClick={dismissNucleationTutorial}
-                className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-full font-bold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase shadow-[0_4px_16px_rgba(6,182,212,0.25)] cursor-pointer"
+                }}
+                className="glass-pill px-4 sm:px-6 py-2 sm:py-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold font-mono tracking-[1.5px] sm:tracking-[2px] text-[8.5px] sm:text-[10px] uppercase shadow-[0_0_24px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95 transition-all"
               >
-                Got it
+                Return to Editor
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          )}
+
+          {/* Supernova white-out: a beat of pure light at the instant of collapse */}
+          <div
+            className={`fixed inset-0 z-[60] pointer-events-none bg-white transition-opacity ease-out ${
+              flashOn ? 'opacity-90 duration-100' : 'opacity-0 duration-[900ms]'
+            }`}
+          />
+
+          {/* Standard Sandbox End Screen — arrives after the ceremony, not instead of it */}
+          {endScreenVisible && endState && currentLevelId === null && (
+            <EndScreen
+              endState={endState}
+              starMass={starMass}
+              elementCounts={elementCounts}
+              score={score}
+              highScore={highScore}
+              astrophysicistMode={astrophysicistMode}
+              onPlayAgain={handlePlayAgain}
+              onChooseStar={handleChooseStar}
+              onMainMenu={handleMainMenu}
+            />
+          )}
+
+          {/* Pause Menu Overlay */}
+          {isPaused && (
+            <PauseMenu
+              onResume={() => setPaused(false)}
+              onMainMenu={handleMainMenu}
+              onOpenCodex={() => setShowCodex(true)}
+              onOpenCampaign={currentLevelId !== null ? () => setShowCampaign(true) : undefined}
+            />
+          )}
+
+          {/* Campaign Scenarios Level Selector Modal */}
+          {showCampaign && (
+            <CampaignSelector
+              onClose={() => { setShowCampaign(false); window.scrollTo(0, 0); }}
+              onSelectLevel={handleLaunchLevel}
+            />
+          )}
+
+          {/* Stellar Codex Journal Modal */}
+          {showCodex && (
+            <Codex
+              initialElement={codexInitialElement}
+              onClose={() => { setShowCodex(false); setCodexInitialElement(null); window.scrollTo(0, 0); }}
+            />
+          )}
+
+          {/* Scenario Briefing Objective Pop-up (translucent, lets player see star in background!) */}
+          {showObjectiveLevelId !== null && (
+            <CampaignObjectiveOverlay
+              levelId={showObjectiveLevelId}
+              onStart={() => {
+                const wasBriefing = objectiveIsBriefing;
+                setShowObjectiveLevelId(null);
+                setObjectiveIsBriefing(false);
+                if (wasBriefing) playSpawnTick();
+              }}
+            />
+          )}
+
+          {/* Campaign Success & Defeat Overlay Screens (delayed for best user experience) */}
+          {currentLevelId !== null && showStatusOverlay && (
+            <CampaignStatusOverlay
+              levelId={currentLevelId}
+              status={levelObjectiveMet ? 'win' : 'fail'}
+              onNextLevel={isTestingCustomScenario ? undefined : (currentLevelId < LEVELS.length ? handleNextLevel : undefined)}
+              onRetry={handleRetryLevel}
+              onBackToCampaign={
+                isTestingCustomScenario
+                  ? () => {
+                      setShowStatusOverlay(false);
+                      const setEditorMode = useGameStore.getState().setEditorMode;
+                      setEditorMode(true);
+                    }
+                  : () => {
+                      setShowStatusOverlay(false); // Instantly hide stale overlay
+                      newGame();
+                      setShowStart(true);
+                      setShowCampaign(true);
+                    }
+              }
+            />
+          )}
+
+          {/* Astrophysicist Mode Iron-56 Synthesis Congratulations Overlay */}
+          {showAstroOverlay && (
+            <AstroFe56Overlay
+              onContinue={() => {
+                useGameStore.setState({ 
+                  showFe56Splash: false,
+                  levelObjectiveMet: false
+                });
+              }}
+            />
+          )}
+
+          {/* Nucleation / Pentagon Self-Fusion Catalyst Tutorial Modal (Intuitively freezes active play once after action completes) */}
+          {delayedShowNucleation && (
+            <div className="fixed inset-0 z-[100] bg-black/35 flex justify-center items-center p-4 animate-fade-in-up">
+              <div 
+                className="border border-cyan-500/20 p-6 sm:p-8 rounded-[32px] max-w-md w-full text-center shadow-[0_16px_48px_rgba(6,182,212,0.15)] relative overflow-hidden isolate"
+                style={{
+                  background: 'radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.12), transparent 50%), radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.08), transparent 50%), rgba(15, 15, 19, 0.96)',
+                }}
+              >
+                <div className="relative z-10 flex flex-col items-center">
+                  {/* Glowing Pentagon Catalyst SVG - Bigger, double-outline exactly matching the in-game tiles! */}
+                  <div className="mb-5 flex items-center justify-center select-none">
+                    <svg width="84" height="84" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-[0_0_12px_rgba(34,211,238,0.7)] animate-pulse">
+                      <polygon 
+                        points="32,8 54,23 46,49 18,49 10,23" 
+                        fill="rgba(6, 182, 212, 0.12)" 
+                        stroke="#22d3ee" 
+                        strokeWidth="3" 
+                        strokeLinejoin="round"
+                      />
+                      <polygon 
+                        points="32,13 49,25 43,45 21,45 15,25" 
+                        fill="none" 
+                        stroke="rgba(34, 211, 238, 0.4)" 
+                        strokeWidth="1.2" 
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+
+                  <h2 className="text-xl sm:text-2xl font-light tracking-wide mb-4 uppercase text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70">
+                    Pentagons are catalysts
+                  </h2>
+
+                  <p className="text-white/65 text-xs sm:text-sm leading-relaxed mb-6 font-light text-center max-w-xs">
+                    A lone <span className="text-[#ff6b6b] font-bold">hydrogen</span> that stops on one of the 12 pentagons fuses into <span className="text-[#feca57] font-bold">helium</span> by itself, a stand-in for the CNO cycle that burns hydrogen in heavier stars.
+                  </p>
+
+                  <button
+                    onClick={dismissNucleationTutorial}
+                    className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-full font-bold tracking-[2px] transition-all active:scale-[0.97] text-xs uppercase shadow-[0_4px_16px_rgba(6,182,212,0.25)] cursor-pointer"
+                  >
+                    Got it
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
 
-      {/* System Warning Toast (e.g. autoplay high score tracking disabled) */}
-      {systemToast && !showStart && !isPaused && !showCampaign && !showCodex && !delayedShowNucleation && showObjectiveLevelId === null && !showStatusOverlay && (
-        <div 
-          className="fixed left-1/2 -translate-x-1/2 z-50 pointer-events-none flex justify-center w-full max-w-[90vw] sm:max-w-none hud-system-toast-container"
-        >
-          <div 
-            className="glass-pill px-6 py-3 rounded-full border border-amber-500/30 text-amber-400 font-bold tracking-[2px] text-[8px] sm:text-[9px] shadow-[0_0_24px_rgba(245,158,11,0.2)] flex items-center justify-center text-center gap-2.5 uppercase font-mono pointer-events-auto cursor-pointer select-none animate-fade-in-up"
-            onClick={dismissSystemToast}
-            title="Dismiss warning"
-          >
-            <span>{systemToast}</span>
-          </div>
-        </div>
-      )}
+          {/* System Warning Toast (e.g. autoplay high score tracking disabled) */}
+          {systemToast && !isPaused && !showCampaign && !showCodex && !delayedShowNucleation && showObjectiveLevelId === null && !showStatusOverlay && (
+            <div 
+              className="fixed left-1/2 -translate-x-1/2 z-50 pointer-events-none flex justify-center w-full max-w-[90vw] sm:max-w-none hud-system-toast-container"
+            >
+              <div 
+                className="glass-pill px-6 py-3 rounded-full border border-amber-500/30 text-amber-400 font-bold tracking-[2px] text-[8px] sm:text-[9px] shadow-[0_0_24px_rgba(245,158,11,0.2)] flex items-center justify-center text-center gap-2.5 uppercase font-mono pointer-events-auto cursor-pointer select-none animate-fade-in-up"
+                onClick={dismissSystemToast}
+                title="Dismiss warning"
+              >
+                <span>{systemToast}</span>
+              </div>
+            </div>
+          )}
 
-      {/* Subtle discovery dynamic toast notification gated to avoid overlaps */}
-      {activeToastElement && !showStart && !isPaused && !showCampaign && !showCodex && !delayedShowNucleation && showObjectiveLevelId === null && !showStatusOverlay && (
-        <div 
-          className="fixed left-1/2 -translate-x-1/2 z-50 pointer-events-none flex justify-center w-full max-w-[90vw] sm:max-w-none hud-toast-container"
-        >
-          <div 
-            className="glass-pill px-6 py-3 rounded-full border border-cyan-500/20 text-cyan-400 font-bold tracking-[3.5px] text-[8.5px] sm:text-[9.5px] shadow-[0_0_24px_rgba(34,211,238,0.15)] flex items-center justify-center text-center gap-2.5 uppercase font-mono pointer-events-auto cursor-pointer select-none animate-fade-in-up"
-            onClick={() => {
-              setCodexInitialElement(activeToastElement);
-              dismissToast();
-              setShowCodex(true);
-            }}
-            title="Click to view Codex Journal log"
-          >
-            <span className="text-xs">✦</span>
-            <span>NEW ELEMENT SYNTHESIZED: {ELEMENTS[activeToastElement].displayName}</span>
-            <span className="text-xs">✦</span>
-          </div>
-        </div>
+          {/* Subtle discovery dynamic toast notification gated to avoid overlaps */}
+          {activeToastElement && !isPaused && !showCampaign && !showCodex && !delayedShowNucleation && showObjectiveLevelId === null && !showStatusOverlay && (
+            <div 
+              className="fixed left-1/2 -translate-x-1/2 z-50 pointer-events-none flex justify-center w-full max-w-[90vw] sm:max-w-none hud-toast-container"
+            >
+              <div 
+                className="glass-pill px-6 py-3 rounded-full border border-cyan-500/20 text-cyan-400 font-bold tracking-[3.5px] text-[8.5px] sm:text-[9.5px] shadow-[0_0_24px_rgba(34,211,238,0.15)] flex items-center justify-center text-center gap-2.5 uppercase font-mono pointer-events-auto cursor-pointer select-none animate-fade-in-up"
+                onClick={() => {
+                  setCodexInitialElement(activeToastElement);
+                  dismissToast();
+                  setShowCodex(true);
+                }}
+                title="Click to view Codex Journal log"
+              >
+                <span className="text-xs">✦</span>
+                <span>NEW ELEMENT SYNTHESIZED: {ELEMENTS[activeToastElement].displayName}</span>
+                <span className="text-xs">✦</span>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {debugOpen && (

@@ -1,4 +1,6 @@
 // src/audio/synth.ts
+import { Capacitor } from '@capacitor/core';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { ELEMENTS } from '../game/elements';
 import type { ElementSymbol } from '../game/types';
 
@@ -10,13 +12,6 @@ let effectsVolume = Number(localStorage.getItem('stellar_effects_volume') ?? '80
 let currentBaseGain = 0.06;
 
 let hapticsEnabled = localStorage.getItem('stellar_haptics') !== 'false';
-
-function getCapacitorHaptics(): any {
-  if (typeof window !== 'undefined' && (window as any).Capacitor?.Plugins?.Haptics) {
-    return (window as any).Capacitor.Plugins.Haptics;
-  }
-  return null;
-}
 
 export function initAudio(): void {
   if (!audioCtx) {
@@ -50,12 +45,19 @@ const VIBRATION_PATTERNS: Record<HapticKind, number | number[]> = {
 export function triggerHaptic(type: HapticKind, vibrateMs?: number | number[]): void {
   if (!hapticsEnabled) return;
   try {
-    const capacitorHaptics = getCapacitorHaptics();
-    if (capacitorHaptics) {
-      if (type === 'light' || type === 'medium' || type === 'heavy') {
-        capacitorHaptics.impact({ style: type.toUpperCase() });
+    if (Capacitor.isNativePlatform()) {
+      if (type === 'light') {
+        Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+      } else if (type === 'medium') {
+        Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {});
+      } else if (type === 'heavy') {
+        Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {});
+      } else if (type === 'success') {
+        Haptics.notification({ type: NotificationType.Success }).catch(() => {});
+      } else if (type === 'warning') {
+        Haptics.notification({ type: NotificationType.Warning }).catch(() => {});
       } else {
-        capacitorHaptics.notification({ type: type.toUpperCase() });
+        Haptics.notification({ type: NotificationType.Error }).catch(() => {});
       }
     } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate(vibrateMs ?? VIBRATION_PATTERNS[type]);
@@ -68,13 +70,8 @@ export function triggerHaptic(type: HapticKind, vibrateMs?: number | number[]): 
 export function hapticSelection(): void {
   if (!hapticsEnabled) return;
   try {
-    const capacitorHaptics = getCapacitorHaptics();
-    if (capacitorHaptics) {
-      if (typeof capacitorHaptics.selectionChanged === 'function') {
-        capacitorHaptics.selectionChanged();
-      } else {
-        capacitorHaptics.impact({ style: 'LIGHT' });
-      }
+    if (Capacitor.isNativePlatform()) {
+      Haptics.selectionChanged().catch(() => {});
     } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate(6);
     }

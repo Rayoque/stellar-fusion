@@ -1,6 +1,7 @@
 // src/main.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Capacitor } from '@capacitor/core';
 import '@fontsource/space-grotesk/300.css';
 import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/500.css';
@@ -88,6 +89,10 @@ if (localStorage.getItem('stellar_debug') === 'true') {
     'color: #34d399; font-weight: bold; font-family: monospace;',
     'color: #93c5fd; font-family: monospace;'
   );
+}
+
+if (Capacitor.isNativePlatform()) {
+  document.documentElement.classList.add('capacitor-native');
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

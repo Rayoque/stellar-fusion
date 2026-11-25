@@ -161,6 +161,16 @@ canvas {
   bottom: calc(4.8rem + env(safe-area-inset-bottom, 0px));
 }
 
+@media (display-mode: standalone) {
+  .hud-bottom-container {
+    bottom: calc(1.0rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.capacitor-native .hud-bottom-container {
+  bottom: calc(1.0rem + env(safe-area-inset-bottom, 0px));
+}
+
 .hud-toast-container {
   top: calc(7.8rem + env(safe-area-inset-top, 0px));
 }

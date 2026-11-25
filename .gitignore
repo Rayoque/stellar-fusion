@@ -46,3 +46,7 @@ Thumbs.db
 # Coverage
 coverage
 *.lcov
+
+# Capacitor iOS
+ios/App/Pods/
+ios/DerivedData/

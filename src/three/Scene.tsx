@@ -30,7 +30,7 @@ function Lighting() {
   );
 }
 
-export function Scene() {
+export function Scene({ showSphere = true }: { showSphere?: boolean }) {
   return (
     <Canvas
       camera={{ position: [0, 0, 5.5], fov: 48, far: 5000 }}
@@ -42,11 +42,15 @@ export function Scene() {
       <Background />
       <Lighting />
 
-      <Sphere />
-      {/* Lives at the root, NOT inside the sphere group: the star collapses
-          beneath the ejecta, which blows outward from where the surface was. */}
-      <EndStateEffect />
-      <Controls />
+      {showSphere && (
+        <>
+          <Sphere />
+          {/* Lives at the root, NOT inside the sphere group: the star collapses
+              beneath the ejecta, which blows outward from where the surface was. */}
+          <EndStateEffect />
+          <Controls />
+        </>
+      )}
     </Canvas>
   );
 }

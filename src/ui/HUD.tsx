@@ -8,8 +8,38 @@ import { CARBON_IGNITION_MASS, DECAY } from '../game/rules';
 import { getStarClass, formatStarAge } from '../game/stars';
 import { ZoomTooltip } from './ZoomTooltip';
 import { AtomIcon, BookIcon, UndoIcon } from './icons';
+import { hapticSelection } from '../audio/synth';
 
 const CARBON_BURNING: ElementSymbol[] = ['Ne', 'Mg', 'Si', 'Fe'];
+
+const ELEMENT_RECIPES: Record<ElementSymbol, string> = {
+  H: 'Primordial fuel · rains each move',
+  He: 'H + H → He  ·  or H on a pentagon',
+  C: '3 He in a triangle → C',
+  O: 'C + He → O',
+  Ne: 'O + He → Ne  (8+ M☉)',
+  Mg: 'Ne + He → Mg  (8+ M☉)',
+  Si: 'Mg + He → Si  (8+ M☉)',
+  Fe: 'Si + Si → Fe  (core collapse)',
+  D: 'H + H → D',
+  He3: 'D + H → He3',
+  He4: 'He3 + He3 → He4',
+  Be7: 'He4 + He3 → Be7  (decays → He4)',
+  Be8: 'He4 + He4 → Be8  (decays → He4)',
+  C12: 'Be8 + He4 → C12',
+  O16: 'C12 + He4 → O16',
+  Ne20: 'O16 + He4 or C12 + C12  (decays → O16)',
+  Mg24: 'Ne20 + He4 → Mg24  (dead end)',
+  Si28: 'O16 + O16 → Si28',
+  S32: 'Si28 + He4 → S32',
+  Ar36: 'S32 + He4 → Ar36',
+  Ca40: 'Ar36 + He4 → Ca40',
+  Ti44: 'Ca40 + He4 → Ti44',
+  Cr48: 'Ti44 + He4 → Cr48',
+  Fe52: 'Cr48 + He4 → Fe52  (decays → Cr48)',
+  Ni56: 'Fe52 + He4 → Ni56  (decays → Fe56)',
+  Fe56: 'Ni56 decay → Fe56  (immovable ash)',
+};
 
 // Short objective label for the banner under the stats pill.
 function objectiveLabel(level: { objectives: Array<{ type: string; element?: ElementSymbol; count?: number }> }): string {
@@ -31,7 +61,7 @@ interface HUDProps {
   turn: number;
   elementCounts: Record<ElementSymbol, number>;
   onOpenMenu: () => void;
-  onOpenCodex: () => void;
+  onOpenCodex: (element?: ElementSymbol) => void;
   onOpenObjectives?: () => void;
   showZoomHint?: boolean;
 }
@@ -129,6 +159,18 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
   // the tray. Decided once per gesture at a small movement threshold.
   const gestureModeRef = React.useRef<'orbit' | 'tray' | null>(null);
   const trayScrollStartRef = React.useRef(0);
+  const pressedElementRef = React.useRef<ElementSymbol | null>(null);
+  const [selectedRecipeElement, setSelectedRecipeElement] = React.useState<ElementSymbol | null>(null);
+
+  React.useEffect(() => {
+    if (!selectedRecipeElement) return;
+    const timer = setTimeout(() => setSelectedRecipeElement(null), 5000);
+    return () => clearTimeout(timer);
+  }, [selectedRecipeElement]);
+
+  React.useEffect(() => {
+    setSelectedRecipeElement(null);
+  }, [showModal, showZenMode, state.astrophysicistMode]);
 
   React.useEffect(() => {
     const tray = trayRef.current;
@@ -459,6 +501,48 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
           {/* Pinch-to-zoom hint, floated directly above the instructions line */}
           {showZoomHint && <ZoomTooltip />}
 
+          {/* Floating element recipe pill when tapping a tray badge */}
+          {selectedRecipeElement && (() => {
+            const recipeEl = ELEMENTS[selectedRecipeElement];
+            const isUnlocked = state.unlockedElements.includes(selectedRecipeElement);
+            return (
+              <div
+                onClick={() => setSelectedRecipeElement(null)}
+                className="glass-pill px-3.5 py-2 rounded-2xl border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.45)] flex items-center gap-2.5 pointer-events-auto cursor-pointer animate-fade-in-up max-w-[90vw]"
+                style={{ borderColor: `${recipeEl.color}40` }}
+              >
+                <span
+                  className="font-mono text-xs font-bold px-2 py-0.5 rounded-full bg-black/50 border"
+                  style={{ color: recipeEl.color, borderColor: `${recipeEl.color}55` }}
+                >
+                  {selectedRecipeElement}
+                </span>
+                <div className="flex flex-col text-left min-w-0">
+                  <span className="text-[10px] font-semibold tracking-wide text-white/95 leading-tight">
+                    {recipeEl.displayName}
+                  </span>
+                  <span className="text-[10px] font-mono text-white/70 leading-snug truncate">
+                    {ELEMENT_RECIPES[selectedRecipeElement]}
+                  </span>
+                </div>
+                {isUnlocked && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const sym = selectedRecipeElement;
+                      setSelectedRecipeElement(null);
+                      onOpenCodex(sym);
+                    }}
+                    className="ml-1 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[9px] font-mono font-bold tracking-wider uppercase text-cyan-300 flex-shrink-0 cursor-pointer transition-colors"
+                  >
+                    Codex →
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Dynamic Instructions placed directly above the Elements Tray */}
           <div className="text-[8px] xs:text-[9px] sm:text-[10px] opacity-35 tracking-[2px] xs:tracking-[4px] font-mono uppercase whitespace-nowrap mb-0.5 select-none">
             {state.astrophysicistMode
@@ -487,6 +571,8 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                 (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
               } catch (err) {}
 
+              const badge = (e.target as HTMLElement).closest('[data-element]');
+              pressedElementRef.current = (badge?.getAttribute('data-element') as ElementSymbol | null) ?? null;
               dragStartRef.current = { x: e.clientX, y: e.clientY };
               gestureModeRef.current = null;
               trayScrollStartRef.current = trayRef.current?.scrollLeft ?? 0;
@@ -562,6 +648,12 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                   canvas.dispatchEvent(upEvent);
                 }
               }
+              if (gestureModeRef.current === null && pressedElementRef.current) {
+                const tapped = pressedElementRef.current;
+                setSelectedRecipeElement(prev => (prev === tapped ? null : tapped));
+                hapticSelection();
+              }
+              pressedElementRef.current = null;
               dragStartRef.current = null;
               gestureModeRef.current = null;
               hasDispatchedDownRef.current = false;
@@ -587,6 +679,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                   canvas.dispatchEvent(cancelEvent);
                 }
               }
+              pressedElementRef.current = null;
               dragStartRef.current = null;
               gestureModeRef.current = null;
               hasDispatchedDownRef.current = false;
@@ -613,12 +706,13 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                   return (
                     <div 
                       key={sym}
-                      className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border bg-black/40 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] flex-shrink-0"
+                      data-element={sym}
+                      className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border bg-black/40 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] flex-shrink-0 cursor-pointer"
                       style={{ 
                         borderColor: el.color,
                         boxShadow: `0 0 10px ${el.color}15, inset 0 0 6px ${el.color}10`
                       }}
-                      title={`${el.displayName}: ${count} nuclei`}
+                      title={`${el.displayName}: ${count} nuclei (tap for recipe)`}
                     >
                       <span 
                         className="font-mono text-[10px] xs:text-xs sm:text-sm font-bold tracking-tight"
@@ -637,8 +731,9 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
                   return (
                     <div
                       key={sym}
-                      className={`relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/10 bg-black/10 select-none cursor-default flex-shrink-0 ${outOfReach ? 'opacity-15' : 'opacity-30'}`}
-                      title={outOfReach ? `Needs a star of ${CARBON_IGNITION_MASS} M☉ or more` : 'Not made yet'}
+                      data-element={sym}
+                      className={`relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/10 bg-black/10 select-none cursor-pointer flex-shrink-0 ${outOfReach ? 'opacity-15' : 'opacity-30'}`}
+                      title={outOfReach ? `Needs a star of ${CARBON_IGNITION_MASS} M☉ or more` : 'Tap for synthesis recipe'}
                     >
                       <span className={`font-mono text-[9px] xs:text-[10px] sm:text-xs text-white/50 font-medium ${outOfReach ? 'line-through' : ''}`}>
                         {sym}
@@ -653,7 +748,7 @@ export function HUD({ phase, starMass, turn, elementCounts, onOpenMenu, onOpenCo
             <div className="flex items-center gap-1.5 xs:gap-2.5 py-2.5 xs:py-3 pr-2.5 xs:pr-3.5 pl-1.5 xs:pl-2.5 flex-shrink-0 border-l border-white/5 bg-black/20">
               {/* Codex Circular shortcut button */}
               <button
-                onClick={onOpenCodex}
+                onClick={() => onOpenCodex()}
                 className="relative flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] cursor-pointer flex-shrink-0"
                 title={state.astrophysicistMode ? "Open Astrophysicist Codex" : "Open Stellar Codex Journal"}
               >
