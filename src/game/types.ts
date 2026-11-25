@@ -122,6 +122,15 @@ export interface MoveSnapshot {
   lastMoveFaceId: number | null;
 }
 
+export interface DragPreview {
+  fromFaceId: number;
+  firstStepId: number;
+  path: number[];
+  landingId: number;
+  outcome: 'move' | 'merge' | 'catalyst' | 'blocked';
+  mergeOutput?: ElementSymbol;
+}
+
 export interface GameState {
   // immutable per run
   starMass: number;         // initial mass in solar masses (M☉), 1-30
@@ -158,6 +167,7 @@ export interface GameState {
   // UI state
   selectedFaceId: number | null;
   dragTargetId: number | null;
+  dragPreview: DragPreview | null;
   isAnimating: boolean;
   endState: EndState | null;
   endReason: EndReason | null;

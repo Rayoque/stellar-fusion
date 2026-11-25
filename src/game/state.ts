@@ -1,6 +1,6 @@
 // src/game/state.ts
 import { create } from 'zustand';
-import type { GameState, Phase, ElementSymbol, Tile, ObstacleInstance, Level, MoveSnapshot, StarClassId, BotId, AutoRunRecord } from './types';
+import type { GameState, Phase, ElementSymbol, Tile, ObstacleInstance, Level, MoveSnapshot, StarClassId, BotId, AutoRunRecord, DragPreview } from './types';
 import { generateTruncatedIcosahedron } from '../geometry/truncatedIcosahedron';
 import { ELEMENTS } from './elements';
 import { countElements } from './rules';
@@ -71,6 +71,7 @@ interface GameActions {
   startDrag: (faceId: number) => void;
   endDrag: (faceId: number, dragWorld: { x: number; y: number; z: number }) => void;
   setDragTargetId: (id: number | null) => void;
+  setDragPreview: (preview: DragPreview | null) => void;
   reset: () => void;
   setPaused: (paused: boolean) => void;
   setShowRealtimeGraphics: (show: boolean) => void;
@@ -244,6 +245,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   selectedFaceId: null,
   dragTargetId: null,
+  dragPreview: null,
   isAnimating: false,
   endState: null,
   endReason: null,
@@ -393,6 +395,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       levelFailed: false,
       selectedFaceId: null,
       dragTargetId: null,
+      dragPreview: null,
       isAnimating: false,
       endState: null,
       endReason: null,
@@ -431,7 +434,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   endDrag: async (fromFaceId, dragWorld) => {
     const state = get();
     if (state.isAnimating || state.endState || state.selectedFaceId !== fromFaceId) {
-      set({ selectedFaceId: null, dragTargetId: null });
+      set({ selectedFaceId: null, dragTargetId: null, dragPreview: null });
       return;
     }
 
@@ -440,7 +443,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // committing stale state over the fresh game.
     const runGen = state.runGeneration;
 
-    set({ isAnimating: true, selectedFaceId: null, dragTargetId: null });
+    set({ isAnimating: true, selectedFaceId: null, dragTargetId: null, dragPreview: null });
 
     try {
       const slide = executeSlide(fromFaceId, dragWorld as any, state);
@@ -454,6 +457,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           blockedTime: performance.now(),
           selectedFaceId: null,
           dragTargetId: null,
+          dragPreview: null,
           dragOffset3D: null,
           isAnimating: false,
         });
@@ -649,12 +653,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
       get().saveCurrentGame();
     } catch (e) {
       console.error('Error in endDrag:', e);
-      set({ isAnimating: false, selectedFaceId: null, dragTargetId: null, dragOffset3D: null, activeSlide: undefined });
+      set({ isAnimating: false, selectedFaceId: null, dragTargetId: null, dragPreview: null, dragOffset3D: null, activeSlide: undefined });
     }
   },
 
   setDragTargetId: (id) => {
     set({ dragTargetId: id });
+  },
+
+  setDragPreview: (preview) => {
+    set({ dragPreview: preview, dragTargetId: preview?.firstStepId ?? null });
   },
 
   reset: () => {
@@ -745,6 +753,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       levelFailed: false,
       selectedFaceId: null,
       dragTargetId: null,
+      dragPreview: null,
       isAnimating: false,
       endState: null,
       endReason: null,
@@ -801,6 +810,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       score: snapshot.score,
       selectedFaceId: null,
       dragTargetId: null,
+      dragPreview: null,
       dragOffset3D: null,
       activeSlide: undefined,
       lastActionWasUndo: true,

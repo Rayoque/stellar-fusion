@@ -2,8 +2,8 @@
 // The move pipeline — everything that happens between a tile being let go and the
 // next turn. The live store, the level solver, and the dev simulator all run moves
 // through commitMove, so they can never disagree about the rules.
-import type { GameState, ElementSymbol, EndState, EndReason, Level, Tile, ObstacleInstance } from './types';
-import type { SlideResult } from '../geometry/slide';
+import type { GameState, ElementSymbol, EndState, EndReason, Level, Tile, ObstacleInstance, DragPreview, Vec3 } from './types';
+import { executeSlide, resolveSlideTarget, type SlideResult } from '../geometry/slide';
 import { detectMerge, applyMerge, countElements, DECAY, type MergeRule } from './rules';
 import { spawnHydrogen } from './spawn';
 import { updatePhase } from './phases';
@@ -53,6 +53,61 @@ export function objectivesMet(state: GameState, level: Level): boolean {
     }
   }
   return true;
+}
+
+export function previewSlide(state: GameState, fromFaceId: number, dragWorld: Vec3): DragPreview | null {
+  const fromFace = state.faces[fromFaceId];
+  const tile = state.tiles.get(fromFaceId);
+  if (!fromFace || !tile) return null;
+
+  const firstStepId = resolveSlideTarget(fromFace, dragWorld, state.faces);
+  if (firstStepId === null) return null;
+
+  const slide = executeSlide(fromFaceId, dragWorld, state);
+  if (slide.path.length <= 1) {
+    return {
+      fromFaceId,
+      firstStepId,
+      path: [fromFaceId],
+      landingId: firstStepId,
+      outcome: 'blocked',
+    };
+  }
+
+  const landingId = slide.path[slide.path.length - 1];
+  const isMerge = slide.stoppedReason === 'merge';
+  const work = cloneForMove(state);
+  work.tiles.delete(fromFaceId);
+
+  let mergeRule: MergeRule | null = null;
+  if (isMerge) {
+    const restingId = slide.path[slide.path.length - 2];
+    work.tiles.set(restingId, { ...tile, faceId: restingId });
+    const viaPortal = work.obstacles?.get(restingId)?.type === 'wormhole';
+    mergeRule = detectMerge(restingId, work, landingId, viaPortal);
+  } else {
+    work.tiles.set(landingId, { ...tile, faceId: landingId, spawnReason: 'slide' });
+    mergeRule = detectMerge(landingId, work);
+  }
+
+  let outcome: DragPreview['outcome'] = 'move';
+  let mergeOutput: ElementSymbol | undefined;
+  if (mergeRule?.requiresPentagon) {
+    outcome = 'catalyst';
+    mergeOutput = mergeRule.output;
+  } else if (mergeRule) {
+    outcome = 'merge';
+    mergeOutput = mergeRule.output;
+  }
+
+  return {
+    fromFaceId,
+    firstStepId,
+    path: slide.path,
+    landingId,
+    outcome,
+    mergeOutput,
+  };
 }
 
 /**

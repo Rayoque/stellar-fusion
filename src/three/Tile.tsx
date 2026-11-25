@@ -23,7 +23,7 @@ export function Tile({ face, tile }: TileProps) {
   const endDrag = useGameStore(s => s.endDrag);
   const isAnimating = useGameStore(s => s.isAnimating);
   const selectedFaceId = useGameStore(s => s.selectedFaceId);
-  const dragTargetId = useGameStore(s => s.dragTargetId);
+  const dragPreview = useGameStore(s => s.dragPreview);
   const blockedFaceId = useGameStore(s => s.blockedFaceId);
   const blockedTime = useGameStore(s => s.blockedTime) || 0;
   const dragOffset3D = useGameStore(s => s.dragOffset3D);
@@ -33,7 +33,11 @@ export function Tile({ face, tile }: TileProps) {
   const showRealtimeGraphics = useGameStore(s => s.showRealtimeGraphics);
 
   const isSelected = face.id === selectedFaceId;
-  const isTarget = face.id === dragTargetId;
+  const isPreviewLanding = dragPreview !== null && face.id === dragPreview.landingId;
+  const isPreviewPathStep =
+    dragPreview !== null &&
+    dragPreview.path.length > 2 &&
+    dragPreview.path.slice(1, -1).includes(face.id);
   const isBlocked = face.id === blockedFaceId;
   const isMergeTarget = activeSlide?.isMerge && face.id === activeSlide.path[activeSlide.path.length - 1];
 
@@ -621,19 +625,60 @@ export function Tile({ face, tile }: TileProps) {
         </group>
       )}
 
-      {/* Drag target indicator overlay (keeps separate from pulling content, stays anchored on the target slot!) */}
-      {isTarget && (
-        <mesh geometry={geometry} scale={1.01}>
-          <meshBasicMaterial 
-            color="#f59e0b" 
-            transparent 
-            opacity={0.25} 
-            side={THREE.DoubleSide}
-            depthWrite={false}
-          />
-          <Edges scale={1.005} threshold={15} color="#f59e0b" />
-        </mesh>
-      )}
+      {/* Drag trajectory & outcome indicator overlay */}
+      {isPreviewLanding && dragPreview && (() => {
+        const previewColor =
+          dragPreview.outcome === 'merge' && dragPreview.mergeOutput
+            ? (ELEMENTS[dragPreview.mergeOutput]?.color ?? '#fbbf24')
+            : dragPreview.outcome === 'catalyst'
+              ? '#22d3ee'
+              : dragPreview.outcome === 'blocked'
+                ? '#ef4444'
+                : '#93c5fd';
+        const edgeColor =
+          dragPreview.outcome === 'move'
+            ? '#bae6fd'
+            : dragPreview.outcome === 'blocked'
+              ? '#f87171'
+              : previewColor;
+        const fillOpacity =
+          dragPreview.outcome === 'merge' || dragPreview.outcome === 'catalyst'
+            ? 0.34
+            : dragPreview.outcome === 'blocked'
+              ? 0.24
+              : 0.22;
+        return (
+          <mesh geometry={geometry} scale={1.012}>
+            <meshBasicMaterial
+              color={previewColor}
+              transparent
+              opacity={fillOpacity}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+            <Edges scale={1.005} threshold={15} color={edgeColor} />
+          </mesh>
+        );
+      })()}
+      {!isPreviewLanding && isPreviewPathStep && dragPreview && (() => {
+        const stepColor =
+          dragPreview.outcome === 'merge' && dragPreview.mergeOutput
+            ? (ELEMENTS[dragPreview.mergeOutput]?.color ?? '#fbbf24')
+            : dragPreview.outcome === 'catalyst'
+              ? '#22d3ee'
+              : '#93c5fd';
+        return (
+          <mesh geometry={geometry} scale={1.006}>
+            <meshBasicMaterial
+              color={stepColor}
+              transparent
+              opacity={0.10}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })()}
     </group>
   );
 }

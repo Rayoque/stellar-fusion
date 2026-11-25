@@ -11,9 +11,11 @@ let currentBaseGain = 0.06;
 
 let hapticsEnabled = localStorage.getItem('stellar_haptics') !== 'false';
 
-let capacitorHaptics: any = null;
-if (typeof window !== 'undefined' && (window as any).Capacitor && (window as any).Capacitor.Plugins) {
-  capacitorHaptics = (window as any).Capacitor.Plugins.Haptics;
+function getCapacitorHaptics(): any {
+  if (typeof window !== 'undefined' && (window as any).Capacitor?.Plugins?.Haptics) {
+    return (window as any).Capacitor.Plugins.Haptics;
+  }
+  return null;
 }
 
 export function initAudio(): void {
@@ -48,6 +50,7 @@ const VIBRATION_PATTERNS: Record<HapticKind, number | number[]> = {
 export function triggerHaptic(type: HapticKind, vibrateMs?: number | number[]): void {
   if (!hapticsEnabled) return;
   try {
+    const capacitorHaptics = getCapacitorHaptics();
     if (capacitorHaptics) {
       if (type === 'light' || type === 'medium' || type === 'heavy') {
         capacitorHaptics.impact({ style: type.toUpperCase() });
@@ -56,6 +59,24 @@ export function triggerHaptic(type: HapticKind, vibrateMs?: number | number[]): 
       }
     } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate(vibrateMs ?? VIBRATION_PATTERNS[type]);
+    }
+  } catch (err) {
+    // Fail silently on unsupported configurations
+  }
+}
+
+export function hapticSelection(): void {
+  if (!hapticsEnabled) return;
+  try {
+    const capacitorHaptics = getCapacitorHaptics();
+    if (capacitorHaptics) {
+      if (typeof capacitorHaptics.selectionChanged === 'function') {
+        capacitorHaptics.selectionChanged();
+      } else {
+        capacitorHaptics.impact({ style: 'LIGHT' });
+      }
+    } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(6);
     }
   } catch (err) {
     // Fail silently on unsupported configurations

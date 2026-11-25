@@ -1,5 +1,5 @@
 // src/three/FusionParticles.tsx
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useGameStore } from '../game/state';
@@ -23,14 +23,20 @@ interface ParticleBurst {
 export function FusionParticles() {
   const lastMerge = useGameStore(s => s.lastMerge);
   const faces = useGameStore(s => s.faces);
-  const [bursts, setBursts] = useState<ParticleBurst[]>([]);
   const burstsRef = useRef<ParticleBurst[]>([]);
   const instancedMeshRef = useRef<THREE.InstancedMesh>(null);
   const nextId = useRef(0);
+  const wasActiveRef = useRef(false);
 
   // Pre-allocate temporary objects to avoid allocations in the render loop
   const tempObject = React.useMemo(() => new THREE.Object3D(), []);
   const tempColor = React.useMemo(() => new THREE.Color(), []);
+
+  useEffect(() => {
+    if (instancedMeshRef.current) {
+      instancedMeshRef.current.count = 0;
+    }
+  }, []);
 
   // Listen for new merges and spawn particle bursts
   useEffect(() => {
@@ -56,44 +62,49 @@ export function FusionParticles() {
     const tangentUp = new THREE.Vector3().crossVectors(normal, right).normalize();
 
     for (let i = 0; i < particleCount; i++) {
-      // Create circular distribution on the tangent plane
+      // Create circular distribution on the tangent plane (velocities in units/sec for 120Hz invariance)
       const angle = Math.random() * Math.PI * 2;
-      const speed = 0.01 + Math.random() * 0.02;
-      
+      const speed = (0.01 + Math.random() * 0.02) * 60;
+
       const velocity = new THREE.Vector3()
         .addScaledVector(right, Math.cos(angle))
         .addScaledVector(tangentUp, Math.sin(angle))
         .normalize()
         .multiplyScalar(speed)
         // Add a slight outward push away from the core
-        .addScaledVector(normal, 0.003 + Math.random() * 0.007);
+        .addScaledVector(normal, (0.003 + Math.random() * 0.007) * 60);
 
       particles.push({
         position: center.clone(),
         velocity,
         color: elColor.clone().multiplyScalar(0.8 + Math.random() * 0.4), // slight color variation
         scale: 0.02 + Math.random() * 0.03,
-        maxAge: 20 + Math.floor(Math.random() * 15), // frames
-        age: 0
+        maxAge: 0.33 + Math.random() * 0.25, // seconds
+        age: 0,
       });
     }
 
-    const newBurst: ParticleBurst = {
+    burstsRef.current.push({
       id: nextId.current++,
       center,
-      particles
-    };
-
-    const updated = [...burstsRef.current, newBurst];
-    burstsRef.current = updated;
-    setBursts(updated);
+      particles,
+    });
   }, [lastMerge, faces]);
 
-  useFrame(() => {
+  useFrame((_, rawDelta) => {
     const mesh = instancedMeshRef.current;
     if (!mesh) return;
 
-    let totalActiveParticles = 0;
+    if (burstsRef.current.length === 0) {
+      if (wasActiveRef.current) {
+        mesh.count = 0;
+        wasActiveRef.current = false;
+      }
+      return;
+    }
+
+    const delta = Math.min(rawDelta, 0.05);
+    const drag = Math.pow(0.93, delta * 60);
     const activeBursts: ParticleBurst[] = [];
 
     // 1. Update particle physics & filter out dead bursts
@@ -101,12 +112,12 @@ export function FusionParticles() {
       let burstHasLivingParticles = false;
       for (const p of burst.particles) {
         if (p.age < p.maxAge) {
-          // Apply friction/drag
-          p.velocity.multiplyScalar(0.93);
-          p.position.add(p.velocity);
-          p.age += 1;
-          totalActiveParticles++;
-          burstHasLivingParticles = true;
+          p.velocity.multiplyScalar(drag);
+          p.position.addScaledVector(p.velocity, delta);
+          p.age += delta;
+          if (p.age < p.maxAge) {
+            burstHasLivingParticles = true;
+          }
         }
       }
       if (burstHasLivingParticles) {
@@ -114,16 +125,14 @@ export function FusionParticles() {
       }
     }
 
-    if (activeBursts.length !== burstsRef.current.length) {
-      burstsRef.current = activeBursts;
-      setBursts(activeBursts);
-    }
+    burstsRef.current = activeBursts;
 
-    // 2. Set instanced positions, scales, and colors
+    // 2. Set instanced positions, scales, and colors for active particles only
     let idx = 0;
+    const maxCapacity = 500;
     for (const burst of activeBursts) {
       for (const p of burst.particles) {
-        if (p.age < p.maxAge) {
+        if (p.age < p.maxAge && idx < maxCapacity) {
           const progress = p.age / p.maxAge;
           const currentScale = p.scale * (1.0 - progress);
 
@@ -132,7 +141,7 @@ export function FusionParticles() {
           tempObject.updateMatrix();
 
           mesh.setMatrixAt(idx, tempObject.matrix);
-          
+
           // Ethereal glowing fade out
           tempColor.copy(p.color).multiplyScalar(1.0 - progress);
           mesh.setColorAt(idx, tempColor);
@@ -142,18 +151,13 @@ export function FusionParticles() {
       }
     }
 
-    // Hide any unused instance indices by positioning them far away
-    const maxCapacity = 500;
-    tempObject.position.set(9999, 9999, 9999);
-    tempObject.scale.set(0, 0, 0);
-    tempObject.updateMatrix();
-    for (let i = idx; i < maxCapacity; i++) {
-      mesh.setMatrixAt(i, tempObject.matrix);
-    }
-
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) {
-      mesh.instanceColor.needsUpdate = true;
+    mesh.count = idx;
+    wasActiveRef.current = idx > 0;
+    if (idx > 0) {
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) {
+        mesh.instanceColor.needsUpdate = true;
+      }
     }
   });
 

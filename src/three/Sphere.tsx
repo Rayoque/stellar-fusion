@@ -6,6 +6,7 @@ import { useGameStore } from '../game/state';
 import { Tile } from './Tile';
 import { AnimatedTile } from './AnimatedTile';
 import { SlideTrail } from './SlideTrail';
+import { DragPreviewTrail } from './DragPreviewTrail';
 import { FusionParticles } from './FusionParticles';
 
 function hexToRgb(hex: string) {
@@ -101,6 +102,7 @@ export function Sphere() {
       default:            return msColor;   // Mass-dependent Main Sequence color
     }
   }, [phase, msColor, endState]);
+  const auraThreeColor = React.useMemo(() => new THREE.Color(auraColor), [auraColor]);
 
   useFrame((state, delta) => {
     const elapsed = state.clock.getElapsedTime();
@@ -139,8 +141,8 @@ export function Sphere() {
           mat.emissive.set('#000000');
           mat.emissiveIntensity = 0;
         } else {
-          mat.color.set(new THREE.Color(auraColor));
-          mat.emissive.set(new THREE.Color(auraColor));
+          mat.color.copy(auraThreeColor);
+          mat.emissive.copy(auraThreeColor);
           if (phase === 'red_giant') {
             mat.emissiveIntensity = 0.65 + Math.sin(elapsed * 1.5) * 0.15; // Slow, breathing pulse
           } else if (phase === 'supergiant') {
@@ -285,6 +287,7 @@ export function Sphere() {
       ))}
       <AnimatedTile />
       <SlideTrail />
+      <DragPreviewTrail />
       <FusionParticles />
     </group>
   );

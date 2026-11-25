@@ -4,10 +4,12 @@ import { TrackballControls } from '@react-three/drei';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../game/state';
+import { ELEMENTS } from '../game/elements';
+import { previewSlide } from '../game/engine';
 import { resolveSlideTarget } from '../geometry/slide';
 import { SCORE_VALUES } from '../game/rules';
 import { setCameraPos } from './cameraState';
-import { playSpawnTick } from '../audio/synth';
+import { playSpawnTick, hapticSelection } from '../audio/synth';
 
 // Sphere scale per phase (mirrors Sphere.tsx's phaseScale).
 function phaseSphereScale(phase: string): number {
@@ -60,7 +62,7 @@ export function Controls() {
   const { camera, gl, scene, size } = useThree();
   const startDrag = useGameStore(s => s.startDrag);
   const endDrag = useGameStore(s => s.endDrag);
-  const setDragTargetId = useGameStore(s => s.setDragTargetId);
+  const setDragPreview = useGameStore(s => s.setDragPreview);
   const faces = useGameStore(s => s.faces);
   const tiles = useGameStore(s => s.tiles);
   const isAnimating = useGameStore(s => s.isAnimating);
@@ -68,6 +70,8 @@ export function Controls() {
 
   const dragStartFaceId = useRef<number | null>(null);
   const dragStartPos = useRef<THREE.Vector3 | null>(null);
+  const dragStartClient = useRef<{ x: number; y: number } | null>(null);
+  const lastPreviewFirstStep = useRef<number | null>(null);
   const [isDraggingTile, setIsDraggingTile] = React.useState(false);
   const [isPointerDownOnTile, setIsPointerDownOnTile] = React.useState(false);
   const [isPointerDownOnTileCandidate, setIsPointerDownOnTileCandidate] = React.useState(false);
@@ -547,9 +551,12 @@ export function Controls() {
         lastTapTime = 0;
         dragStartFaceId.current = null;
         dragStartPos.current = null;
+        dragStartClient.current = null;
+        lastPreviewFirstStep.current = null;
         setIsDraggingTile(false);
         setIsPointerDownOnTile(false);
         setIsPointerDownOnTileCandidate(false);
+        setDragPreview(null);
         useGameStore.setState({ selectedFaceId: null, dragOffset3D: null });
         return;
       }
@@ -568,8 +575,11 @@ export function Controls() {
       if ((window as any).isOrbitingFromHUD === true) {
         dragStartFaceId.current = null;
         dragStartPos.current = null;
+        dragStartClient.current = null;
+        lastPreviewFirstStep.current = null;
         setIsDraggingTile(false);
         setIsPointerDownOnTile(false);
+        setDragPreview(null);
         return;
       }
 
@@ -603,8 +613,10 @@ export function Controls() {
         }
       }
 
-      // Only begin tracking a drag if the clicked face actually has an active tile on it!
-      if (hitFaceId !== null && tiles.has(hitFaceId)) {
+      // Only begin tracking a drag if the clicked face actually has a movable tile on it!
+      const hitTile = hitFaceId !== null ? tiles.get(hitFaceId) : undefined;
+      const hitSlideDistance = hitTile ? (ELEMENTS[hitTile.element]?.slideDistance ?? 0) : 0;
+      if (hitFaceId !== null && hitTile && hitSlideDistance > 0) {
         const fromFace = faces[hitFaceId];
         if (fromFace) {
           // Calculate if the tile is clearly in the foreground relative to the camera
@@ -616,6 +628,8 @@ export function Controls() {
           if (dot <= 0.08) {
             dragStartFaceId.current = null;
             dragStartPos.current = null;
+            dragStartClient.current = null;
+            lastPreviewFirstStep.current = null;
             setIsDraggingTile(false);
             setIsPointerDownOnTile(false);
             setIsPointerDownOnTileCandidate(false);
@@ -625,11 +639,15 @@ export function Controls() {
 
         dragStartFaceId.current = hitFaceId;
         dragStartPos.current = new THREE.Vector3(x, y, 0);
+        dragStartClient.current = { x: event.clientX, y: event.clientY };
+        lastPreviewFirstStep.current = null;
         setIsPointerDownOnTileCandidate(true);
         // Do NOT set isPointerDownOnTile or startDrag yet to check gesture alignment
       } else {
         dragStartFaceId.current = null;
         dragStartPos.current = null;
+        dragStartClient.current = null;
+        lastPreviewFirstStep.current = null;
         setIsDraggingTile(false);
         setIsPointerDownOnTile(false);
         setIsPointerDownOnTileCandidate(false);
@@ -637,25 +655,19 @@ export function Controls() {
     };
 
     const onPointerMove = (event: PointerEvent) => {
-      if (dragStartPos.current === null || dragStartFaceId.current === null || isAnimating) return;
+      if (dragStartPos.current === null || dragStartClient.current === null || dragStartFaceId.current === null || isAnimating) return;
 
       const rect = dom.getBoundingClientRect();
-      const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      const dxPx = event.clientX - dragStartClient.current.x;
+      const dyPx = -(event.clientY - dragStartClient.current.y);
+      const distPx = Math.hypot(dxPx, dyPx);
 
-      const deltaXTouch = x - dragStartPos.current.x;
-      const deltaYTouch = y - dragStartPos.current.y;
-      const distFromTouch = Math.sqrt(deltaXTouch * deltaXTouch + deltaYTouch * deltaYTouch);
-
-      // GESTURE CLASSIFIER: Check if swipe is aligned with valid tile sliding corridor
+      // GESTURE CLASSIFIER: Check if swipe is aligned with valid tile sliding corridor (aspect-invariant CSS pixels)
       if (!isDraggingTile && !isPointerDownOnTile) {
-        if (distFromTouch > 0.04) {
+        if (distPx > 10) {
           const fromFace = faces[dragStartFaceId.current];
           if (fromFace) {
-            const dragVec = new THREE.Vector3(x - dragStartPos.current.x, y - dragStartPos.current.y, 0);
-            const aspect = rect.width / rect.height;
-            const dragVecCorrected = new THREE.Vector3(dragVec.x * aspect, dragVec.y, 0);
-            const dragDir = dragVecCorrected.clone().transformDirection(camera.matrixWorld).normalize();
+            const dragDir = new THREE.Vector3(dxPx, dyPx, 0).transformDirection(camera.matrixWorld).normalize();
 
             // Tangent projection check
             const normal = new THREE.Vector3(fromFace.tangentFrame.n.x, fromFace.tangentFrame.n.y, fromFace.tangentFrame.n.z);
@@ -673,12 +685,13 @@ export function Controls() {
               }
             }
 
-            // Lock to sliding only if highly aligned (bestDot > 0.82)
-            if (bestDot > 0.82) {
+            // Forgiving lock threshold (0.55 handles pentagon 36° midpoints and rim foreshortening)
+            if (bestDot > 0.55) {
               setIsDraggingTile(true);
               setIsPointerDownOnTile(true);
               setIsPointerDownOnTileCandidate(false);
               startDrag(dragStartFaceId.current);
+              hapticSelection();
               try {
                 dom.setPointerCapture(event.pointerId);
               } catch (err) {}
@@ -686,9 +699,12 @@ export function Controls() {
               // Treated as board rotation. Cancel slide tracking.
               dragStartFaceId.current = null;
               dragStartPos.current = null;
+              dragStartClient.current = null;
+              lastPreviewFirstStep.current = null;
               setIsDraggingTile(false);
               setIsPointerDownOnTile(false);
               setIsPointerDownOnTileCandidate(false);
+              setDragPreview(null);
               useGameStore.setState({ selectedFaceId: null });
               return;
             }
@@ -701,33 +717,40 @@ export function Controls() {
       const fromFace = faces[dragStartFaceId.current];
       if (!fromFace) return;
 
-      // Project the center of the starting tile onto the screen in NDC to get a fixed origin point (joystick center)
+      // Project the center of the starting tile into CSS pixels to get a fixed, aspect-invariant joystick origin
       const faceCenter = new THREE.Vector3(fromFace.center.x, fromFace.center.y, fromFace.center.z);
       const projectedCenter = faceCenter.project(camera);
+      const centerPxX = rect.left + (projectedCenter.x * 0.5 + 0.5) * rect.width;
+      const centerPxY = rect.top + (-projectedCenter.y * 0.5 + 0.5) * rect.height;
+      const dxFromCenterPx = event.clientX - centerPxX;
+      const dyFromCenterPx = -(event.clientY - centerPxY);
+      const distFromCenterPx = Math.hypot(dxFromCenterPx, dyFromCenterPx);
 
-      // Calculate the drag vector and distance relative to the projected center of the tile
-      const dragVec = new THREE.Vector3(x - projectedCenter.x, y - projectedCenter.y, 0);
-      const distFromCenter = dragVec.length();
-
-      // Aspect-correct before deriving a world direction: NDC x/y both span [-1,1], so on a
-      // non-square (e.g. portrait phone) viewport the horizontal axis is over-weighted, which
-      // skews the resolved slide direction (notably making upward drags read sideways).
-      const aspect = rect.width / rect.height;
-      const dragVecCorrected = new THREE.Vector3(dragVec.x * aspect, dragVec.y, 0);
-
-      // If they drag their finger back close to the center of the tile (distFromCenter < 0.07),
-      // clear the drag target indicator to show that releasing will cancel the swipe.
-      if (distFromCenter < 0.07) {
-        setDragTargetId(null);
+      // If they drag their finger back close to the center of the tile (< 20px),
+      // clear the drag preview to show that releasing will cancel the swipe.
+      if (distFromCenterPx < 20) {
+        if (lastPreviewFirstStep.current !== null) {
+          lastPreviewFirstStep.current = null;
+          setDragPreview(null);
+          hapticSelection();
+        }
       } else {
-        const dragDir = dragVecCorrected.clone().transformDirection(camera.matrixWorld).normalize();
-        const nextId = resolveSlideTarget(fromFace, { x: dragDir.x, y: dragDir.y, z: dragDir.z }, faces);
-        setDragTargetId(nextId);
+        const dragDir = new THREE.Vector3(dxFromCenterPx, dyFromCenterPx, 0).transformDirection(camera.matrixWorld).normalize();
+        const dragWorld = { x: dragDir.x, y: dragDir.y, z: dragDir.z };
+        const nextId = resolveSlideTarget(fromFace, dragWorld, faces);
+        if (nextId !== lastPreviewFirstStep.current) {
+          lastPreviewFirstStep.current = nextId;
+          const preview = previewSlide(useGameStore.getState(), dragStartFaceId.current, dragWorld);
+          setDragPreview(preview);
+          hapticSelection();
+        }
       }
 
-      // Calculate a subtler 3D pull displacement based on the drag vector from the tile's center.
-      // We transform it into world space to align with the camera viewport.
-      const pullVec = dragVecCorrected.clone().transformDirection(camera.matrixWorld).multiplyScalar(0.4);
+      // Calculate a subtle 3D pull displacement normalized by viewport narrow dimension
+      const minDim = Math.max(1, Math.min(rect.width, rect.height));
+      const pullVec = new THREE.Vector3(dxFromCenterPx / minDim, dyFromCenterPx / minDim, 0)
+        .transformDirection(camera.matrixWorld)
+        .multiplyScalar(0.8);
       if (pullVec.length() > 0.10) {
         pullVec.setLength(0.10); // clamped to 0.10 for local cell boundaries
       }
@@ -745,16 +768,19 @@ export function Controls() {
       const clickDist = Math.hypot(event.clientX - pointerDownX, event.clientY - pointerDownY);
       const isEditorMode = useGameStore.getState().isEditorMode;
 
-      if (isEditorMode && clickDuration < 300 && clickDist < 8 && pointerDownFaceId !== null) {
+      if (event.type !== 'pointercancel' && isEditorMode && clickDuration < 300 && clickDist < 8 && pointerDownFaceId !== null) {
         const applyBrush = useGameStore.getState().applyEditorBrush;
         if (applyBrush) {
           applyBrush(pointerDownFaceId);
         }
         dragStartFaceId.current = null;
         dragStartPos.current = null;
+        dragStartClient.current = null;
+        lastPreviewFirstStep.current = null;
         setIsDraggingTile(false);
         setIsPointerDownOnTile(false);
         setIsPointerDownOnTileCandidate(false);
+        setDragPreview(null);
         useGameStore.setState({ selectedFaceId: null });
         return;
       }
@@ -769,43 +795,39 @@ export function Controls() {
       setIsPointerDownOnTileCandidate(false);
       dragStartFaceId.current = null;
       dragStartPos.current = null;
-      setDragTargetId(null);
+      dragStartClient.current = null;
+      lastPreviewFirstStep.current = null;
+      setDragPreview(null);
       useGameStore.setState({ dragOffset3D: null });
 
-      if (!wasDragging || startFaceId === null || startPos === null || isAnimating) {
+      if (event.type === 'pointercancel' || !wasDragging || startFaceId === null || startPos === null || isAnimating) {
         useGameStore.setState({ selectedFaceId: null });
         return;
       }
 
       const rect = dom.getBoundingClientRect();
-      const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
       const fromFace = faces[startFaceId];
       if (!fromFace) {
         useGameStore.setState({ selectedFaceId: null });
         return;
       }
 
-      // Project the tile center to calculate final cancel / swipe distance
+      // Project the tile center to CSS pixels for consistent cancel & direction calculation
       const faceCenter = new THREE.Vector3(fromFace.center.x, fromFace.center.y, fromFace.center.z);
       const projectedCenter = faceCenter.project(camera);
-      const dragVec = new THREE.Vector3(x - projectedCenter.x, y - projectedCenter.y, 0);
-      const distFromCenter = dragVec.length();
+      const centerPxX = rect.left + (projectedCenter.x * 0.5 + 0.5) * rect.width;
+      const centerPxY = rect.top + (-projectedCenter.y * 0.5 + 0.5) * rect.height;
+      const dxFromCenterPx = event.clientX - centerPxX;
+      const dyFromCenterPx = -(event.clientY - centerPxY);
+      const distFromCenterPx = Math.hypot(dxFromCenterPx, dyFromCenterPx);
 
-      // DELIBERATE SWIPE CANCELLATION CHECK:
-      // If the release position is close to the tile center (distFromCenter < 0.07),
-      // it means the player dragged their finger back over the starting shape.
-      // We cancel the swipe, clear store drag targets, and return early.
-      if (distFromCenter < 0.07) {
+      // DELIBERATE SWIPE CANCELLATION CHECK (< 20px from tile center)
+      if (distFromCenterPx < 20) {
         useGameStore.setState({ selectedFaceId: null });
         return;
       }
 
-      // Aspect-correct so the released direction matches true on-screen pixel direction
-      // (see onPointerMove) — keeps the committed slide consistent with the live preview.
-      const aspect = rect.width / rect.height;
-      const dragDir = new THREE.Vector3(dragVec.x * aspect, dragVec.y, 0)
+      const dragDir = new THREE.Vector3(dxFromCenterPx, dyFromCenterPx, 0)
         .transformDirection(camera.matrixWorld)
         .normalize();
       endDrag(startFaceId, { x: dragDir.x, y: dragDir.y, z: dragDir.z });
@@ -822,7 +844,7 @@ export function Controls() {
       dom.removeEventListener('pointerup', onPointerUp);
       dom.removeEventListener('pointercancel', onPointerUp);
     };
-  }, [camera, gl, scene, startDrag, endDrag, setDragTargetId, faces, tiles, isAnimating, isDraggingTile, isPointerDownOnTile]);
+  }, [camera, gl, scene, startDrag, endDrag, setDragPreview, faces, tiles, isAnimating, isDraggingTile, isPointerDownOnTile]);
 
   const showControls = !(isAnimating || isDraggingTile || isPointerDownOnTile || isPointerDownOnTileCandidate);
 
